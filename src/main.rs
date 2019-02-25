@@ -1,7 +1,6 @@
 //! # Main
 //!
 //! Main daemon entry
-//!
 
 extern crate coordinator;
 

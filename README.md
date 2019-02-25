@@ -1,3 +1,3 @@
-# Guardnode Coordinator
+# Coordinator
 
-Guardnode Coordinator implementation for the Commerceblock Covalence system
+Implementation of the Coordinator daemon, responsible for verifying the operation of Guardnodes in the Commerceblock Covalence system

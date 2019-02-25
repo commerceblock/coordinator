@@ -1,7 +1,6 @@
 //! # Coordinator Library
 //!
 //! Basic functionality required by Coordinator daemon
-//!
 
 // Coding conventions
 #![deny(non_upper_case_globals)]

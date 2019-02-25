@@ -7,4 +7,3 @@
 pub fn run() {
     println!("Running Coordinator daemon!");
 }
-
