@@ -7,3 +7,5 @@ homepage = "https://github.com/commerceblock"
 repository = "https://github.com/commerceblock/coordinator"
 
 [dependencies]
+rust-ocean = { git = "https://github.com/commerceblock/rust-ocean"}
+ocean-rpc = { git = "https://github.com/commerceblock/rust-ocean-rpc"}
