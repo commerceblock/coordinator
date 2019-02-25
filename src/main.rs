@@ -6,5 +6,5 @@
 extern crate coordinator;
 
 fn main() {
-    println!("Hello, Coordinator!");
+    coordinator::daemon::run();
 }
