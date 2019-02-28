@@ -6,6 +6,7 @@ use bitcoin::util::hash::Sha256dHash;
 
 /// Request struct storing info on client request and modelling data that need
 /// to be stored
+#[derive(Debug)]
 pub struct Request {
     /// Request start block height
     pub start_blockheight: u32,
@@ -28,6 +29,7 @@ pub struct Request {
 // }
 
 /// Bid struct storing successful bids and modelling data that need to be stored
+#[derive(Debug)]
 pub struct Bid {
     /// Ocean transaction ID of the bid transaction
     pub txid: Sha256dHash,

@@ -4,7 +4,8 @@
 
 use bitcoin::util::hash::Sha256dHash;
 use ocean_rpc::Client;
-use request::{Bid, Request};
+
+use crate::request::{Bid, Request};
 
 /// Service trait defining functionality for interfacing with service chain
 pub trait Service {
@@ -61,12 +62,26 @@ impl Service for MockService {
     }
 
     /// Try get active request, by genesis hash, from service chain
-    fn get_request(&self, _hash: &Sha256dHash) -> Result<Option<Request>, &str> {
-        Ok(None)
+    fn get_request(&self, hash: &Sha256dHash) -> Result<Option<Request>, &str> {
+        let dummy_req = Request {
+            start_blockheight: 1,
+            end_blockheight: 3,
+            genesis_blockhash: *hash,
+            fee_percentage: 5,
+            num_tickets: 10,
+        };
+
+        Ok(Some(dummy_req))
     }
 
     /// Try get active request bids, by genesis hash, from service chain
     fn get_request_bids(&self, _hash: &Sha256dHash) -> Result<Option<Vec<Bid>>, &str> {
-        Ok(None)
+        let dummy_bid = Bid {
+            txid: Sha256dHash::from_hex(
+                "1234567890000000000000000000000000000000000000000000000000000000",
+            )
+            .unwrap(),
+        };
+        Ok(Some(vec![dummy_bid]))
     }
 }

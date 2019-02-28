@@ -13,11 +13,15 @@
 #![warn(unused_extern_crates)]
 #![warn(unused_import_braces)]
 #![warn(unused_results)]
+#![allow(unused_imports)] // alow this for now - remove later
 #![allow(dead_code)] // alow this for now - remove later
+
+#[macro_use]
+extern crate log as _log; // TODO: add logger
 
 extern crate bitcoin;
 extern crate ocean_rpc;
-//extern crate rust_ocean as ocean;
+extern crate rust_ocean as _ocean;
 
 pub mod daemon;
 pub mod request;

@@ -7,6 +7,7 @@ homepage = "https://github.com/commerceblock"
 repository = "https://github.com/commerceblock/coordinator"
 
 [dependencies]
+log = { version = "0.4" }
 rust-ocean = { git = "https://github.com/commerceblock/rust-ocean"}
 ocean-rpc = { git = "https://github.com/commerceblock/rust-ocean-rpc"}
 bitcoin = { version = "0.15", features = [ "serde" ] }
