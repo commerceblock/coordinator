@@ -13,7 +13,7 @@
 #![warn(unused_extern_crates)]
 #![warn(unused_import_braces)]
 #![warn(unused_results)]
-#![allow(dead_code)]    // alow this for now - remove later
+#![allow(dead_code)] // alow this for now - remove later
 
 extern crate bitcoin;
 extern crate ocean_rpc;
