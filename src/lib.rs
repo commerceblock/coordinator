@@ -13,8 +13,12 @@
 #![warn(unused_extern_crates)]
 #![warn(unused_import_braces)]
 #![warn(unused_results)]
+#![allow(dead_code)]    // alow this for now - remove later
 
+extern crate bitcoin;
 extern crate ocean_rpc;
-extern crate rust_ocean;
+//extern crate rust_ocean as ocean;
 
 pub mod daemon;
+pub mod request;
+pub mod service;
