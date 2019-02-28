@@ -9,8 +9,12 @@ if [ $? != 0 ]; then
 fi
 
 $CARGO_FMT -- --check
-if [ $? != 0 ]; then
+result=$?
+
+if [ $result != 0 ]; then
     printf "[pre_commit] $CARGO_FMT → \033[0;31merror\033[0m \n"
 else
     printf "[pre_commit] $CARGO_FMT → \033[0;32mOK\033[0m \n"
 fi
+
+exit $result
