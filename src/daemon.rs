@@ -4,10 +4,11 @@
 
 use bitcoin::util::hash::{HexError, Sha256dHash};
 
+use crate::error::{CError, Result};
 use crate::service::{MockService, Service};
 
 /// Run method
-pub fn run() -> Result<(), &'static str> {
+pub fn run() -> Result<()> {
     println!("Running Coordinator daemon!");
 
     let genesis_hash =
@@ -15,17 +16,16 @@ pub fn run() -> Result<(), &'static str> {
             .unwrap();
 
     let service = MockService {};
-    let service_req = service.get_request(&genesis_hash).unwrap();
+    let service_req = service.get_request(&genesis_hash)?;
     match service_req {
         Some(req) => {
             println! {"Received request: {:?}", req};
-            let service_bids = service.get_request_bids(&genesis_hash).unwrap();
-            match service_bids {
-                Some(bids) => println! {"and bids: {:?}", bids},
-                _ => (),
+            let service_bids = service.get_request_bids(&genesis_hash)?;
+            if let Some(bids) = service_bids {
+                println! {"and bids: {:?}", bids}
             }
         }
-        _ => (),
+        _ => return Err(CError::Service("No requests found")),
     }
     Ok(())
 }

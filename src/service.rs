@@ -5,18 +5,19 @@
 use bitcoin::util::hash::Sha256dHash;
 use ocean_rpc::Client;
 
+use crate::error::Result;
 use crate::request::{Bid, Request};
 
 /// Service trait defining functionality for interfacing with service chain
 pub trait Service {
     /// Get all active requests, if any, from service chain
-    fn get_requests(&self) -> Result<Option<Vec<Request>>, &str>;
+    fn get_requests(&self) -> Result<Option<Vec<Request>>>;
 
     /// Try get active request, by genesis hash, from service chain
-    fn get_request(&self, hash: &Sha256dHash) -> Result<Option<Request>, &str>;
+    fn get_request(&self, hash: &Sha256dHash) -> Result<Option<Request>>;
 
     /// Try get active request bids, by genesis hash, from service chain
-    fn get_request_bids(&self, hash: &Sha256dHash) -> Result<Option<Vec<Bid>>, &str>;
+    fn get_request_bids(&self, hash: &Sha256dHash) -> Result<Option<Vec<Bid>>>;
 }
 
 /// Rpc implementation of Service using an underlying ocean rpc connection
@@ -57,12 +58,12 @@ pub struct MockService {}
 
 impl Service for MockService {
     /// Get all active requests, if any, from service chain
-    fn get_requests(&self) -> Result<Option<Vec<Request>>, &str> {
+    fn get_requests(&self) -> Result<Option<Vec<Request>>> {
         Ok(None)
     }
 
     /// Try get active request, by genesis hash, from service chain
-    fn get_request(&self, hash: &Sha256dHash) -> Result<Option<Request>, &str> {
+    fn get_request(&self, hash: &Sha256dHash) -> Result<Option<Request>> {
         let dummy_req = Request {
             start_blockheight: 1,
             end_blockheight: 3,
@@ -75,7 +76,7 @@ impl Service for MockService {
     }
 
     /// Try get active request bids, by genesis hash, from service chain
-    fn get_request_bids(&self, _hash: &Sha256dHash) -> Result<Option<Vec<Bid>>, &str> {
+    fn get_request_bids(&self, _hash: &Sha256dHash) -> Result<Option<Vec<Bid>>> {
         let dummy_bid = Bid {
             txid: Sha256dHash::from_hex(
                 "1234567890000000000000000000000000000000000000000000000000000000",

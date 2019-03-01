@@ -24,5 +24,6 @@ extern crate ocean_rpc;
 extern crate rust_ocean as _ocean;
 
 pub mod daemon;
+pub mod error;
 pub mod request;
 pub mod service;
