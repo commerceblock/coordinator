@@ -17,7 +17,7 @@
 #![allow(dead_code)] // alow this for now - remove later
 
 #[macro_use]
-extern crate log as _log; // TODO: add logger
+extern crate log;
 
 extern crate bitcoin;
 extern crate ocean_rpc;

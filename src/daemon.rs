@@ -9,7 +9,7 @@ use crate::service::{MockService, Service};
 
 /// Run method
 pub fn run() -> Result<()> {
-    println!("Running Coordinator daemon!");
+    info!("Running Coordinator daemon!");
 
     let genesis_hash =
         Sha256dHash::from_hex("73902d2a365fff2724e26d975148124268ec6a84991016683817ea2c973b199b")
@@ -19,10 +19,12 @@ pub fn run() -> Result<()> {
     let service_req = service.get_request(&genesis_hash)?;
     match service_req {
         Some(req) => {
-            println! {"Received request: {:?}", req};
+            info! {"Received request: {:?}", req};
             let service_bids = service.get_request_bids(&genesis_hash)?;
             if let Some(bids) = service_bids {
-                println! {"and bids: {:?}", bids}
+                info! {"and bids: {:?}", bids}
+            } else {
+                warn! {"no bids found"}
             }
         }
         _ => return Err(CError::Service("No requests found")),
