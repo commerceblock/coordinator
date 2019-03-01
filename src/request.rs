@@ -3,6 +3,7 @@
 //! Service request models for client requests and bids
 
 use bitcoin::util::hash::Sha256dHash;
+use secp256k1::key::PublicKey;
 
 /// Request struct storing info on client request and modelling data that need
 /// to be stored
@@ -33,6 +34,8 @@ pub struct Request {
 pub struct Bid {
     /// Ocean transaction ID of the bid transaction
     pub txid: Sha256dHash,
+    /// Bid owner verification public key
+    pub pubkey: PublicKey,
 }
 
 // TODO

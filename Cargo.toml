@@ -13,3 +13,4 @@ env_logger = "0.6"
 rust-ocean = { git = "https://github.com/commerceblock/rust-ocean"}
 ocean-rpc = { git = "https://github.com/commerceblock/rust-ocean-rpc"}
 bitcoin = { version = "0.15", features = [ "serde" ] }
+secp256k1 = "0.12.2"
