@@ -25,7 +25,7 @@ extern crate ocean_rpc;
 extern crate rust_ocean as _ocean;
 extern crate secp256k1;
 
-pub mod challenger;
+pub mod challenge;
 pub mod clientchain;
 pub mod coordinator;
 pub mod error;

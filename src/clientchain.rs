@@ -2,10 +2,11 @@
 //!
 //! Client chain interface and implementations
 
+use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
+
 use bitcoin::util::hash::Sha256dHash;
 use bitcoin_hashes::hex::ToHex;
 use ocean_rpc::Client;
-use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
 
 use crate::error::Result;
 
