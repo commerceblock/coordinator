@@ -3,7 +3,7 @@
 //! Service chain interface and implementations
 
 use bitcoin::util::hash::Sha256dHash;
-use bitcoin::util::misc;
+use bitcoin_hashes::hex::FromHex;
 use ocean_rpc::Client;
 use secp256k1::key::PublicKey;
 
@@ -85,7 +85,7 @@ impl Service for MockService {
             )
             .unwrap(),
             pubkey: PublicKey::from_slice(
-                &misc::hex_bytes(
+                &Vec::<u8>::from_hex(
                     "03356190524d52d7e94e1bd43e8f23778e585a4fe1f275e65a06fa5ceedb67d2f3",
                 )
                 .unwrap(),

@@ -20,10 +20,12 @@
 extern crate log;
 
 extern crate bitcoin;
+extern crate bitcoin_hashes;
 extern crate ocean_rpc;
 extern crate rust_ocean as _ocean;
 extern crate secp256k1;
 
+pub mod clientchain;
 pub mod daemon;
 pub mod error;
 pub mod request;
