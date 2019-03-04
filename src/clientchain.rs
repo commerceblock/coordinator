@@ -5,6 +5,7 @@
 use bitcoin::util::hash::Sha256dHash;
 use bitcoin_hashes::hex::ToHex;
 use ocean_rpc::Client;
+use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
 
 use crate::error::Result;
 
@@ -39,7 +40,10 @@ pub struct MockClientChain {}
 impl ClientChain for MockClientChain {
     /// Get client chain blockheight
     fn get_blockheight(&self) -> Result<u64> {
-        Ok(0)
+        // Mock implementation increments a static counter
+        // each time this method is called
+        static HEIGHT: AtomicUsize = ATOMIC_USIZE_INIT;
+        Ok(HEIGHT.fetch_add(1, Ordering::SeqCst) as u64)
     }
 
     /// Send challenge transaction to client chain

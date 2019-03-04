@@ -67,8 +67,8 @@ impl Service for MockService {
     /// Try get active request, by genesis hash, from service chain
     fn get_request(&self, hash: &Sha256dHash) -> Result<Option<Request>> {
         let dummy_req = Request {
-            start_blockheight: 1,
-            end_blockheight: 3,
+            start_blockheight: 2,
+            end_blockheight: 5,
             genesis_blockhash: *hash,
             fee_percentage: 5,
             num_tickets: 10,

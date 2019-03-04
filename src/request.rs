@@ -10,9 +10,9 @@ use secp256k1::key::PublicKey;
 #[derive(Debug)]
 pub struct Request {
     /// Request start block height
-    pub start_blockheight: u32,
+    pub start_blockheight: usize,
     /// Request end block height
-    pub end_blockheight: u32,
+    pub end_blockheight: usize,
     /// Genesis blockhash of client issuing request
     pub genesis_blockhash: Sha256dHash,
     /// Fee percentage for Guardnodes set by client

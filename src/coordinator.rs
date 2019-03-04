@@ -15,5 +15,5 @@ pub fn run() -> Result<()> {
     let service = MockService {};
     let clientchain = MockClientChain {};
 
-    ::challenger::run_challenger(service, clientchain)
+    ::challenger::run_challenger(&service, &clientchain)
 }
