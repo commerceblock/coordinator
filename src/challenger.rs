@@ -44,20 +44,29 @@ pub fn run_request_challenge<T: Service, K: ClientChain>(
     }
 }
 
+/// Check if a request is ready to initiate challenging
+pub fn check_request(request: &Request, height: u64) -> Result<bool> {
+    if request.start_blockheight <= height as usize {
+        return Ok(true);
+    }
+    Ok(false)
+}
+
 /// Run challenger main method
 pub fn run_challenger<T: Service, K: ClientChain>(service: &T, clientchain: &K) -> Result<()> {
     // hardcoded genesis hash for now
+    // TODO: from config
     let genesis_hash =
         Sha256dHash::from_hex("73902d2a365fff2724e26d975148124268ec6a84991016683817ea2c973b199b")
             .unwrap();
 
-    info!("Running challenger!");
+    info!("Challenger reporting!");
     loop {
         let get_req = service.get_request(&genesis_hash)?;
         match get_req {
             Some(req) => {
                 let height = clientchain.get_blockheight()?;
-                if req.start_blockheight <= height as usize {
+                if check_request(&req, height)? {
                     run_request_challenge(service, clientchain, &genesis_hash, req)?;
                     break;
                 } else {
