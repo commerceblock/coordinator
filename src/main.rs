@@ -13,7 +13,7 @@ fn main() {
     // To see results set RUST_LOG to one of the following:
     // info, warning, debug, error, coordinator(for all)
     env_logger::init();
-    if let Err(e) = coordinator::daemon::run() {
+    if let Err(e) = coordinator::coordinator::run() {
         error!("daemon failure: {}", e);
         process::exit(1);
     }

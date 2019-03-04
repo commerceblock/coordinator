@@ -17,8 +17,8 @@ pub type Result<T> = result::Result<T, CError>;
 pub enum CError {
     /// Inherit all errors from ocean rpc
     OceanRpc(OceanRpcError),
-    /// Service error
-    Service(&'static str),
+    /// Coordinator error
+    Coordinator(&'static str),
 }
 
 impl From<OceanRpcError> for CError {
@@ -29,7 +29,7 @@ impl From<OceanRpcError> for CError {
 
 impl From<&'static str> for CError {
     fn from(e: &'static str) -> CError {
-        CError::Service(e)
+        CError::Coordinator(e)
     }
 }
 
@@ -37,7 +37,7 @@ impl fmt::Display for CError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             CError::OceanRpc(ref e) => write!(f, "ocean rpc error: {}", e),
-            CError::Service(ref e) => write!(f, "service error: {}", e),
+            CError::Coordinator(ref e) => write!(f, "service error: {}", e),
         }
     }
 }
@@ -46,14 +46,14 @@ impl error::Error for CError {
     fn description(&self) -> &str {
         match *self {
             CError::OceanRpc(_) => "ocean rpc error",
-            CError::Service(_) => "service error",
+            CError::Coordinator(_) => "service error",
         }
     }
 
     fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         match *self {
             CError::OceanRpc(ref e) => Some(e),
-            CError::Service(_) => None,
+            CError::Coordinator(_) => None,
         }
     }
 }

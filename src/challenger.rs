@@ -1,21 +1,21 @@
-//! Daemon
+//! Challenger
 //!
-//! Coordinator daemon run implementation
+//! Challenger entry point
 
 use bitcoin::util::hash::{HexError, Sha256dHash};
 
-use crate::error::{CError, Result};
-use crate::service::{MockService, Service};
+use clientchain::ClientChain;
+use error::{CError, Result};
+use service::Service;
 
-/// Run method
-pub fn run() -> Result<()> {
-    info!("Running Coordinator daemon!");
+/// Run challenger main method
+pub fn run_challenger<T: Service, K: ClientChain>(service: T, clientchain: K) -> Result<()> {
+    info!("Running challenger!");
 
     let genesis_hash =
         Sha256dHash::from_hex("73902d2a365fff2724e26d975148124268ec6a84991016683817ea2c973b199b")
             .unwrap();
 
-    let service = MockService {};
     let service_req = service.get_request(&genesis_hash)?;
     match service_req {
         Some(req) => {
@@ -27,7 +27,10 @@ pub fn run() -> Result<()> {
                 warn! {"no bids found"}
             }
         }
-        _ => return Err(CError::Service("No requests found")),
+        _ => return Err(CError::Coordinator("No requests found")),
     }
     Ok(())
 }
+
+// TODO
+// Challenger struct ?
