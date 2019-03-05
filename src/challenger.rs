@@ -3,11 +3,13 @@
 //! Methods and models for fetching, structuring and running challenge requests
 
 use std::rc::Rc;
+use std::sync::mpsc::Receiver;
 use std::{thread, time};
 
 use bitcoin::util::hash::{HexError, Sha256dHash};
 
 use crate::clientchain::ClientChain;
+use crate::coordinator;
 use crate::error::{CError, Result};
 use crate::request::{Bid, Request};
 use crate::service::Service;
@@ -18,6 +20,7 @@ use crate::service::Service;
 pub fn run_challenge_request<K: ClientChain>(
     clientchain: &K,
     challenge: &mut ChallengeRequest,
+    verify_rx: Receiver<&'static str>,
 ) -> Result<()> {
     info! {"Running challenge for request: {:?}\n and bids: {:?}", challenge.request, challenge.bids};
     loop {
@@ -37,6 +40,7 @@ pub fn run_challenge_request<K: ClientChain>(
 
         // get challenge proofs
         //
+        info! {"proof: {}", verify_rx.recv().unwrap()}
 
         thread::sleep(time::Duration::from_secs(1))
     }
