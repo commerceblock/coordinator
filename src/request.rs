@@ -30,7 +30,7 @@ pub struct Request {
 // }
 
 /// Bid struct storing successful bids and modelling data that need to be stored
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Bid {
     /// Ocean transaction ID of the bid transaction
     pub txid: Sha256dHash,

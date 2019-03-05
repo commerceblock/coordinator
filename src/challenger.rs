@@ -2,14 +2,13 @@
 //!
 //! Methods and models for fetching, structuring and running challenge requests
 
-use std::rc::Rc;
 use std::sync::mpsc::Receiver;
+use std::sync::{Arc, Mutex};
 use std::{thread, time};
 
 use bitcoin::util::hash::{HexError, Sha256dHash};
 
 use crate::clientchain::ClientChain;
-use crate::coordinator;
 use crate::error::{CError, Result};
 use crate::request::{Bid, Request};
 use crate::service::Service;
@@ -19,33 +18,42 @@ use crate::service::Service;
 /// ...
 pub fn run_challenge_request<K: ClientChain>(
     clientchain: &K,
-    challenge: &mut ChallengeRequest,
-    verify_rx: Receiver<&'static str>,
+    challenge: Arc<Mutex<ChallengeRequest>>,
+    verify_rx: Receiver<ChallengeVerify>,
 ) -> Result<()> {
-    info! {"Running challenge for request: {:?}\n and bids: {:?}", challenge.request, challenge.bids};
+    info! {"Running challenge request: {:?}", challenge.lock().unwrap()};
     loop {
         let challenge_height = clientchain.get_blockheight()?;
-        if challenge.request.end_blockheight < challenge_height as usize {
+        if challenge.lock().unwrap().request.end_blockheight < challenge_height as usize {
             break;
         }
         info! {"sending challenge (height: {})...", challenge_height}
 
         // send challenge
         //
-        challenge.latest_challenge = Some(clientchain.send_challenge()?);
+        challenge.lock().unwrap().latest_challenge = Some(clientchain.send_challenge()?);
 
         // verify challenge
         //
-        info! {"challenge verified. waiting for challenge proofs..."}
+        info! {"challenge verified. fetching proofs..."}
 
         // get challenge proofs
         //
-        info! {"proof: {}", verify_rx.recv().unwrap()}
+        info! {"proof: {:?}", verify_rx.recv().unwrap()}
 
         thread::sleep(time::Duration::from_secs(1))
     }
-    info! {"Request ended (endheight: {})", challenge.request.end_blockheight}
+    info! {"Request ended (endheight: {})", challenge.lock().unwrap().request.end_blockheight}
     Ok(())
+}
+
+/// Struct to store a verified challenge response
+#[derive(Debug)]
+pub struct ChallengeVerify {
+    /// Hash for verified challenge response
+    pub challenge: Sha256dHash,
+    /// Winning bid owner that sent the response
+    pub bid: Bid,
 }
 
 /// Mainstains challenge state with information on
@@ -54,9 +62,9 @@ pub fn run_challenge_request<K: ClientChain>(
 #[derive(Debug)]
 pub struct ChallengeRequest {
     /// Service Request for issuing challenges
-    request: Request,
+    pub request: Request,
     /// Request winning bids that respond to challenges
-    bids: Vec<Bid>,
+    pub bids: Vec<Bid>,
     /// Latest challenge txid hash in the client chain
     pub latest_challenge: Option<Sha256dHash>,
 }
