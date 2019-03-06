@@ -7,7 +7,7 @@ use bitcoin_hashes::hex::FromHex;
 use ocean_rpc::Client;
 use secp256k1::key::PublicKey;
 
-use crate::error::Result;
+use crate::error::{CError, Result};
 use crate::request::{Bid, Request};
 
 /// Service trait defining functionality for interfacing with service chain
@@ -56,7 +56,24 @@ impl RpcService {
 // }
 
 /// Mock implementation of Service using some mock logic for testing
-pub struct MockService {}
+pub struct MockService {
+    /// Flag that when set returns error on all inherited methods that return
+    /// Result
+    pub return_err: bool,
+    /// Flag that when set returns None on all inherited methods that return
+    /// Option
+    pub return_none: bool,
+}
+
+impl MockService {
+    /// Create a MockService with all flags turned off by default
+    pub fn new() -> Self {
+        MockService {
+            return_err: false,
+            return_none: false,
+        }
+    }
+}
 
 impl Service for MockService {
     /// Get all active requests, if any, from service chain
@@ -66,6 +83,12 @@ impl Service for MockService {
 
     /// Try get active request, by genesis hash, from service chain
     fn get_request(&self, hash: &Sha256dHash) -> Result<Option<Request>> {
+        if self.return_none {
+            return Ok(None);
+        }
+        if self.return_err {
+            return Err(CError::Coordinator("get_request failed"));
+        }
         let dummy_req = Request {
             start_blockheight: 2,
             end_blockheight: 5,
@@ -73,12 +96,17 @@ impl Service for MockService {
             fee_percentage: 5,
             num_tickets: 10,
         };
-
         Ok(Some(dummy_req))
     }
 
     /// Try get active request bids, by genesis hash, from service chain
     fn get_request_bids(&self, _hash: &Sha256dHash) -> Result<Option<Vec<Bid>>> {
+        if self.return_none {
+            return Ok(None);
+        }
+        if self.return_err {
+            return Err(CError::Coordinator("get_request_bids failed"));
+        }
         let dummy_bid = Bid {
             txid: Sha256dHash::from_hex(
                 "1234567890000000000000000000000000000000000000000000000000000000",

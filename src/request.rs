@@ -7,7 +7,7 @@ use secp256k1::key::PublicKey;
 
 /// Request struct storing info on client request and modelling data that need
 /// to be stored
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Request {
     /// Request start block height
     pub start_blockheight: usize,
@@ -30,18 +30,12 @@ pub struct Request {
 // }
 
 /// Bid struct storing successful bids and modelling data that need to be stored
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Bid {
     /// Ocean transaction ID of the bid transaction
     pub txid: Sha256dHash,
     /// Bid owner verification public key
     pub pubkey: PublicKey,
-}
-
-impl PartialEq for Bid {
-    fn eq(&self, other: &Bid) -> bool {
-        self.txid == other.txid && self.pubkey == other.pubkey
-    }
 }
 
 // TODO

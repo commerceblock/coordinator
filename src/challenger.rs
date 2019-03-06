@@ -179,8 +179,6 @@ mod tests {
     use crate::service::MockService;
     use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
 
-    static SERVICE: MockService = MockService {};
-
     #[test]
     fn verify_challenge_test() {
         let mut clientchain = MockClientChain::new();
@@ -196,8 +194,8 @@ mod tests {
             verify_challenge(&dummy_hash, &clientchain, time::Duration::from_nanos(1)).unwrap()
                 == false
         );
-
         clientchain.return_false = false;
+
         clientchain.return_err = true;
         assert!(
             verify_challenge(&dummy_hash, &clientchain, time::Duration::from_nanos(1)).is_err(),
@@ -207,8 +205,11 @@ mod tests {
 
     #[test]
     fn get_challenge_responses_test() {
+        let service = MockService::new();
         let clientchain = MockClientChain::new();
+
         let dummy_hash = clientchain.send_challenge().unwrap();
+        let dummy_bid = service.get_request_bids(&dummy_hash).unwrap().unwrap()[0].clone();
 
         let (vtx, vrx): (Sender<ChallengeResponse>, Receiver<ChallengeResponse>) = channel();
 
@@ -217,38 +218,20 @@ mod tests {
         assert_eq!(res.unwrap().len(), 0);
 
         // then test with a few dummy responses
-        vtx.send(ChallengeResponse(
-            dummy_hash,
-            SERVICE.get_request_bids(&dummy_hash).unwrap().unwrap()[0].clone(),
-        ))
-        .unwrap();
-        vtx.send(ChallengeResponse(
-            dummy_hash,
-            SERVICE.get_request_bids(&dummy_hash).unwrap().unwrap()[0].clone(),
-        ))
-        .unwrap();
-        vtx.send(ChallengeResponse(
-            dummy_hash,
-            SERVICE.get_request_bids(&dummy_hash).unwrap().unwrap()[0].clone(),
-        ))
-        .unwrap();
+        vtx.send(ChallengeResponse(dummy_hash, dummy_bid.clone()))
+            .unwrap();
+        vtx.send(ChallengeResponse(dummy_hash, dummy_bid.clone()))
+            .unwrap();
+        vtx.send(ChallengeResponse(dummy_hash, dummy_bid.clone()))
+            .unwrap();
         let res = get_challenge_responses(&vrx, time::Duration::from_millis(10)).unwrap();
         assert_eq!(res.len(), 3);
         assert_eq!(res[0].0, dummy_hash);
-        assert_eq!(
-            res[0].1,
-            SERVICE.get_request_bids(&dummy_hash).unwrap().unwrap()[0]
-        );
+        assert_eq!(res[0].1, dummy_bid);
         assert_eq!(res[1].0, dummy_hash);
-        assert_eq!(
-            res[1].1,
-            SERVICE.get_request_bids(&dummy_hash).unwrap().unwrap()[0]
-        );
+        assert_eq!(res[1].1, dummy_bid);
         assert_eq!(res[2].0, dummy_hash);
-        assert_eq!(
-            res[2].1,
-            SERVICE.get_request_bids(&dummy_hash).unwrap().unwrap()[0]
-        );
+        assert_eq!(res[2].1, dummy_bid);
 
         // then drop channel sender and test correct error is returned
         std::mem::drop(vtx);
@@ -258,5 +241,89 @@ mod tests {
             Err(CError::Coordinator("Challenge response receiver disconnected")) => assert!(true),
             Err(_) => assert!(false, "should not return any error"),
         }
+    }
+
+    #[test]
+    fn check_request_test() {
+        let clientchain = MockClientChain::new();
+        let dummy_hash = clientchain.send_challenge().unwrap();
+
+        let service = MockService::new();
+        let dummy_request = service.get_request(&dummy_hash).unwrap().unwrap();
+
+        assert!(dummy_request.start_blockheight == 2);
+        assert!(check_request(&dummy_request, 1) == false);
+        assert!(check_request(&dummy_request, 3) == true);
+        assert!(check_request(&dummy_request, 2) == true);
+    }
+
+    #[test]
+    fn get_request_bids_test() {
+        let clientchain = MockClientChain::new();
+        let dummy_hash = clientchain.send_challenge().unwrap();
+
+        let mut service = MockService::new();
+        let dummy_request = service.get_request(&dummy_hash).unwrap().unwrap();
+        let dummy_bid = service.get_request_bids(&dummy_hash).unwrap().unwrap()[0].clone();
+
+        // first test with bids
+        let res = get_request_bids(&dummy_request, &service).unwrap();
+        assert_eq!(res.len(), 1);
+        assert_eq!(res[0], dummy_bid);
+
+        // then test with None result
+        service.return_none = true;
+        let res = get_request_bids(&dummy_request, &service);
+        match res {
+            Ok(_) => assert!(false, "should not return Ok"),
+            Err(CError::Coordinator("No bids found")) => assert!(true),
+            Err(_) => assert!(false, "should not return any error"),
+        }
+        service.return_none = false;
+
+        // then test with Err result
+        service.return_err = true;
+        let res = get_request_bids(&dummy_request, &service);
+        match res {
+            Ok(_) => assert!(false, "should not return Ok"),
+            Err(CError::Coordinator("No bids found")) => {
+                assert!(false, "should not specific error")
+            }
+            Err(_) => assert!(true),
+        }
+    }
+
+    #[test]
+    fn fetch_next_test() {
+        let mut clientchain = MockClientChain::new();
+        let dummy_hash = clientchain.send_challenge().unwrap();
+
+        let mut service = MockService::new();
+        let dummy_request = service.get_request(&dummy_hash).unwrap().unwrap();
+        let dummy_bid = service.get_request_bids(&dummy_hash).unwrap().unwrap()[0].clone();
+
+        // first test what happens when clientchain fails
+        clientchain.return_err = true;
+        assert!(fetch_next(&service, &clientchain, &dummy_hash).is_err());
+        clientchain.return_err = false;
+
+        // then test when get_request returns none
+        service.return_none = true;
+        let res = fetch_next(&service, &clientchain, &dummy_hash).unwrap();
+        match res {
+            None => assert!(true),
+            Some(_v) => assert!(false, "not expecting value"),
+        }
+        service.return_none = false;
+
+        // then test when get_request returns Request
+        clientchain.height = dummy_request.start_blockheight as u64;
+        let res = fetch_next(&service, &clientchain, &dummy_hash)
+            .unwrap()
+            .unwrap();
+        assert_eq!(res.latest_challenge, None);
+        assert_eq!(res.bids.len(), 1);
+        assert_eq!(res.bids[0], dummy_bid);
+        assert_eq!(res.request, dummy_request);
     }
 }

@@ -18,7 +18,7 @@ use crate::service::{MockService, Service};
 pub fn run() -> Result<()> {
     info!("Running coordinator!");
 
-    let service = MockService {};
+    let service = MockService::new();
     let clientchain = MockClientChain::new();
 
     // hardcoded genesis hash for now

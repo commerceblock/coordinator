@@ -43,14 +43,18 @@ pub struct MockClientChain {
     /// Flag that when set returns false on all inherited methods that return
     /// bool
     pub return_false: bool,
+    /// Mock client chain blockheight - incremented by default on
+    /// get_blockheight
+    pub height: u64,
 }
 
 impl MockClientChain {
-    /// Create an RpcClientChain with underlying rpc client connectivity
+    /// Create a MockClientChain with all flags turned off by default
     pub fn new() -> Self {
         MockClientChain {
             return_err: false,
             return_false: false,
+            height: 0,
         }
     }
 }
@@ -61,6 +65,13 @@ impl ClientChain for MockClientChain {
         if self.return_err {
             return Err(CError::Coordinator("get_blockheight failed"));
         }
+
+        // when height is set return that
+        // if not use a static counter that auto increments
+        if self.height > 0 {
+            return Ok(self.height);
+        }
+
         // Mock implementation increments a static counter
         // each time this method is called
         static HEIGHT: AtomicUsize = ATOMIC_USIZE_INIT;
