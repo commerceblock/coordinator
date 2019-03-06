@@ -13,6 +13,32 @@ use crate::error::{CError, Result};
 use crate::request::{Bid, Request};
 use crate::service::Service;
 
+static NUM_VERIFY_ATTEMPTS: u8 = 5;
+
+/// Attempts to verify that a challenge has been included in the client chain
+/// Method tries a fixed number of attempts NUM_VERIFY_ATTEMPTS with variable
+// delay time between these to allow easy configuration
+pub fn verify_challenge<K: ClientChain>(
+    hash: &Sha256dHash,
+    clientchain: &K,
+    attempt_delay: time::Duration,
+) -> Result<bool> {
+    info! {"verifying challenge hash: {}", hash}
+    for i in 0..NUM_VERIFY_ATTEMPTS {
+        if clientchain.verify_challenge(&hash)? {
+            info! {"challenge verified"}
+            return Ok(true);
+        }
+        warn! {"attempt {} failed", i+1}
+        if i + 1 == NUM_VERIFY_ATTEMPTS {
+            break;
+        }
+        info! {"sleeping for {}sec...", attempt_delay.as_secs()}
+        thread::sleep(attempt_delay)
+    }
+    Ok(false)
+}
+
 /// Run challenge for a specific request on the client chain
 /// ...
 /// ...
@@ -25,7 +51,6 @@ pub fn run_challenge_request<K: ClientChain>(
     loop {
         let challenge_height = clientchain.get_blockheight()?;
         info! {"client chain height: {}", challenge_height}
-
         if challenge_state.lock().unwrap().request.end_blockheight < challenge_height as usize {
             break;
         }
@@ -33,11 +58,14 @@ pub fn run_challenge_request<K: ClientChain>(
         // send challenge
         //
         info! {"sending challenge..."}
-        challenge_state.lock().unwrap().latest_challenge = Some(clientchain.send_challenge()?);
+        let challenge_hash = clientchain.send_challenge()?;
+        challenge_state.lock().unwrap().latest_challenge = Some(challenge_hash);
 
         // verify challenge
         //
-        info! {"challenge verified. fetching proofs..."}
+        if !verify_challenge(&challenge_hash, clientchain, time::Duration::from_secs(60))? {
+            continue;
+        }
 
         // get challenge proofs
         //
