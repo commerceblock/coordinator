@@ -74,6 +74,6 @@ pub fn run_verify(
         }
         std::mem::drop(challenge_lock);
 
-        thread::sleep(time::Duration::from_secs(1))
+        thread::sleep(time::Duration::from_secs(5))
     })
 }

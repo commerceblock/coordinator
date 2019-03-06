@@ -2,7 +2,7 @@
 //!
 //! Methods and models for fetching, structuring and running challenge requests
 
-use std::sync::mpsc::Receiver;
+use std::sync::mpsc::{channel, Receiver, TryRecvError};
 use std::sync::{Arc, Mutex};
 use std::{thread, time};
 
@@ -39,6 +39,38 @@ pub fn verify_challenge<K: ClientChain>(
     Ok(false)
 }
 
+/// Get responses to the challenge by reading data from the channel receiver
+/// Channel is read for a configurable duration and then the method returns
+/// all the responses that have been received
+pub fn get_challenge_responses(
+    verify_rx: &Receiver<ChallengeResponse>,
+    get_duration: time::Duration,
+) -> Result<Vec<ChallengeResponse>> {
+    let mut responses = vec![];
+
+    let (dur_tx, dur_rx) = channel();
+    let _ = thread::spawn(move || {
+        thread::sleep(get_duration);
+        dur_tx.send("tick").unwrap();
+    });
+
+    let mut time_to_break = false;
+    while time_to_break == false {
+        match verify_rx.try_recv() {
+            Ok(resp) => responses.push(resp),
+            Err(TryRecvError::Empty) => {}
+            Err(TryRecvError::Disconnected) => {
+                return Err(CError::Coordinator(
+                    "Challenge response receiver disconnected",
+                ))
+            }
+        }
+        let _ = dur_rx.try_recv().map(|_| time_to_break = true);
+    }
+
+    Ok(responses)
+}
+
 /// Run challenge for a specific request on the client chain
 /// ...
 /// ...
@@ -56,20 +88,17 @@ pub fn run_challenge_request<K: ClientChain>(
         }
 
         // send challenge
-        //
         info! {"sending challenge..."}
         let challenge_hash = clientchain.send_challenge()?;
         challenge_state.lock().unwrap().latest_challenge = Some(challenge_hash);
 
         // verify challenge
-        //
-        if !verify_challenge(&challenge_hash, clientchain, time::Duration::from_secs(60))? {
+        if !verify_challenge(&challenge_hash, clientchain, time::Duration::from_secs(1))? {
             continue;
         }
 
         // get challenge proofs
-        //
-        info! {"proof: {:?}", verify_rx.recv().unwrap()}
+        info! {"responses : {:?}", get_challenge_responses(&verify_rx, time::Duration::from_secs(1))?}
 
         thread::sleep(time::Duration::from_secs(1))
     }
@@ -133,7 +162,7 @@ pub fn fetch_next<T: Service, K: ClientChain>(
                     latest_challenge: None,
                 }));
             } else {
-                info! {"Request (startheight: {}) not ready for current height: {}", req.start_blockheight, height}
+                warn! {"Request (startheight: {}) not ready for current height: {}", req.start_blockheight, height}
             }
         }
         _ => {
