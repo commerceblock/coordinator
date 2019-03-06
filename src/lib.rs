@@ -29,5 +29,6 @@ pub mod challenger;
 pub mod clientchain;
 pub mod coordinator;
 pub mod error;
+pub mod listener;
 pub mod request;
 pub mod service;

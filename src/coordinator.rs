@@ -11,6 +11,7 @@ use bitcoin::util::hash::{HexError, Sha256dHash};
 use crate::challenger::{ChallengeResponse, ChallengeState};
 use crate::clientchain::MockClientChain;
 use crate::error::{CError, Result};
+use crate::listener::{Listener, MockListener};
 use crate::service::{MockService, Service};
 
 /// Run coordinator main method
@@ -20,6 +21,7 @@ pub fn run() -> Result<()> {
 
     let service = MockService::new();
     let clientchain = MockClientChain::new();
+    let listener = MockListener {};
 
     // hardcoded genesis hash for now
     // TODO: from config
@@ -35,7 +37,7 @@ pub fn run() -> Result<()> {
             let (verify_tx, verify_rx): (Sender<ChallengeResponse>, Receiver<ChallengeResponse>) =
                 channel();
 
-            let verify_handle = run_verify(shared_challenge.clone(), verify_tx, thread_rx);
+            let verify_handle = listener.do_work(shared_challenge.clone(), verify_tx, thread_rx);
 
             ::challenger::run_challenge_request(&clientchain, shared_challenge.clone(), verify_rx)?;
 
@@ -47,33 +49,4 @@ pub fn run() -> Result<()> {
         thread::sleep(time::Duration::from_secs(1))
     }
     Ok(())
-}
-
-/// Run challenge verifier method
-/// Currently mock replies to challenge requests
-pub fn run_verify(
-    challenge: Arc<Mutex<ChallengeState>>,
-    vtx: Sender<ChallengeResponse>,
-    trx: Receiver<()>,
-) -> thread::JoinHandle<()> {
-    thread::spawn(move || loop {
-        match trx.try_recv() {
-            Ok(_) | Err(TryRecvError::Disconnected) => {
-                info!("Verify ended");
-                break;
-            }
-            Err(TryRecvError::Empty) => {}
-        }
-
-        // get immutable lock to avoid changing any data
-        let challenge_lock = challenge.lock().unwrap();
-
-        if let Some(latest) = challenge_lock.latest_challenge {
-            vtx.send(ChallengeResponse(latest, challenge_lock.bids[0].clone()))
-                .unwrap();
-        }
-        std::mem::drop(challenge_lock);
-
-        thread::sleep(time::Duration::from_secs(5))
-    })
 }
