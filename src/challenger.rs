@@ -18,20 +18,22 @@ use crate::service::Service;
 /// ...
 pub fn run_challenge_request<K: ClientChain>(
     clientchain: &K,
-    challenge: Arc<Mutex<ChallengeRequest>>,
-    verify_rx: Receiver<ChallengeVerify>,
+    challenge_state: Arc<Mutex<ChallengeState>>,
+    verify_rx: Receiver<ChallengeResponse>,
 ) -> Result<()> {
-    info! {"Running challenge request: {:?}", challenge.lock().unwrap()};
+    info! {"Running challenge request: {:?}", challenge_state.lock().unwrap().request};
     loop {
         let challenge_height = clientchain.get_blockheight()?;
-        if challenge.lock().unwrap().request.end_blockheight < challenge_height as usize {
+        info! {"client chain height: {}", challenge_height}
+
+        if challenge_state.lock().unwrap().request.end_blockheight < challenge_height as usize {
             break;
         }
-        info! {"sending challenge (height: {})...", challenge_height}
 
         // send challenge
         //
-        challenge.lock().unwrap().latest_challenge = Some(clientchain.send_challenge()?);
+        info! {"sending challenge..."}
+        challenge_state.lock().unwrap().latest_challenge = Some(clientchain.send_challenge()?);
 
         // verify challenge
         //
@@ -43,24 +45,20 @@ pub fn run_challenge_request<K: ClientChain>(
 
         thread::sleep(time::Duration::from_secs(1))
     }
-    info! {"Request ended (endheight: {})", challenge.lock().unwrap().request.end_blockheight}
+    info! {"Challenge request ended"}
     Ok(())
 }
 
-/// Struct to store a verified challenge response
+/// Tuple struct to store a verified challenge response
+/// for a winning bid on a specific challenge hash
 #[derive(Debug)]
-pub struct ChallengeVerify {
-    /// Hash for verified challenge response
-    pub challenge: Sha256dHash,
-    /// Winning bid owner that sent the response
-    pub bid: Bid,
-}
+pub struct ChallengeResponse(pub Sha256dHash, pub Bid);
 
 /// Mainstains challenge state with information on
 /// challenge requests and bids as well as the
 /// latest challenge hash in the client chain
 #[derive(Debug)]
-pub struct ChallengeRequest {
+pub struct ChallengeState {
     /// Service Request for issuing challenges
     pub request: Request,
     /// Request winning bids that respond to challenges
@@ -70,7 +68,7 @@ pub struct ChallengeRequest {
 }
 
 /// Check if request start height has been reached in order to initiate
-/// challenging
+/// challenging.
 fn check_request(request: &Request, height: u64) -> bool {
     return if request.start_blockheight <= height as usize {
         true
@@ -90,18 +88,18 @@ fn get_request_bids<T: Service>(request: &Request, service: &T) -> Result<Vec<Bi
 /// Fetch next challenge state given a request and bids in the service chain
 /// A challenge is fetched only when a request exists and the required
 /// starting blockheight has been reached in the corresponding client chain
-pub fn fetch_challenge_request<T: Service, K: ClientChain>(
+pub fn fetch_next<T: Service, K: ClientChain>(
     service: &T,
     clientchain: &K,
     genesis: &Sha256dHash,
-) -> Result<Option<ChallengeRequest>> {
+) -> Result<Option<ChallengeState>> {
     info!("Fetching challenge request!");
     match service.get_request(&genesis)? {
         Some(req) => {
             let height = clientchain.get_blockheight()?;
             if check_request(&req, height) {
                 let bids = get_request_bids(&req, service)?;
-                return Ok(Some(ChallengeRequest {
+                return Ok(Some(ChallengeState {
                     request: req,
                     bids: bids,
                     latest_challenge: None,

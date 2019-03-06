@@ -8,7 +8,7 @@ use std::{thread, time};
 
 use bitcoin::util::hash::{HexError, Sha256dHash};
 
-use crate::challenger::{ChallengeRequest, ChallengeVerify};
+use crate::challenger::{ChallengeResponse, ChallengeState};
 use crate::clientchain::MockClientChain;
 use crate::error::{CError, Result};
 use crate::service::{MockService, Service};
@@ -28,13 +28,11 @@ pub fn run() -> Result<()> {
             .unwrap();
 
     loop {
-        if let Some(challenge) =
-            ::challenger::fetch_challenge_request(&service, &clientchain, &genesis_hash)?
-        {
+        if let Some(challenge) = ::challenger::fetch_next(&service, &clientchain, &genesis_hash)? {
             let mut shared_challenge = Arc::new(Mutex::new(challenge));
 
             let (thread_tx, thread_rx) = channel();
-            let (verify_tx, verify_rx): (Sender<ChallengeVerify>, Receiver<ChallengeVerify>) =
+            let (verify_tx, verify_rx): (Sender<ChallengeResponse>, Receiver<ChallengeResponse>) =
                 channel();
 
             let verify_handle = run_verify(shared_challenge.clone(), verify_tx, thread_rx);
@@ -45,8 +43,8 @@ pub fn run() -> Result<()> {
             verify_handle.join().expect("verify_handle join failed");
             break;
         }
-        info! {"Sleeping for 5 sec..."}
-        thread::sleep(time::Duration::from_secs(5))
+        info! {"Sleeping for 1 sec..."}
+        thread::sleep(time::Duration::from_secs(1))
     }
     Ok(())
 }
@@ -54,14 +52,14 @@ pub fn run() -> Result<()> {
 /// Run challenge verifier method
 /// Currently mock replies to challenge requests
 pub fn run_verify(
-    challenge: Arc<Mutex<ChallengeRequest>>,
-    vtx: Sender<ChallengeVerify>,
+    challenge: Arc<Mutex<ChallengeState>>,
+    vtx: Sender<ChallengeResponse>,
     trx: Receiver<()>,
 ) -> thread::JoinHandle<()> {
     thread::spawn(move || loop {
         match trx.try_recv() {
             Ok(_) | Err(TryRecvError::Disconnected) => {
-                info!("Terminating verify");
+                info!("Verify ended");
                 break;
             }
             Err(TryRecvError::Empty) => {}
@@ -71,11 +69,8 @@ pub fn run_verify(
         let challenge_lock = challenge.lock().unwrap();
 
         if let Some(latest) = challenge_lock.latest_challenge {
-            vtx.send(ChallengeVerify {
-                challenge: latest,
-                bid: challenge_lock.bids[0].clone(),
-            })
-            .unwrap();
+            vtx.send(ChallengeResponse(latest, challenge_lock.bids[0].clone()))
+                .unwrap();
         }
         std::mem::drop(challenge_lock);
 
