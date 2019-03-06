@@ -38,6 +38,12 @@ pub struct Bid {
     pub pubkey: PublicKey,
 }
 
+impl PartialEq for Bid {
+    fn eq(&self, other: &Bid) -> bool {
+        self.txid == other.txid && self.pubkey == other.pubkey
+    }
+}
+
 // TODO
 // from json:RequestResult implementation
 // impl Bid {

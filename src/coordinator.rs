@@ -19,7 +19,7 @@ pub fn run() -> Result<()> {
     info!("Running coordinator!");
 
     let service = MockService {};
-    let clientchain = MockClientChain {};
+    let clientchain = MockClientChain::new();
 
     // hardcoded genesis hash for now
     // TODO: from config

@@ -171,3 +171,92 @@ pub fn fetch_next<T: Service, K: ClientChain>(
     }
     Ok(None)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::clientchain::MockClientChain;
+    use crate::service::MockService;
+    use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
+
+    static SERVICE: MockService = MockService {};
+
+    #[test]
+    fn verify_challenge_test() {
+        let mut clientchain = MockClientChain::new();
+        let dummy_hash = clientchain.send_challenge().unwrap();
+
+        assert!(
+            verify_challenge(&dummy_hash, &clientchain, time::Duration::from_nanos(1)).unwrap()
+                == true
+        );
+
+        clientchain.return_false = true;
+        assert!(
+            verify_challenge(&dummy_hash, &clientchain, time::Duration::from_nanos(1)).unwrap()
+                == false
+        );
+
+        clientchain.return_false = false;
+        clientchain.return_err = true;
+        assert!(
+            verify_challenge(&dummy_hash, &clientchain, time::Duration::from_nanos(1)).is_err(),
+            "verify_challenge failed"
+        )
+    }
+
+    #[test]
+    fn get_challenge_responses_test() {
+        let clientchain = MockClientChain::new();
+        let dummy_hash = clientchain.send_challenge().unwrap();
+
+        let (vtx, vrx): (Sender<ChallengeResponse>, Receiver<ChallengeResponse>) = channel();
+
+        // first test with empty response
+        let res = get_challenge_responses(&vrx, time::Duration::from_millis(1));
+        assert_eq!(res.unwrap().len(), 0);
+
+        // then test with a few dummy responses
+        vtx.send(ChallengeResponse(
+            dummy_hash,
+            SERVICE.get_request_bids(&dummy_hash).unwrap().unwrap()[0].clone(),
+        ))
+        .unwrap();
+        vtx.send(ChallengeResponse(
+            dummy_hash,
+            SERVICE.get_request_bids(&dummy_hash).unwrap().unwrap()[0].clone(),
+        ))
+        .unwrap();
+        vtx.send(ChallengeResponse(
+            dummy_hash,
+            SERVICE.get_request_bids(&dummy_hash).unwrap().unwrap()[0].clone(),
+        ))
+        .unwrap();
+        let res = get_challenge_responses(&vrx, time::Duration::from_millis(10)).unwrap();
+        assert_eq!(res.len(), 3);
+        assert_eq!(res[0].0, dummy_hash);
+        assert_eq!(
+            res[0].1,
+            SERVICE.get_request_bids(&dummy_hash).unwrap().unwrap()[0]
+        );
+        assert_eq!(res[1].0, dummy_hash);
+        assert_eq!(
+            res[1].1,
+            SERVICE.get_request_bids(&dummy_hash).unwrap().unwrap()[0]
+        );
+        assert_eq!(res[2].0, dummy_hash);
+        assert_eq!(
+            res[2].1,
+            SERVICE.get_request_bids(&dummy_hash).unwrap().unwrap()[0]
+        );
+
+        // then drop channel sender and test correct error is returned
+        std::mem::drop(vtx);
+        let res = get_challenge_responses(&vrx, time::Duration::from_millis(1));
+        match res {
+            Ok(_) => assert!(false, "should not return Ok"),
+            Err(CError::Coordinator("Challenge response receiver disconnected")) => assert!(true),
+            Err(_) => assert!(false, "should not return any error"),
+        }
+    }
+}
