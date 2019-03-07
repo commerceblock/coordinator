@@ -12,6 +12,7 @@ use crate::clientchain::ClientChain;
 use crate::error::{CError, Result};
 use crate::request::{Bid, Request};
 use crate::service::Service;
+use crate::storage::Storage;
 
 static NUM_VERIFY_ATTEMPTS: u8 = 5;
 
@@ -79,13 +80,16 @@ pub fn get_challenge_responses(
     Ok(responses)
 }
 
-/// Run challenge for a specific request on the client chain
-/// ...
-/// ...
-pub fn run_challenge_request<K: ClientChain>(
+/// Run challenge for a specific request on the client chain. On each new client
+/// height send a challenge on the client chain continuing until active request
+/// expires (end_blockheight). For each challenge, verify it has been included
+/// to the client chain and then fetch all challenge responses for a specified
+/// time duration. These responses are then stored via the storage interface
+pub fn run_challenge_request<K: ClientChain, D: Storage>(
     clientchain: &K,
     challenge_state: Arc<Mutex<ChallengeState>>,
     verify_rx: &Receiver<ChallengeResponse>,
+    storage: &D,
 ) -> Result<()> {
     info! {"Running challenge request: {:?}", challenge_state.lock().unwrap().request};
     loop {
@@ -95,18 +99,20 @@ pub fn run_challenge_request<K: ClientChain>(
             break;
         }
 
-        // send challenge
         info! {"sending challenge..."}
         let challenge_hash = clientchain.send_challenge()?;
         challenge_state.lock().unwrap().latest_challenge = Some(challenge_hash);
 
-        // verify challenge
         if !verify_challenge(&challenge_hash, clientchain, time::Duration::from_secs(1))? {
             continue;
         }
 
-        // get challenge proofs
-        info! {"responses : {:?}", get_challenge_responses(&challenge_hash, &verify_rx, time::Duration::from_secs(1))?}
+        info! {"storing responses..."}
+        storage.save_challenge_responses(get_challenge_responses(
+            &challenge_hash,
+            &verify_rx,
+            time::Duration::from_secs(1),
+        )?)?;
         challenge_state.lock().unwrap().latest_challenge = None; // stop receiving responses
     }
     info! {"Challenge request ended"}

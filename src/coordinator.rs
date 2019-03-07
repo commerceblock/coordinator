@@ -13,6 +13,7 @@ use crate::clientchain::MockClientChain;
 use crate::error::{CError, Result};
 use crate::listener::{Listener, MockListener};
 use crate::service::{MockService, Service};
+use crate::storage::{MockStorage, Storage};
 
 /// Run coordinator main method
 /// Currently using mock interfaces until ocean rpcs are finished
@@ -22,6 +23,7 @@ pub fn run() -> Result<()> {
     let service = MockService::new();
     let clientchain = MockClientChain::new();
     let listener = MockListener {};
+    let storage = MockStorage::new();
 
     // hardcoded genesis hash for now
     // TODO: from config
@@ -31,6 +33,8 @@ pub fn run() -> Result<()> {
 
     loop {
         if let Some(challenge) = ::challenger::fetch_next(&service, &clientchain, &genesis_hash)? {
+            storage.save_challenge_state(challenge.clone())?;
+
             let mut shared_challenge = Arc::new(Mutex::new(challenge));
 
             let (thread_tx, thread_rx) = channel();
@@ -43,6 +47,7 @@ pub fn run() -> Result<()> {
                 &clientchain,
                 shared_challenge.clone(),
                 &verify_rx,
+                &storage,
             )?;
 
             thread_tx.send(()).expect("thread_tx send failed");
