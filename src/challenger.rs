@@ -121,7 +121,7 @@ pub struct ChallengeResponse(pub Sha256dHash, pub Bid);
 /// Mainstains challenge state with information on
 /// challenge requests and bids as well as the
 /// latest challenge hash in the client chain
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ChallengeState {
     /// Service Request for issuing challenges
     pub request: Request,

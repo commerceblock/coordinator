@@ -36,24 +36,9 @@ impl RpcService {
     }
 }
 
-// TODO
-// implement Service trait, once rpc calls for request/bid exist in ocean_rpc
-// impl Service for RpcService {
-//     /// Get all active requests, if any, from service chain
-//     fn get_requests(&self) -> Result<Option<Vec<Request>>, &str> {
-//         Ok(None)
-//     }
-
-//     /// Try get active request, by genesis hash, from service chain
-//     fn get_request(&self, _hash: &Sha256dHash) -> Result<Option<Request>,
-// &str> {         Ok(None)
-//     }
-
-//     /// Try get active request bids, by genesis hash, from service chain
-//     fn get_request_bids(&self, _hash: &Sha256dHash) ->
-// Result<Option<Vec<Bid>>, &str> {         Ok(None)
-//     }
-// }
+//
+// TODO: implement Service trait for RpcService
+//
 
 /// Mock implementation of Service using some mock logic for testing
 pub struct MockService {

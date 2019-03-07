@@ -35,6 +35,10 @@ impl RpcClientChain {
     }
 }
 
+//
+// TODO: implement ClientChain trait for RpcClientChain
+//
+
 /// Mock implementation of ClientChain using some mock logic for testing
 pub struct MockClientChain {
     /// Flag that when set returns error on all inherited methods that return
@@ -60,6 +64,7 @@ impl MockClientChain {
 }
 
 impl MockClientChain {
+    #[inline]
     fn static_height(incr: bool) -> u64 {
         static HEIGHT: AtomicUsize = ATOMIC_USIZE_INIT;
         if incr {

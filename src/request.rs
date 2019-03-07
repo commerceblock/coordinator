@@ -7,7 +7,7 @@ use secp256k1::key::PublicKey;
 
 /// Request struct storing info on client request and modelling data that need
 /// to be stored
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Request {
     /// Request start block height
     pub start_blockheight: usize,
