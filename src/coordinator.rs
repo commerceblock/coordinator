@@ -39,7 +39,11 @@ pub fn run() -> Result<()> {
 
             let verify_handle = listener.do_work(shared_challenge.clone(), verify_tx, thread_rx);
 
-            ::challenger::run_challenge_request(&clientchain, shared_challenge.clone(), verify_rx)?;
+            ::challenger::run_challenge_request(
+                &clientchain,
+                shared_challenge.clone(),
+                &verify_rx,
+            )?;
 
             thread_tx.send(()).expect("thread_tx send failed");
             verify_handle.join().expect("verify_handle join failed");

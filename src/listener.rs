@@ -56,7 +56,7 @@ impl Listener for MockListener {
             }
             std::mem::drop(challenge_lock);
 
-            thread::sleep(time::Duration::from_secs(5))
+            thread::sleep(time::Duration::from_millis(500))
         })
     }
 }

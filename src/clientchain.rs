@@ -59,6 +59,17 @@ impl MockClientChain {
     }
 }
 
+impl MockClientChain {
+    fn static_height(incr: bool) -> u64 {
+        static HEIGHT: AtomicUsize = ATOMIC_USIZE_INIT;
+        if incr {
+            HEIGHT.fetch_add(1, Ordering::SeqCst) as u64
+        } else {
+            HEIGHT.load(Ordering::SeqCst) as u64
+        }
+    }
+}
+
 impl ClientChain for MockClientChain {
     /// Get client chain blockheight
     fn get_blockheight(&self) -> Result<u64> {
@@ -66,16 +77,13 @@ impl ClientChain for MockClientChain {
             return Err(CError::Coordinator("get_blockheight failed"));
         }
 
-        // when height is set return that
-        // if not use a static counter that auto increments
+        // when height is set return that (unit-testing ease)
         if self.height > 0 {
             return Ok(self.height);
         }
 
-        // Mock implementation increments a static counter
-        // each time this method is called
-        static HEIGHT: AtomicUsize = ATOMIC_USIZE_INIT;
-        Ok(HEIGHT.fetch_add(1, Ordering::SeqCst) as u64)
+        // If height not set then use static counter
+        Ok(MockClientChain::static_height(true))
     }
 
     /// Send challenge transaction to client chain
@@ -83,7 +91,18 @@ impl ClientChain for MockClientChain {
         if self.return_err {
             return Err(CError::Coordinator("send_challenge failed"));
         }
-        Ok(Sha256dHash::from_hex(&vec![0; 32].to_hex()).unwrap())
+
+        // if height is set use it for hash generation
+        if self.height > 0 {
+            return Ok(
+                Sha256dHash::from_hex(&vec![(self.height % 16) as u8; 32].to_hex()).unwrap(),
+            );
+        }
+        // If height is not set use static counter to generate random hash
+        Ok(Sha256dHash::from_hex(
+            &vec![(MockClientChain::static_height(false) % 16) as u8; 32].to_hex(),
+        )
+        .unwrap())
     }
 
     /// Verify challenge transaction has been included in the chain

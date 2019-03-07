@@ -25,6 +25,7 @@ pub fn verify_challenge<K: ClientChain>(
 ) -> Result<bool> {
     info! {"verifying challenge hash: {}", hash}
     for i in 0..NUM_VERIFY_ATTEMPTS {
+        // fixed number of attempts?
         if clientchain.verify_challenge(&hash)? {
             info! {"challenge verified"}
             return Ok(true);
@@ -41,8 +42,9 @@ pub fn verify_challenge<K: ClientChain>(
 
 /// Get responses to the challenge by reading data from the channel receiver
 /// Channel is read for a configurable duration and then the method returns
-/// all the responses that have been received
+/// all the responses that have been received for a specific challenge hash
 pub fn get_challenge_responses(
+    challenge_hash: &Sha256dHash,
     verify_rx: &Receiver<ChallengeResponse>,
     get_duration: time::Duration,
 ) -> Result<Vec<ChallengeResponse>> {
@@ -50,6 +52,7 @@ pub fn get_challenge_responses(
 
     let (dur_tx, dur_rx) = channel();
     let _ = thread::spawn(move || {
+        // timer to kill receiving
         thread::sleep(get_duration);
         dur_tx.send("tick").unwrap();
     });
@@ -57,8 +60,13 @@ pub fn get_challenge_responses(
     let mut time_to_break = false;
     while time_to_break == false {
         match verify_rx.try_recv() {
-            Ok(resp) => responses.push(resp),
-            Err(TryRecvError::Empty) => {}
+            Ok(resp) => {
+                if resp.0 == *challenge_hash {
+                    // filter old invalid/responses
+                    responses.push(resp)
+                }
+            }
+            Err(TryRecvError::Empty) => {} // ignore empty - it's allowed
             Err(TryRecvError::Disconnected) => {
                 return Err(CError::Coordinator(
                     "Challenge response receiver disconnected",
@@ -77,7 +85,7 @@ pub fn get_challenge_responses(
 pub fn run_challenge_request<K: ClientChain>(
     clientchain: &K,
     challenge_state: Arc<Mutex<ChallengeState>>,
-    verify_rx: Receiver<ChallengeResponse>,
+    verify_rx: &Receiver<ChallengeResponse>,
 ) -> Result<()> {
     info! {"Running challenge request: {:?}", challenge_state.lock().unwrap().request};
     loop {
@@ -98,9 +106,8 @@ pub fn run_challenge_request<K: ClientChain>(
         }
 
         // get challenge proofs
-        info! {"responses : {:?}", get_challenge_responses(&verify_rx, time::Duration::from_secs(1))?}
-
-        thread::sleep(time::Duration::from_secs(1))
+        info! {"responses : {:?}", get_challenge_responses(&challenge_hash, &verify_rx, time::Duration::from_secs(1))?}
+        challenge_state.lock().unwrap().latest_challenge = None; // stop receiving responses
     }
     info! {"Challenge request ended"}
     Ok(())
@@ -206,7 +213,7 @@ mod tests {
     #[test]
     fn get_challenge_responses_test() {
         let service = MockService::new();
-        let clientchain = MockClientChain::new();
+        let mut clientchain = MockClientChain::new();
 
         let dummy_hash = clientchain.send_challenge().unwrap();
         let dummy_bid = service.get_request_bids(&dummy_hash).unwrap().unwrap()[0].clone();
@@ -214,17 +221,25 @@ mod tests {
         let (vtx, vrx): (Sender<ChallengeResponse>, Receiver<ChallengeResponse>) = channel();
 
         // first test with empty response
-        let res = get_challenge_responses(&vrx, time::Duration::from_millis(1));
+        let res = get_challenge_responses(&dummy_hash, &vrx, time::Duration::from_millis(1));
         assert_eq!(res.unwrap().len(), 0);
 
-        // then test with a few dummy responses
+        // then test with a few dummy responses and an old hash that is ignored
+        clientchain.height = 1;
+        let old_dummy_hash = clientchain.send_challenge().unwrap();
+
         vtx.send(ChallengeResponse(dummy_hash, dummy_bid.clone()))
             .unwrap();
         vtx.send(ChallengeResponse(dummy_hash, dummy_bid.clone()))
             .unwrap();
+        vtx.send(ChallengeResponse(old_dummy_hash, dummy_bid.clone()))
+            .unwrap();
         vtx.send(ChallengeResponse(dummy_hash, dummy_bid.clone()))
             .unwrap();
-        let res = get_challenge_responses(&vrx, time::Duration::from_millis(10)).unwrap();
+        vtx.send(ChallengeResponse(old_dummy_hash, dummy_bid.clone()))
+            .unwrap();
+        let res =
+            get_challenge_responses(&dummy_hash, &vrx, time::Duration::from_millis(10)).unwrap();
         assert_eq!(res.len(), 3);
         assert_eq!(res[0].0, dummy_hash);
         assert_eq!(res[0].1, dummy_bid);
@@ -235,7 +250,7 @@ mod tests {
 
         // then drop channel sender and test correct error is returned
         std::mem::drop(vtx);
-        let res = get_challenge_responses(&vrx, time::Duration::from_millis(1));
+        let res = get_challenge_responses(&dummy_hash, &vrx, time::Duration::from_millis(1));
         match res {
             Ok(_) => assert!(false, "should not return Ok"),
             Err(CError::Coordinator("Challenge response receiver disconnected")) => assert!(true),
@@ -325,5 +340,13 @@ mod tests {
         assert_eq!(res.bids.len(), 1);
         assert_eq!(res.bids[0], dummy_bid);
         assert_eq!(res.request, dummy_request);
+
+        // then test when get_request returns None as height too low
+        clientchain.height = 1;
+        let res = fetch_next(&service, &clientchain, &dummy_hash).unwrap();
+        match res {
+            None => assert!(true),
+            Some(_v) => assert!(false, "not expecting value"),
+        }
     }
 }
