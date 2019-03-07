@@ -2,6 +2,7 @@
 //!
 //! Client chain interface and implementations
 
+use std::cell::RefCell;
 use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
 
 use bitcoin::util::hash::Sha256dHash;
@@ -49,7 +50,7 @@ pub struct MockClientChain {
     pub return_false: bool,
     /// Mock client chain blockheight - incremented by default on
     /// get_blockheight
-    pub height: u64,
+    pub height: RefCell<u64>,
 }
 
 impl MockClientChain {
@@ -58,19 +59,7 @@ impl MockClientChain {
         MockClientChain {
             return_err: false,
             return_false: false,
-            height: 0,
-        }
-    }
-}
-
-impl MockClientChain {
-    #[inline]
-    fn static_height(incr: bool) -> u64 {
-        static HEIGHT: AtomicUsize = ATOMIC_USIZE_INIT;
-        if incr {
-            HEIGHT.fetch_add(1, Ordering::SeqCst) as u64
-        } else {
-            HEIGHT.load(Ordering::SeqCst) as u64
+            height: RefCell::new(0),
         }
     }
 }
@@ -82,13 +71,9 @@ impl ClientChain for MockClientChain {
             return Err(CError::Coordinator("get_blockheight failed"));
         }
 
-        // when height is set return that (unit-testing ease)
-        if self.height > 0 {
-            return Ok(self.height);
-        }
-
-        // If height not set then use static counter
-        Ok(MockClientChain::static_height(true))
+        let mut height = self.height.borrow_mut();
+        *height += 1; // increment height for integration testing
+        Ok(*height - 1) // return previous height
     }
 
     /// Send challenge transaction to client chain
@@ -97,17 +82,8 @@ impl ClientChain for MockClientChain {
             return Err(CError::Coordinator("send_challenge failed"));
         }
 
-        // if height is set use it for hash generation
-        if self.height > 0 {
-            return Ok(
-                Sha256dHash::from_hex(&vec![(self.height % 16) as u8; 32].to_hex()).unwrap(),
-            );
-        }
-        // If height is not set use static counter to generate random hash
-        Ok(Sha256dHash::from_hex(
-            &vec![(MockClientChain::static_height(false) % 16) as u8; 32].to_hex(),
-        )
-        .unwrap())
+        // Use height to generate mock challenge hash
+        Ok(Sha256dHash::from_hex(&vec![(*self.height.borrow() % 16) as u8; 32].to_hex()).unwrap())
     }
 
     /// Verify challenge transaction has been included in the chain

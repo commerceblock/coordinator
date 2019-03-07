@@ -12,7 +12,7 @@ use crate::challenger::{ChallengeResponse, ChallengeState};
 use crate::clientchain::MockClientChain;
 use crate::error::{CError, Result};
 use crate::listener::{Listener, MockListener};
-use crate::service::{MockService, Service};
+use crate::service::MockService;
 use crate::storage::{MockStorage, Storage};
 
 /// Run coordinator main method
@@ -48,8 +48,11 @@ pub fn run() -> Result<()> {
                 shared_challenge.clone(),
                 &verify_rx,
                 &storage,
+                time::Duration::from_secs(1),
+                time::Duration::from_secs(1),
             )?;
 
+            info! {"storage:\n{:?}", storage}
             thread_tx.send(()).expect("thread_tx send failed");
             verify_handle.join().expect("verify_handle join failed");
             break;
