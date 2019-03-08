@@ -6,7 +6,25 @@ use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
 use std::sync::{Arc, Mutex};
 use std::{thread, time};
 
+use bitcoin::consensus::serialize;
+use bitcoin::util::hash::{BitcoinHash, Sha256dHash};
+use secp256k1::{Message, PublicKey, Secp256k1, Signature};
+
 use crate::challenger::{ChallengeResponse, ChallengeState};
+use crate::error::{CError, Result};
+
+/// Enum for all the messages handled by the listener
+pub enum ListenerMsg {
+    /// Variant for MsgChallengeSig
+    ChallengeSig(MsgChallengeSig),
+}
+
+/// Messsage type for challenge proofs sent by guardnodes
+pub struct MsgChallengeSig {
+    hash: Sha256dHash,
+    pubkey: PublicKey,
+    sig: Signature,
+}
 
 /// Listener trait defining desired functionality for the struct that handles
 /// incoming requests, verifies them and informs the challenger of the verified
@@ -20,6 +38,27 @@ pub trait Listener {
         vtx: Sender<ChallengeResponse>,
         trx: Receiver<()>,
     ) -> thread::JoinHandle<()>;
+
+    /// Handle message challenge sig
+    fn handle_msg_challengesig(&self, msg: MsgChallengeSig) -> Result<()> {
+        let secp = Secp256k1::new();
+
+        match secp.verify(
+            &Message::from_slice(&serialize(&msg.hash)).unwrap(),
+            &msg.sig,
+            &msg.pubkey,
+        ) {
+            Ok(_) => Ok(()),
+            Err(_) => Err(CError::Coordinator("handle_msg_challengesig failed")),
+        }
+    }
+
+    /// Handle message
+    fn handle_msg(&self, msg: ListenerMsg) -> Result<()> {
+        match msg {
+            ListenerMsg::ChallengeSig(c) => self.handle_msg_challengesig(c),
+        }
+    }
 }
 
 /// Mock implementation of Listener for generating mock challenge responses
