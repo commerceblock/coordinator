@@ -4,7 +4,7 @@
 
 use std::cell::RefCell;
 
-use crate::challenger::{ChallengeResponse, ChallengeState};
+use crate::challenger::{ChallengeResponse, ChallengeResponseSet, ChallengeState};
 use crate::error::{CError, Result};
 
 /// Storage trait defining required functionality for objects that store request
@@ -13,7 +13,7 @@ pub trait Storage {
     /// Store the state of a challenge request
     fn save_challenge_state(&self, challenge: ChallengeState) -> Result<()>;
     /// Store responses to a specific challenge
-    fn save_challenge_responses(&self, responses: Vec<ChallengeResponse>) -> Result<()>;
+    fn save_challenge_responses(&self, responses: ChallengeResponseSet) -> Result<()>;
 }
 
 /// Database implementation of Storage trait
@@ -65,7 +65,7 @@ impl Storage for MockStorage {
     }
 
     /// Store responses to a specific challenge
-    fn save_challenge_responses(&self, responses: Vec<ChallengeResponse>) -> Result<()> {
+    fn save_challenge_responses(&self, responses: ChallengeResponseSet) -> Result<()> {
         if self.return_err {
             return Err(CError::Coordinator("save_challenge_responses failed"));
         }

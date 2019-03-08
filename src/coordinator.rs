@@ -52,7 +52,10 @@ pub fn run() -> Result<()> {
                 time::Duration::from_secs(1),
             )?;
 
-            info! {"storage:\n{:?}", storage}
+            println! {"***** Responses *****"}
+            for resp in storage.challenge_responses.borrow().iter() {
+                println! {"{:?}", resp}
+            }
             thread_tx.send(()).expect("thread_tx send failed");
             verify_handle.join().expect("verify_handle join failed");
             break;

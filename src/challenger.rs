@@ -2,6 +2,7 @@
 //!
 //! Methods and models for fetching, structuring and running challenge requests
 
+use std::collections::HashSet;
 use std::sync::mpsc::{channel, Receiver, TryRecvError};
 use std::sync::{Arc, Mutex};
 use std::{thread, time};
@@ -48,8 +49,8 @@ pub fn get_challenge_responses(
     challenge_hash: &Sha256dHash,
     verify_rx: &Receiver<ChallengeResponse>,
     get_duration: time::Duration,
-) -> Result<Vec<ChallengeResponse>> {
-    let mut responses = vec![];
+) -> Result<ChallengeResponseSet> {
+    let mut responses = ChallengeResponseSet::new();
 
     let (dur_tx, dur_rx) = channel();
     let _ = thread::spawn(move || {
@@ -64,7 +65,7 @@ pub fn get_challenge_responses(
             Ok(resp) => {
                 if resp.0 == *challenge_hash {
                     // filter old invalid/responses
-                    responses.push(resp)
+                    let _ = responses.insert(resp);
                 }
             }
             Err(TryRecvError::Empty) => {} // ignore empty - it's allowed
@@ -123,8 +124,18 @@ pub fn run_challenge_request<K: ClientChain, D: Storage>(
 
 /// Tuple struct to store a verified challenge response
 /// for a winning bid on a specific challenge hash
-#[derive(Debug)]
+#[derive(Debug, Hash)]
 pub struct ChallengeResponse(pub Sha256dHash, pub Bid);
+
+impl PartialEq for ChallengeResponse {
+    fn eq(&self, other: &ChallengeResponse) -> bool {
+        self.0 == other.0 && self.1 == other.1
+    }
+}
+impl Eq for ChallengeResponse {}
+
+/// Type defining a set of Challenge Responses
+pub type ChallengeResponseSet = HashSet<ChallengeResponse>;
 
 /// Mainstains challenge state with information on
 /// challenge requests and bids as well as the
@@ -242,7 +253,8 @@ mod tests {
         // then test with a few dummy responses and old hashes that are ignored
         let _ = clientchain.height.replace(1); // change height in order to generate a different hash
         let old_dummy_hash = clientchain.send_challenge().unwrap();
-
+        let mut dummy_response_set = ChallengeResponseSet::new();
+        let _ = dummy_response_set.insert(ChallengeResponse(dummy_hash, dummy_bid.clone()));
         vtx.send(ChallengeResponse(dummy_hash, dummy_bid.clone()))
             .unwrap();
         vtx.send(ChallengeResponse(dummy_hash, dummy_bid.clone()))
@@ -255,13 +267,8 @@ mod tests {
             .unwrap();
         let res =
             get_challenge_responses(&dummy_hash, &vrx, time::Duration::from_millis(1)).unwrap();
-        assert_eq!(res.len(), 3);
-        assert_eq!(res[0].0, dummy_hash);
-        assert_eq!(res[0].1, dummy_bid);
-        assert_eq!(res[1].0, dummy_hash);
-        assert_eq!(res[1].1, dummy_bid);
-        assert_eq!(res[2].0, dummy_hash);
-        assert_eq!(res[2].1, dummy_bid);
+        assert_eq!(res.len(), 1);
+        assert_eq!(res, dummy_response_set);
 
         // then drop channel sender and test correct error is returned
         std::mem::drop(vtx);
@@ -427,6 +434,7 @@ mod tests {
                 assert!(true);
                 assert_eq!(actual_hash, storage.challenge_responses.borrow()[0].0);
                 assert_eq!(actual_bid, storage.challenge_responses.borrow()[0].1);
+                assert_eq!(1, storage.challenge_responses.borrow().len());
             }
             Err(_) => assert!(false, "should not return error"),
         }
