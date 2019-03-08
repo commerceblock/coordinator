@@ -2,6 +2,8 @@
 //!
 //! Service request models for client requests and bids
 
+use std::collections::HashSet;
+
 use bitcoin::util::hash::Sha256dHash;
 use secp256k1::key::PublicKey;
 
@@ -30,13 +32,16 @@ pub struct Request {
 // }
 
 /// Bid struct storing successful bids and modelling data that need to be stored
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Hash, Eq)]
 pub struct Bid {
     /// Ocean transaction ID of the bid transaction
     pub txid: Sha256dHash,
     /// Bid owner verification public key
     pub pubkey: PublicKey,
 }
+
+/// Type defining a set of Bids
+pub type BidSet = HashSet<Bid>;
 
 // TODO
 // from json:RequestResult implementation

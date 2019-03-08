@@ -8,7 +8,7 @@ use ocean_rpc::Client;
 use secp256k1::key::PublicKey;
 
 use crate::error::{CError, Result};
-use crate::request::{Bid, Request};
+use crate::request::{Bid, BidSet, Request};
 
 /// Service trait defining functionality for interfacing with service chain
 pub trait Service {
@@ -19,7 +19,7 @@ pub trait Service {
     fn get_request(&self, hash: &Sha256dHash) -> Result<Option<Request>>;
 
     /// Try get active request bids, by genesis hash, from service chain
-    fn get_request_bids(&self, hash: &Sha256dHash) -> Result<Option<Vec<Bid>>>;
+    fn get_request_bids(&self, hash: &Sha256dHash) -> Result<Option<BidSet>>;
 }
 
 /// Rpc implementation of Service using an underlying ocean rpc connection
@@ -85,7 +85,7 @@ impl Service for MockService {
     }
 
     /// Try get active request bids, by genesis hash, from service chain
-    fn get_request_bids(&self, _hash: &Sha256dHash) -> Result<Option<Vec<Bid>>> {
+    fn get_request_bids(&self, _hash: &Sha256dHash) -> Result<Option<BidSet>> {
         if self.return_none {
             return Ok(None);
         }
@@ -105,6 +105,8 @@ impl Service for MockService {
             )
             .unwrap(),
         };
-        Ok(Some(vec![dummy_bid]))
+        let mut bid_set = BidSet::new();
+        let _ = bid_set.insert(dummy_bid);
+        Ok(Some(bid_set))
     }
 }

@@ -10,7 +10,7 @@ use bitcoin::util::hash::{HexError, Sha256dHash};
 
 use crate::clientchain::ClientChain;
 use crate::error::{CError, Result};
-use crate::request::{Bid, Request};
+use crate::request::{Bid, BidSet, Request};
 use crate::service::Service;
 use crate::storage::Storage;
 
@@ -134,7 +134,7 @@ pub struct ChallengeState {
     /// Service Request for issuing challenges
     pub request: Request,
     /// Request winning bids that respond to challenges
-    pub bids: Vec<Bid>,
+    pub bids: BidSet,
     /// Latest challenge txid hash in the client chain
     pub latest_challenge: Option<Sha256dHash>,
 }
@@ -150,7 +150,7 @@ fn check_request(request: &Request, height: u64) -> bool {
 }
 
 /// Attempt to fetch the winnings bids for a request in the service chain
-fn get_request_bids<T: Service>(request: &Request, service: &T) -> Result<Vec<Bid>> {
+fn get_request_bids<T: Service>(request: &Request, service: &T) -> Result<BidSet> {
     match service.get_request_bids(&request.genesis_blockhash)? {
         Some(bids) => return Ok(bids),
         _ => Err(CError::Coordinator("No bids found")),
@@ -225,8 +225,14 @@ mod tests {
         let clientchain = MockClientChain::new();
 
         let dummy_hash = clientchain.send_challenge().unwrap();
-        let dummy_bid = service.get_request_bids(&dummy_hash).unwrap().unwrap()[0].clone();
-
+        let dummy_bid = service
+            .get_request_bids(&dummy_hash)
+            .unwrap()
+            .unwrap()
+            .iter()
+            .next()
+            .unwrap()
+            .clone();
         let (vtx, vrx): (Sender<ChallengeResponse>, Receiver<ChallengeResponse>) = channel();
 
         // first test with empty response
@@ -288,12 +294,20 @@ mod tests {
 
         let mut service = MockService::new();
         let dummy_request = service.get_request(&dummy_hash).unwrap().unwrap();
-        let dummy_bid = service.get_request_bids(&dummy_hash).unwrap().unwrap()[0].clone();
+        let dummy_bid = service
+            .get_request_bids(&dummy_hash)
+            .unwrap()
+            .unwrap()
+            .iter()
+            .next()
+            .unwrap()
+            .clone();
+        let mut dummy_set = BidSet::new();
+        let _ = dummy_set.insert(dummy_bid);
 
         // first test with some bids
         let res = get_request_bids(&dummy_request, &service).unwrap();
-        assert_eq!(res.len(), 1);
-        assert_eq!(res[0], dummy_bid);
+        assert_eq!(res, dummy_set);
 
         // then test with None result
         service.return_none = true;
@@ -324,7 +338,16 @@ mod tests {
 
         let mut service = MockService::new();
         let dummy_request = service.get_request(&dummy_hash).unwrap().unwrap();
-        let dummy_bid = service.get_request_bids(&dummy_hash).unwrap().unwrap()[0].clone();
+        let dummy_bid = service
+            .get_request_bids(&dummy_hash)
+            .unwrap()
+            .unwrap()
+            .iter()
+            .next()
+            .unwrap()
+            .clone();
+        let mut dummy_set = BidSet::new();
+        let _ = dummy_set.insert(dummy_bid);
 
         // first test what happens when clientchain fails
         clientchain.return_err = true;
@@ -348,8 +371,7 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(res.latest_challenge, None);
-        assert_eq!(res.bids.len(), 1);
-        assert_eq!(res.bids[0], dummy_bid);
+        assert_eq!(res.bids, dummy_set);
         assert_eq!(res.request, dummy_request);
 
         // then test when get_request returns None as height too low
@@ -385,7 +407,7 @@ mod tests {
             .height
             .replace((dummy_request.start_blockheight as u64) + 1); // set height +1 for challenge hash response
         let actual_hash = clientchain.send_challenge().unwrap();
-        let actual_bid = challenge_state.bids[0].clone();
+        let actual_bid = challenge_state.bids.iter().next().unwrap().clone();
         vtx.send(ChallengeResponse(actual_hash, actual_bid.clone()))
             .unwrap();
 

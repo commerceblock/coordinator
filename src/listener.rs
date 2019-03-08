@@ -51,8 +51,11 @@ impl Listener for MockListener {
             let challenge_lock = challenge.lock().unwrap();
 
             if let Some(latest) = challenge_lock.latest_challenge {
-                vtx.send(ChallengeResponse(latest, challenge_lock.bids[0].clone()))
-                    .unwrap();
+                vtx.send(ChallengeResponse(
+                    latest,
+                    challenge_lock.bids.iter().next().unwrap().clone(),
+                ))
+                .unwrap();
             }
             std::mem::drop(challenge_lock);
 
