@@ -201,15 +201,24 @@ pub fn fetch_next<T: Service, K: ClientChain>(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
+
+    use bitcoin_hashes::hex::ToHex;
+
     use crate::clientchain::MockClientChain;
     use crate::service::MockService;
     use crate::storage::MockStorage;
-    use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
+
+    /// Generate dummy hash for tests
+    fn gen_dummy_hash(i: u8) -> Sha256dHash {
+        Sha256dHash::from_hex(&vec![i; 32].to_hex()).unwrap()
+    }
 
     #[test]
     fn verify_challenge_test() {
         let mut clientchain = MockClientChain::new();
-        let dummy_hash = clientchain.send_challenge().unwrap();
+        let dummy_hash = gen_dummy_hash(5);
 
         assert!(
             verify_challenge(&dummy_hash, &clientchain, time::Duration::from_nanos(1)).unwrap()
@@ -233,9 +242,8 @@ mod tests {
     #[test]
     fn get_challenge_responses_test() {
         let service = MockService::new();
-        let clientchain = MockClientChain::new();
 
-        let dummy_hash = clientchain.send_challenge().unwrap();
+        let dummy_hash = gen_dummy_hash(3);
         let dummy_bid = service
             .get_request_bids(&dummy_hash)
             .unwrap()
@@ -251,8 +259,7 @@ mod tests {
         assert_eq!(res.unwrap().len(), 0);
 
         // then test with a few dummy responses and old hashes that are ignored
-        let _ = clientchain.height.replace(1); // change height in order to generate a different hash
-        let old_dummy_hash = clientchain.send_challenge().unwrap();
+        let old_dummy_hash = gen_dummy_hash(8);
         let mut dummy_response_set = ChallengeResponseSet::new();
         let _ = dummy_response_set.insert(ChallengeResponse(dummy_hash, dummy_bid.clone()));
         vtx.send(ChallengeResponse(dummy_hash, dummy_bid.clone()))
@@ -282,10 +289,8 @@ mod tests {
 
     #[test]
     fn check_request_test() {
-        let clientchain = MockClientChain::new();
-        let dummy_hash = clientchain.send_challenge().unwrap();
-
         let service = MockService::new();
+        let dummy_hash = gen_dummy_hash(11);
         let dummy_request = service.get_request(&dummy_hash).unwrap().unwrap();
 
         assert!(dummy_request.start_blockheight == 2);
@@ -296,10 +301,8 @@ mod tests {
 
     #[test]
     fn get_request_bids_test() {
-        let clientchain = MockClientChain::new();
-        let dummy_hash = clientchain.send_challenge().unwrap();
-
         let mut service = MockService::new();
+        let dummy_hash = gen_dummy_hash(10);
         let dummy_request = service.get_request(&dummy_hash).unwrap().unwrap();
         let dummy_bid = service
             .get_request_bids(&dummy_hash)
@@ -341,7 +344,7 @@ mod tests {
     #[test]
     fn fetch_next_test() {
         let mut clientchain = MockClientChain::new();
-        let dummy_hash = clientchain.send_challenge().unwrap();
+        let dummy_hash = gen_dummy_hash(255);
 
         let mut service = MockService::new();
         let dummy_request = service.get_request(&dummy_hash).unwrap().unwrap();
@@ -396,7 +399,7 @@ mod tests {
         let mut storage = MockStorage::new();
         let service = MockService::new();
 
-        let dummy_hash = clientchain.send_challenge().unwrap();
+        let dummy_hash = gen_dummy_hash(0);
         let dummy_request = service.get_request(&dummy_hash).unwrap().unwrap();
 
         // test normal operation of run_challenge_request by adding some responses for
@@ -413,9 +416,9 @@ mod tests {
         let _ = clientchain
             .height
             .replace((dummy_request.start_blockheight as u64) + 1); // set height +1 for challenge hash response
-        let actual_hash = clientchain.send_challenge().unwrap();
-        let actual_bid = challenge_state.bids.iter().next().unwrap().clone();
-        vtx.send(ChallengeResponse(actual_hash, actual_bid.clone()))
+        let dummy_challenge_hash = clientchain.send_challenge().unwrap();
+        let dummy_bid = challenge_state.bids.iter().next().unwrap().clone();
+        vtx.send(ChallengeResponse(dummy_challenge_hash, dummy_bid.clone()))
             .unwrap();
 
         let _ = clientchain
@@ -432,8 +435,11 @@ mod tests {
         match res {
             Ok(_) => {
                 assert!(true);
-                assert_eq!(actual_hash, storage.challenge_responses.borrow()[0].0);
-                assert_eq!(actual_bid, storage.challenge_responses.borrow()[0].1);
+                assert_eq!(
+                    dummy_challenge_hash,
+                    storage.challenge_responses.borrow()[0].0
+                );
+                assert_eq!(dummy_bid, storage.challenge_responses.borrow()[0].1);
                 assert_eq!(1, storage.challenge_responses.borrow().len());
             }
             Err(_) => assert!(false, "should not return error"),
@@ -488,7 +494,7 @@ mod tests {
             .unwrap();
 
         clientchain.return_false = true;
-        vtx.send(ChallengeResponse(actual_hash, actual_bid.clone()))
+        vtx.send(ChallengeResponse(dummy_challenge_hash, dummy_bid.clone()))
             .unwrap();
 
         let res = run_challenge_request(
@@ -517,7 +523,7 @@ mod tests {
             .unwrap()
             .unwrap();
 
-        vtx.send(ChallengeResponse(actual_hash, actual_bid.clone()))
+        vtx.send(ChallengeResponse(dummy_challenge_hash, dummy_bid.clone()))
             .unwrap();
         let res = run_challenge_request(
             &clientchain,
