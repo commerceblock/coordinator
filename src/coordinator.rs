@@ -7,11 +7,11 @@ use std::sync::{Arc, Mutex};
 use std::{thread, time};
 
 use bitcoin::util::hash::{HexError, Sha256dHash};
+use futures::sync::oneshot;
 
 use crate::challenger::{ChallengeResponse, ChallengeState};
 use crate::clientchain::MockClientChain;
 use crate::error::{CError, Result};
-use crate::listener::{Listener, MockListener};
 use crate::service::MockService;
 use crate::storage::{MockStorage, Storage};
 
@@ -22,7 +22,6 @@ pub fn run() -> Result<()> {
 
     let service = MockService::new();
     let clientchain = MockClientChain::new();
-    let listener = MockListener {};
     let storage = MockStorage::new();
 
     // hardcoded genesis hash for now
@@ -37,19 +36,21 @@ pub fn run() -> Result<()> {
 
             let mut shared_challenge = Arc::new(Mutex::new(challenge));
 
-            let (thread_tx, thread_rx) = channel();
+            let (thread_tx, thread_rx) = oneshot::channel();
+
             let (verify_tx, verify_rx): (Sender<ChallengeResponse>, Receiver<ChallengeResponse>) =
                 channel();
 
-            let verify_handle = listener.do_work(shared_challenge.clone(), verify_tx, thread_rx);
+            let verify_handle =
+                ::listener::run_listener(shared_challenge.clone(), verify_tx, thread_rx);
 
             ::challenger::run_challenge_request(
                 &clientchain,
                 shared_challenge.clone(),
                 &verify_rx,
                 &storage,
-                time::Duration::from_secs(1),
-                time::Duration::from_secs(1),
+                time::Duration::from_secs(300),
+                time::Duration::from_secs(60),
             )?;
 
             println! {"***** Responses *****"}

@@ -110,7 +110,7 @@ pub fn run_challenge_request<K: ClientChain, D: Storage>(
             continue;
         }
 
-        info! {"storing responses..."}
+        info! {"fetching responses..."}
         storage.save_challenge_responses(get_challenge_responses(
             &challenge_hash,
             &verify_rx,

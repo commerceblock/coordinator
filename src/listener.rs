@@ -8,97 +8,96 @@ use std::{thread, time};
 
 use bitcoin::consensus::serialize;
 use bitcoin::util::hash::{BitcoinHash, Sha256dHash};
+use futures::future;
+use futures::sync::oneshot;
+use hyper::rt::{self, Future, Stream};
+use hyper::service::{service_fn, service_fn_ok};
+use hyper::{Body, Method, Request, Response, Server, StatusCode};
 use secp256k1::{Message, PublicKey, Secp256k1, Signature};
+use serde_json::{self, Value};
 
 use crate::challenger::{ChallengeResponse, ChallengeState};
 use crate::error::{CError, Result};
 
-/// Enum for all the messages handled by the listener
-pub enum ListenerMsg {
-    /// Variant for MsgChallengeSig
-    ChallengeSig(MsgChallengeSig),
-}
-
 /// Messsage type for challenge proofs sent by guardnodes
-pub struct MsgChallengeSig {
+pub struct ChallengeSig {
     hash: Sha256dHash,
     pubkey: PublicKey,
     sig: Signature,
 }
 
-/// Listener trait defining desired functionality for the struct that handles
-/// incoming requests, verifies them and informs the challenger of the verified
-/// ones via the ChallengeResponse model
-pub trait Listener {
-    /// Main do_work listener method listening to incoming requests, verifying
-    /// and sending responses to challenger
-    fn do_work(
-        &self,
-        challenge: Arc<Mutex<ChallengeState>>,
-        vtx: Sender<ChallengeResponse>,
-        trx: Receiver<()>,
-    ) -> thread::JoinHandle<()>;
+/// Verify that the challenge signature is valid using ecdsa tools
+fn verify_challenge_sig(challenge_sig: ChallengeSig) -> Result<()> {
+    let secp = Secp256k1::new();
 
-    /// Handle message challenge sig
-    fn handle_msg_challengesig(&self, msg: MsgChallengeSig) -> Result<()> {
-        let secp = Secp256k1::new();
-
-        match secp.verify(
-            &Message::from_slice(&serialize(&msg.hash)).unwrap(),
-            &msg.sig,
-            &msg.pubkey,
-        ) {
-            Ok(_) => Ok(()),
-            Err(_) => Err(CError::Coordinator("handle_msg_challengesig failed")),
-        }
-    }
-
-    /// Handle message
-    fn handle_msg(&self, msg: ListenerMsg) -> Result<()> {
-        match msg {
-            ListenerMsg::ChallengeSig(c) => self.handle_msg_challengesig(c),
-        }
+    match secp.verify(
+        &Message::from_slice(&serialize(&challenge_sig.hash)).unwrap(),
+        &challenge_sig.sig,
+        &challenge_sig.pubkey,
+    ) {
+        Ok(_) => Ok(()),
+        Err(_) => Err(CError::Coordinator("verify_challenge_sig failed")),
     }
 }
 
-/// Mock implementation of Listener for generating mock challenge responses
-pub struct MockListener {}
+/// Handle listener service requests
+fn handle(
+    req: Request<Body>,
+    _challenge: &Arc<Mutex<ChallengeState>>,
+    _challenge_resp: &Sender<ChallengeResponse>,
+) -> Box<Future<Item = Response<Body>, Error = hyper::Error> + Send> {
+    let mut response = Response::new(Body::empty());
 
-/// Note
-/// This is a temporary implementation for integration testing with other
-/// interfaces. Ideally it will be removed once the listener interface has been
-/// finalised and replaced by dummy requests sent to the listener on any
-/// integration tests
-impl Listener for MockListener {
-    /// Run mock listener do_work method producing mock challenge responses
-    fn do_work(
-        &self,
-        challenge: Arc<Mutex<ChallengeState>>,
-        vtx: Sender<ChallengeResponse>,
-        trx: Receiver<()>,
-    ) -> thread::JoinHandle<()> {
-        thread::spawn(move || loop {
-            match trx.try_recv() {
-                Ok(_) | Err(TryRecvError::Disconnected) => {
-                    info!("Verify ended");
-                    break;
+    match (req.method(), req.uri().path()) {
+        (&Method::GET, "/") => {
+            *response.body_mut() =
+                Body::from("Challenge proof should be POSTed to /challengeproof");
+        }
+
+        (&Method::POST, "/challengeproof") => {
+            let resp = req.into_body().concat2().map(move |body| {
+                match serde_json::from_slice::<Value>(body.as_ref()) {
+                    Ok(obj) => {
+                        info!("{:?}", obj);
+                        Response::new(Body::from("Success"))
+                    }
+                    Err(e) => {
+                        warn! {"serialization error: {:?}", e}
+                        Response::new(Body::from("Invalid body"))
+                    }
                 }
-                Err(TryRecvError::Empty) => {}
-            }
+            });
+            return Box::new(resp);
+        }
 
-            // get immutable lock to avoid changing any data
-            let challenge_lock = challenge.lock().unwrap();
-
-            if let Some(latest) = challenge_lock.latest_challenge {
-                vtx.send(ChallengeResponse(
-                    latest,
-                    challenge_lock.bids.iter().next().unwrap().clone(),
-                ))
-                .unwrap();
-            }
-            std::mem::drop(challenge_lock);
-
-            thread::sleep(time::Duration::from_millis(500))
-        })
+        _ => {
+            *response.body_mut() = Body::from("Invalid request");
+        }
     }
+
+    Box::new(future::ok(response))
+}
+
+/// Run listener service
+pub fn run_listener(
+    challenge: Arc<Mutex<ChallengeState>>,
+    ch_resp: Sender<ChallengeResponse>,
+    ch_recv: oneshot::Receiver<()>,
+) -> thread::JoinHandle<()> {
+    let addr = ([127, 0, 0, 1], 9999).into();
+
+    let listener_service = move || {
+        let challenge = Arc::clone(&challenge);
+        let challenge_resp = ch_resp.clone();
+        service_fn(move |req: Request<Body>| handle(req, &challenge, &challenge_resp))
+    };
+
+    let server = Server::bind(&addr)
+        .serve(listener_service)
+        .with_graceful_shutdown(ch_recv)
+        .map_err(|e| eprintln!("server error: {}", e));
+
+    thread::spawn(move || {
+        rt::run(server);
+    })
 }
