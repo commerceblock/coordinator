@@ -13,7 +13,7 @@
 #![warn(unused_extern_crates)]
 #![warn(unused_import_braces)]
 #![warn(unused_results)]
-#![allow(unused_imports)] // alow this for now - remove later
+#![warn(unused_imports)] // alow this for now - remove later
 #![allow(dead_code)] // alow this for now - remove later
 
 #[macro_use]

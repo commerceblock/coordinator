@@ -19,35 +19,41 @@ use serde_json::{self, Value};
 
 use crate::challenger::{ChallengeResponse, ChallengeState};
 use crate::error::Result;
+use crate::request::Bid;
 
 /// Messsage type for challenge proofs sent by guardnodes
 #[derive(Debug)]
-pub struct ChallengeSig {
+pub struct ChallengeProof {
     /// Challenge (transaction id) hash
     pub hash: Sha256dHash,
-    /// Pubkey used to generate challenge signature
-    pub pubkey: PublicKey,
     /// Challenge signature for hash and pubkey
     pub sig: Signature,
+    /// Pubkey used to generate challenge signature
+    pub bid: Bid,
 }
 
-impl ChallengeSig {
-    /// Parse serde json value into ChallengeSig
-    pub fn from_json(val: Value) -> Result<ChallengeSig> {
+impl ChallengeProof {
+    /// Parse serde json value into ChallengeProof
+    pub fn from_json(val: Value) -> Result<ChallengeProof> {
         let hash = Sha256dHash::from_hex(val["hash"].as_str().unwrap_or(""))?;
+        let txid = Sha256dHash::from_hex(val["txid"].as_str().unwrap_or(""))?;
         let pubkey =
             PublicKey::from_slice(&Vec::<u8>::from_hex(val["pubkey"].as_str().unwrap_or(""))?)?;
         let sig = Signature::from_der(&Vec::<u8>::from_hex(val["sig"].as_str().unwrap_or(""))?)?;
-        Ok(ChallengeSig { hash, pubkey, sig })
+        Ok(ChallengeProof {
+            hash,
+            sig,
+            bid: Bid { txid, pubkey },
+        })
     }
 
     /// Verify that the challenge signature is valid using ecdsa tools
-    fn verify(challenge_sig: ChallengeSig) -> Result<()> {
+    fn verify(challenge_proof: &ChallengeProof) -> Result<()> {
         let secp = Secp256k1::new();
         secp.verify(
-            &Message::from_slice(&serialize(&challenge_sig.hash)).unwrap(),
-            &challenge_sig.sig,
-            &challenge_sig.pubkey,
+            &Message::from_slice(&serialize(&challenge_proof.hash)).unwrap(),
+            &challenge_proof.sig,
+            &challenge_proof.bid.pubkey,
         )?;
         Ok(())
     }
@@ -57,44 +63,41 @@ impl ChallengeSig {
 fn handle_challengeproof(
     req: Request<Body>,
     challenge: Arc<Mutex<ChallengeState>>,
-    _challenge_resp: &Sender<ChallengeResponse>,
+    challenge_resp: Sender<ChallengeResponse>,
 ) -> Box<Future<Item = Response<Body>, Error = hyper::Error> + Send> {
     let resp = req.into_body().concat2().map(move |body| {
         // parse request body
         match serde_json::from_slice::<Value>(body.as_ref()) {
             // parse json from body
-            Ok(obj) => match ChallengeSig::from_json(obj) {
-                // parse challenge sig from json
-                Ok(sig) => {
-                    let latest = challenge.lock().unwrap().latest_challenge;
-                    match latest {
-                        // match active challenge hash with request
-                        Some(h) => {
-                            if sig.hash != h {
-                                return response(
-                                    StatusCode::BAD_REQUEST,
-                                    format!("bad-hash: {:?}", sig.hash),
-                                );
-                            }
+            Ok(obj) => match ChallengeProof::from_json(obj) {
+                // parse challenge proof from json
+                Ok(proof) => {
+                    // check for an active challenge
+                    let challenge_lock = challenge.lock().unwrap();
+                    if let Some(h) = challenge_lock.latest_challenge {
+                        // check challenge proof bid exists
+                        if !challenge_lock.bids.contains(&proof.bid) {
+                            return response(StatusCode::BAD_REQUEST, "bad-bid".to_string());
                         }
-                        None => {
-                            return response(
-                                StatusCode::BAD_REQUEST,
-                                format!("no active challenge"),
-                            )
+                        // drop lock immediately
+                        std::mem::drop(challenge_lock);
+                        // check challenge proof hash is correct
+                        if proof.hash != h {
+                            return response(StatusCode::BAD_REQUEST, "bad-hash".to_string());
                         }
+                        // check challenge proof sig is correct
+                        if let Err(e) = ChallengeProof::verify(&proof) {
+                            return response(StatusCode::BAD_REQUEST, format!("bad-sig: {:?}", e));
+                        }
+                        // send successful response to challenger
+                        challenge_resp
+                            .send(ChallengeResponse(proof.hash, proof.bid.clone()))
+                            .unwrap();
+                        return response(StatusCode::OK, String::new());
                     }
-
-                    // After checking active challenge, verify challenge sig
-                    if let Err(e) = ChallengeSig::verify(sig) {
-                        return response(StatusCode::BAD_REQUEST, format!("bad-sig: {:?}", e));
-                    }
-                    response(StatusCode::OK, "Success".to_string())
+                    response(StatusCode::BAD_REQUEST, format!("no-active-challenge"))
                 }
-                Err(e) => response(
-                    StatusCode::BAD_REQUEST,
-                    format!("bad-challenge-data: {:?}", e),
-                ),
+                Err(e) => response(StatusCode::BAD_REQUEST, format!("bad-proof-data: {:?}", e)),
             },
             Err(e) => response(StatusCode::BAD_REQUEST, format!("bad-json-data: {:?}", e)),
         }
@@ -106,7 +109,7 @@ fn handle_challengeproof(
 fn handle(
     req: Request<Body>,
     challenge: Arc<Mutex<ChallengeState>>,
-    challenge_resp: &Sender<ChallengeResponse>,
+    challenge_resp: Sender<ChallengeResponse>,
 ) -> Box<Future<Item = Response<Body>, Error = hyper::Error> + Send> {
     let resp = match (req.method(), req.uri().path()) {
         (&Method::GET, "/") => response(
@@ -115,7 +118,7 @@ fn handle(
         ),
 
         (&Method::POST, "/challengeproof") => {
-            return handle_challengeproof(req, challenge.clone(), challenge_resp);
+            return handle_challengeproof(req, challenge, challenge_resp);
         }
 
         _ => response(
@@ -146,7 +149,7 @@ pub fn run_listener(
     let listener_service = move || {
         let challenge = Arc::clone(&challenge);
         let challenge_resp = ch_resp.clone();
-        service_fn(move |req: Request<Body>| handle(req, challenge.clone(), &challenge_resp))
+        service_fn(move |req: Request<Body>| handle(req, challenge.clone(), challenge_resp.clone()))
     };
 
     let server = Server::bind(&addr)

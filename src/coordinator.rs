@@ -2,16 +2,16 @@
 //!
 //! Coordinator entry point for spawning all components
 
-use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
+use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::{thread, time};
 
-use bitcoin::util::hash::{HexError, Sha256dHash};
+use bitcoin::util::hash::Sha256dHash;
 use futures::sync::oneshot;
 
-use crate::challenger::{ChallengeResponse, ChallengeState};
+use crate::challenger::ChallengeResponse;
 use crate::clientchain::MockClientChain;
-use crate::error::{CError, Result};
+use crate::error::Result;
 use crate::service::MockService;
 use crate::storage::{MockStorage, Storage};
 

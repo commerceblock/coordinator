@@ -3,7 +3,6 @@
 //! Client chain interface and implementations
 
 use std::cell::RefCell;
-use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
 
 use bitcoin::util::hash::Sha256dHash;
 use bitcoin_hashes::hex::ToHex;

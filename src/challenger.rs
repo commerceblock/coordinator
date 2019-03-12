@@ -7,7 +7,7 @@ use std::sync::mpsc::{channel, Receiver, TryRecvError};
 use std::sync::{Arc, Mutex};
 use std::{thread, time};
 
-use bitcoin::util::hash::{HexError, Sha256dHash};
+use bitcoin::util::hash::Sha256dHash;
 
 use crate::clientchain::ClientChain;
 use crate::error::{CError, Result};
@@ -202,7 +202,7 @@ pub fn fetch_next<T: Service, K: ClientChain>(
 mod tests {
     use super::*;
 
-    use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
+    use std::sync::mpsc::{channel, Receiver, Sender};
 
     use bitcoin_hashes::hex::ToHex;
 
