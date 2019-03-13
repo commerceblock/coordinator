@@ -190,6 +190,144 @@ mod tests {
     }
 
     #[test]
+    fn handle_test() {
+        let (resp_tx, resp_rx): (Sender<ChallengeResponse>, Receiver<ChallengeResponse>) = channel();
+
+        let chl_hash = gen_dummy_hash(11);
+        let _challenge_state = gen_challenge_state(&gen_dummy_hash(3), &chl_hash);
+        let bid_txid = _challenge_state.bids.iter().next().unwrap().txid;
+        let bid_pubkey = _challenge_state.bids.iter().next().unwrap().pubkey;
+        let challenge_state = Arc::new(Mutex::new(_challenge_state));
+
+        // Request get /
+        let data = "";
+        let request = Request::builder()
+            .method("GET")
+            .uri("/")
+            .body(Body::from(data))
+            .unwrap();
+        let _ = handle(request, challenge_state.clone(), resp_tx.clone())
+            .map(|res| {
+                assert_eq!(res.status(), StatusCode::OK);
+                res.into_body()
+                    .concat2()
+                    .map(|chunk| {
+                        assert_eq!(
+                            "Challenge proof should be POSTed to /challengeproof",
+                            String::from_utf8_lossy(&chunk)
+                        );
+                    })
+                    .wait()
+            })
+            .wait();
+        assert!(resp_rx.try_recv() == Err(TryRecvError::Empty)); // check receiver empty
+
+        // Request get /dummy
+        let data = "";
+        let request = Request::builder()
+            .method("GET")
+            .uri("/dummy")
+            .body(Body::from(data))
+            .unwrap();
+        let _ = handle(request, challenge_state.clone(), resp_tx.clone())
+            .map(|res| {
+                assert_eq!(res.status(), StatusCode::NOT_FOUND);
+                res.into_body()
+                    .concat2()
+                    .map(|chunk| {
+                        assert_eq!("Invalid request /dummy", String::from_utf8_lossy(&chunk));
+                    })
+                    .wait()
+            })
+            .wait();
+        assert!(resp_rx.try_recv() == Err(TryRecvError::Empty)); // check receiver empty
+
+        // Request post /dummy
+        let data = "";
+        let request = Request::builder()
+            .method("POST")
+            .uri("/dummy")
+            .body(Body::from(data))
+            .unwrap();
+        let _ = handle(request, challenge_state.clone(), resp_tx.clone())
+            .map(|res| {
+                assert_eq!(res.status(), StatusCode::NOT_FOUND);
+                res.into_body()
+                    .concat2()
+                    .map(|chunk| {
+                        assert_eq!("Invalid request /dummy", String::from_utf8_lossy(&chunk));
+                    })
+                    .wait()
+            })
+            .wait();
+        assert!(resp_rx.try_recv() == Err(TryRecvError::Empty)); // check receiver empty
+
+        // Request empty post /challengeproof
+        let data = "";
+        let request = Request::builder()
+            .method("POST")
+            .uri("/challengeproof")
+            .body(Body::from(data))
+            .unwrap();
+        let _ = handle(request, challenge_state.clone(), resp_tx.clone())
+            .map(|res| {
+                assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+                res.into_body()
+                    .concat2()
+                    .map(|chunk| {
+                        assert!(String::from_utf8_lossy(&chunk).contains("bad-json-data"));
+                    })
+                    .wait()
+            })
+            .wait();
+        assert!(resp_rx.try_recv() == Err(TryRecvError::Empty)); // check receiver empty
+
+        // Request good post /challengeproof
+        let secret_key = SecretKey::from_slice(&[0xaa; 32]).unwrap();
+        let secp = Secp256k1::new();
+        let sig = secp.sign(&Message::from_slice(&serialize(&chl_hash)).unwrap(), &secret_key);
+        let data = format!(
+            r#"
+        {{
+            "txid": "{}",
+            "pubkey": "{}",
+            "hash": "{}",
+            "sig": "{}"
+        }}"#,
+            bid_txid,
+            bid_pubkey,
+            chl_hash,
+            sig.serialize_der().to_hex()
+        );
+        let request = Request::builder()
+            .method("POST")
+            .uri("/challengeproof")
+            .body(Body::from(data))
+            .unwrap();
+        let _ = handle(request, challenge_state.clone(), resp_tx.clone())
+            .map(|res| {
+                assert_eq!(res.status(), StatusCode::OK);
+                res.into_body()
+                    .concat2()
+                    .map(|chunk| {
+                        assert_eq!("", String::from_utf8_lossy(&chunk));
+                    })
+                    .wait()
+            })
+            .wait();
+        assert!(
+            resp_rx.try_recv()
+                == Ok(ChallengeResponse(
+                    chl_hash,
+                    Bid {
+                        txid: bid_txid,
+                        pubkey: bid_pubkey,
+                    },
+                ))
+        ); // check receiver not empty
+    }
+
+    #[test]
     fn handle_challengeproof_test() {
         let (resp_tx, resp_rx): (Sender<ChallengeResponse>, Receiver<ChallengeResponse>) = channel();
 
