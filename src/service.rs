@@ -97,9 +97,10 @@ impl Service for MockService {
                 "1234567890000000000000000000000000000000000000000000000000000000",
             )
             .unwrap(),
+            // pubkey corresponding to SecretKey::from_slice(&[0xaa; 32])
             pubkey: PublicKey::from_slice(
                 &Vec::<u8>::from_hex(
-                    "03356190524d52d7e94e1bd43e8f23778e585a4fe1f275e65a06fa5ceedb67d2f3",
+                    "026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3",
                 )
                 .unwrap(),
             )

@@ -204,15 +204,13 @@ mod tests {
 
     use std::sync::mpsc::{channel, Receiver, Sender};
 
-    use bitcoin_hashes::hex::ToHex;
-
     use crate::clientchain::MockClientChain;
     use crate::service::MockService;
     use crate::storage::MockStorage;
 
     /// Generate dummy hash for tests
     fn gen_dummy_hash(i: u8) -> Sha256dHash {
-        Sha256dHash::from_hex(&vec![i; 32].to_hex()).unwrap()
+        Sha256dHash::from(&[i as u8; 32] as &[u8])
     }
 
     #[test]

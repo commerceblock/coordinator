@@ -59,12 +59,15 @@ impl ChallengeProof {
     }
 }
 
+// Future hyper return type for listener server responses
+type BoxFut = Box<Future<Item = Response<Body>, Error = hyper::Error> + Send>;
+
 /// Handle challengeproof POST request
 fn handle_challengeproof(
     req: Request<Body>,
     challenge: Arc<Mutex<ChallengeState>>,
     challenge_resp: Sender<ChallengeResponse>,
-) -> Box<Future<Item = Response<Body>, Error = hyper::Error> + Send> {
+) -> BoxFut {
     let resp = req.into_body().concat2().map(move |body| {
         // parse request body
         match serde_json::from_slice::<Value>(body.as_ref()) {
@@ -110,7 +113,7 @@ fn handle(
     req: Request<Body>,
     challenge: Arc<Mutex<ChallengeState>>,
     challenge_resp: Sender<ChallengeResponse>,
-) -> Box<Future<Item = Response<Body>, Error = hyper::Error> + Send> {
+) -> BoxFut {
     let resp = match (req.method(), req.uri().path()) {
         (&Method::GET, "/") => response(
             StatusCode::OK,
@@ -160,4 +163,276 @@ pub fn run_listener(
     thread::spawn(move || {
         rt::run(server);
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bitcoin_hashes::hex::ToHex;
+    use secp256k1::SecretKey;
+    use std::sync::mpsc::{channel, Receiver, TryRecvError};
+
+    use crate::service::{MockService, Service};
+
+    /// Generate dummy hash for tests
+    fn gen_dummy_hash(i: u8) -> Sha256dHash {
+        Sha256dHash::from(&[i as u8; 32] as &[u8])
+    }
+
+    /// Geberate dummy challenge state
+    fn gen_challenge_state(
+        request_hash: &Sha256dHash,
+        challenge_hash: &Sha256dHash,
+    ) -> ChallengeState {
+        let service = MockService::new();
+
+        let request = service.get_request(&request_hash).unwrap().unwrap();
+        let bids = service.get_request_bids(&request_hash).unwrap().unwrap();
+        ChallengeState {
+            request,
+            bids,
+            latest_challenge: Some(*challenge_hash),
+        }
+    }
+
+    #[test]
+    fn handle_challengeproof_test() {
+        let (resp_tx, resp_rx): (Sender<ChallengeResponse>, Receiver<ChallengeResponse>) =
+            channel();
+
+        let chl_hash = gen_dummy_hash(8);
+        let _challenge_state = gen_challenge_state(&gen_dummy_hash(1), &chl_hash);
+        let bid_txid = _challenge_state.bids.iter().next().unwrap().txid;
+        let bid_pubkey = _challenge_state.bids.iter().next().unwrap().pubkey;
+        let challenge_state = Arc::new(Mutex::new(_challenge_state));
+
+        // Request body data empty
+        let data = "";
+        let request = Request::new(Body::from(data));
+        let _ = handle_challengeproof(request, challenge_state.clone(), resp_tx.clone())
+            .map(|res| {
+                assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+                res.into_body()
+                    .concat2()
+                    .map(|chunk| {
+                        assert!(String::from_utf8_lossy(&chunk).contains("bad-json-data"));
+                    })
+                    .wait()
+            })
+            .wait();
+        assert!(resp_rx.try_recv() == Err(TryRecvError::Empty)); // check receiver empty
+
+        // Bad json data on request body (extra comma)
+        let data = r#"
+        {
+            "txid": "1234567890000000000000000000000000000000000000000000000000000000",
+        }"#;
+        let request = Request::new(Body::from(data));
+        let _ = handle_challengeproof(request, challenge_state.clone(), resp_tx.clone())
+            .map(|res| {
+                assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+                res.into_body()
+                    .concat2()
+                    .map(|chunk| {
+                        assert!(String::from_utf8_lossy(&chunk).contains("bad-json-data"));
+                    })
+                    .wait()
+            })
+            .wait();
+        assert!(resp_rx.try_recv() == Err(TryRecvError::Empty)); // check receiver empty
+
+        // Missing proof data on request body
+        let data = r#"
+        {
+            "txid": "1234567890000000000000000000000000000000000000000000000000000000"
+        }"#;
+        let request = Request::new(Body::from(data));
+        let _ = handle_challengeproof(request, challenge_state.clone(), resp_tx.clone())
+            .map(|res| {
+                assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+                res.into_body()
+                    .concat2()
+                    .map(|chunk| {
+                        assert!(String::from_utf8_lossy(&chunk).contains("bad-proof-data"));
+                    })
+                    .wait()
+            })
+            .wait();
+        assert!(resp_rx.try_recv() == Err(TryRecvError::Empty)); // check receiver empty
+
+        // Bad proof data on request body (invalid pubkey)
+        let data = r#"
+        {
+            "txid": "1234567890000000000000000000000000000000000000000000000000000000",
+            "pubkey": "3356190524d52d7e94e1bd43e8f23778e585a4fe1f275e65a06fa5ceedb67d2f3",
+            "hash": "0404040404040404040404040404040404040404040404040404040404040404",
+            "sig": "304402201742daea5ec3b7306b9164be862fc1659cc830032180b8b17beffe02645860d602201039eba402d22e630308e6af05da8dd4f05b51b7d672ca5fc9e3b0a57776365c"
+        }"#;
+        let request = Request::new(Body::from(data));
+        let _ = handle_challengeproof(request, challenge_state.clone(), resp_tx.clone())
+            .map(|res| {
+                assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+                res.into_body()
+                    .concat2()
+                    .map(|chunk| {
+                        assert!(String::from_utf8_lossy(&chunk).contains("bad-proof-data"));
+                    })
+                    .wait()
+            })
+            .wait();
+        assert!(resp_rx.try_recv() == Err(TryRecvError::Empty)); // check receiver empty
+
+        // No active challenge (hash is None) so request rejected
+        challenge_state.lock().unwrap().latest_challenge = None;
+        let data = r#"
+        {
+            "txid": "0000000000000000000000000000000000000000000000000000000000000000",
+            "pubkey": "03356190524d52d7e94e1bd43e8f23778e585a4fe1f275e65a06fa5ceedb67d111",
+            "hash": "0404040404040404040404040404040404040404040404040404040404040404",
+            "sig": "304402201742daea5ec3b7306b9164be862fc1659cc830032180b8b17beffe02645860d602201039eba402d22e630308e6af05da8dd4f05b51b7d672ca5fc9e3b0a57776365c"
+        }"#;
+        let request = Request::new(Body::from(data));
+        let _ =
+            handle_challengeproof(request, challenge_state.clone(), resp_tx.clone())
+                .map(|res| {
+                    assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+                    res.into_body().concat2().map(|chunk| {
+                    assert!(String::from_utf8_lossy(&chunk).contains("no-active-challenge"));
+                }).wait()
+                })
+                .wait();
+        challenge_state.lock().unwrap().latest_challenge = Some(chl_hash);
+        assert!(resp_rx.try_recv() == Err(TryRecvError::Empty)); // check receiver empty
+
+        // Invalid bid on request body (txid does not exist)
+        let data = r#"
+        {
+            "txid": "0000000000000000000000000000000000000000000000000000000000000000",
+            "pubkey": "03356190524d52d7e94e1bd43e8f23778e585a4fe1f275e65a06fa5ceedb67d111",
+            "hash": "0404040404040404040404040404040404040404040404040404040404040404",
+            "sig": "304402201742daea5ec3b7306b9164be862fc1659cc830032180b8b17beffe02645860d602201039eba402d22e630308e6af05da8dd4f05b51b7d672ca5fc9e3b0a57776365c"
+        }"#;
+        let request = Request::new(Body::from(data));
+        let _ = handle_challengeproof(request, challenge_state.clone(), resp_tx.clone())
+            .map(|res| {
+                assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+                res.into_body()
+                    .concat2()
+                    .map(|chunk| {
+                        assert!(String::from_utf8_lossy(&chunk).contains("bad-bid"));
+                    })
+                    .wait()
+            })
+            .wait();
+        assert!(resp_rx.try_recv() == Err(TryRecvError::Empty)); // check receiver empty
+
+        // Invalid bid on request body (pubkey does not exist)
+        let data = format!(r#"
+        {{
+            "txid": "{}",
+            "pubkey": "03356190524d52d7e94e1bd43e8f23778e585a4fe1f275e65a06fa5ceedb67d111",
+            "hash": "0404040404040404040404040404040404040404040404040404040404040404",
+            "sig": "304402201742daea5ec3b7306b9164be862fc1659cc830032180b8b17beffe02645860d602201039eba402d22e630308e6af05da8dd4f05b51b7d672ca5fc9e3b0a57776365c"
+        }}"#, bid_txid);
+        let request = Request::new(Body::from(data));
+        let _ = handle_challengeproof(request, challenge_state.clone(), resp_tx.clone())
+            .map(|res| {
+                assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+                res.into_body()
+                    .concat2()
+                    .map(|chunk| {
+                        assert!(String::from_utf8_lossy(&chunk).contains("bad-bid"));
+                    })
+                    .wait()
+            })
+            .wait();
+        assert!(resp_rx.try_recv() == Err(TryRecvError::Empty)); // check receiver empty
+
+        // Request send for an invalid / out of date challenge hash
+        let data = format!(r#"
+        {{
+            "txid": "{}",
+            "pubkey": "{}",
+            "hash": "0404040404040404040404040404040404040404040404040404040404040404",
+            "sig": "304402201742daea5ec3b7306b9164be862fc1659cc830032180b8b17beffe02645860d602201039eba402d22e630308e6af05da8dd4f05b51b7d672ca5fc9e3b0a57776365c"
+        }}"#, bid_txid, bid_pubkey);
+        let request = Request::new(Body::from(data));
+        let _ = handle_challengeproof(request, challenge_state.clone(), resp_tx.clone())
+            .map(|res| {
+                assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+                res.into_body()
+                    .concat2()
+                    .map(|chunk| {
+                        assert!(String::from_utf8_lossy(&chunk).contains("bad-hash"));
+                    })
+                    .wait()
+            })
+            .wait();
+        assert!(resp_rx.try_recv() == Err(TryRecvError::Empty)); // check receiver empty
+
+        // Request sent an invalid sig for the correct bid and challenge hash
+        let data = format!(r#"
+        {{
+            "txid": "{}",
+            "pubkey": "{}",
+            "hash": "{}",
+            "sig": "304402201742daea5ec3b7306b9164be862fc1659cc830032180b8b17beffe02645860d602201039eba402d22e630308e6af05da8dd4f05b51b7d672ca5fc9e3b0a57776365c"
+        }}"#, bid_txid, bid_pubkey, chl_hash);
+        let request = Request::new(Body::from(data));
+        let _ = handle_challengeproof(request, challenge_state.clone(), resp_tx.clone())
+            .map(|res| {
+                assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+                res.into_body()
+                    .concat2()
+                    .map(|chunk| {
+                        assert!(String::from_utf8_lossy(&chunk).contains("bad-sig"));
+                    })
+                    .wait()
+            })
+            .wait();
+        assert!(resp_rx.try_recv() == Err(TryRecvError::Empty)); // check receiver empty
+
+        // Correct sig sent in the request body for bid and active challenge
+        let secret_key = SecretKey::from_slice(&[0xaa; 32]).unwrap();
+        let secp = Secp256k1::new();
+        let sig = secp.sign(
+            &Message::from_slice(&serialize(&chl_hash)).unwrap(),
+            &secret_key,
+        );
+        let data = format!(
+            r#"
+        {{
+            "txid": "{}",
+            "pubkey": "{}",
+            "hash": "{}",
+            "sig": "{}"
+        }}"#,
+            bid_txid,
+            bid_pubkey,
+            chl_hash,
+            sig.serialize_der().to_hex()
+        );
+        let request = Request::new(Body::from(data));
+        let _ = handle_challengeproof(request, challenge_state.clone(), resp_tx.clone())
+            .map(|res| {
+                assert_eq!(res.status(), StatusCode::OK);
+                res.into_body()
+                    .concat2()
+                    .map(|chunk| {
+                        assert!(String::from_utf8_lossy(&chunk) == "");
+                    })
+                    .wait()
+            })
+            .wait();
+        assert!(
+            resp_rx.try_recv()
+                == Ok(ChallengeResponse(
+                    chl_hash,
+                    Bid {
+                        txid: bid_txid,
+                        pubkey: bid_pubkey,
+                    },
+                ))
+        ); // check receiver not empty
+    }
 }
