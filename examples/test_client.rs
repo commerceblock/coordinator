@@ -2,23 +2,42 @@
 //!
 //! Mock Example of client sending a POST request to server
 
+extern crate bitcoin;
+extern crate bitcoin_hashes;
 extern crate hyper;
+extern crate secp256k1;
 
-use hyper::header::HeaderValue;
-use hyper::rt::{self, Future, Stream};
-use hyper::Client;
-use hyper::{Body, Method, Request};
+use bitcoin::consensus::encode::serialize;
+use bitcoin::util::hash::Sha256dHash;
+use bitcoin_hashes::hex::ToHex;
+use hyper::{
+    header::HeaderValue,
+    rt::{self, Future, Stream},
+    Body, Client, Method, Request,
+};
+use secp256k1::{Message, Secp256k1, SecretKey};
 
 fn main() {
     let client = Client::new();
 
-    let data = r#"
-    {
+    let hash = Sha256dHash::from_hex("0404040404040404040404040404040404040404040404040404040404040404").unwrap();
+    let secp = Secp256k1::new();
+    let secret_key = SecretKey::from_slice(&[0xaa; 32]).expect("32 bytes within curve order");
+
+    let msg = Message::from_slice(&serialize(&hash)).unwrap();
+    let sig = secp.sign(&msg, &secret_key);
+
+    let data = format!(
+        r#"
+    {{
         "txid": "1234567890000000000000000000000000000000000000000000000000000000",
-        "pubkey": "03356190524d52d7e94e1bd43e8f23778e585a4fe1f275e65a06fa5ceedb67d2f3",
-        "hash": "0404040404040404040404040404040404040404040404040404040404040404",
-        "sig": "304402201742daea5ec3b7306b9164be862fc1659cc830032180b8b17beffe02645860d602201039eba402d22e630308e6af05da8dd4f05b51b7d672ca5fc9e3b0a57776365c"
-    }"#;
+        "pubkey": "026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3",
+        "hash": "{}",
+        "sig": "{}"
+    }}"#,
+        hash,
+        sig.serialize_der().to_hex()
+    );
 
     let uri: hyper::Uri = "http://localhost:9999/challengeproof".parse().unwrap();
     let mut req = Request::new(Body::from(data));
@@ -36,7 +55,7 @@ fn main() {
             println!("Headers: {:#?}", res.headers());
 
             res.into_body().concat2().map(|chunk| {
-                println!("{:?}", chunk);
+                println!("body: {}", String::from_utf8_lossy(&chunk));
             })
         })
         .map(|_| {

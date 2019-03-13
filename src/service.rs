@@ -2,8 +2,9 @@
 //!
 //! Service chain interface and implementations
 
+use std::str::FromStr;
+
 use bitcoin::util::hash::Sha256dHash;
-use bitcoin_hashes::hex::FromHex;
 use ocean_rpc::Client;
 use secp256k1::key::PublicKey;
 
@@ -95,10 +96,7 @@ impl Service for MockService {
         let dummy_bid = Bid {
             txid: Sha256dHash::from_hex("1234567890000000000000000000000000000000000000000000000000000000").unwrap(),
             // pubkey corresponding to SecretKey::from_slice(&[0xaa; 32])
-            pubkey: PublicKey::from_slice(
-                &Vec::<u8>::from_hex("026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3").unwrap(),
-            )
-            .unwrap(),
+            pubkey: PublicKey::from_str("026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3").unwrap(),
         };
         let mut bid_set = BidSet::new();
         let _ = bid_set.insert(dummy_bid);

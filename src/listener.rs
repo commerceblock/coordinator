@@ -2,6 +2,7 @@
 //!
 //! Listener interface and implementations
 
+use std::str::FromStr;
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -37,7 +38,7 @@ impl ChallengeProof {
     pub fn from_json(val: Value) -> Result<ChallengeProof> {
         let hash = Sha256dHash::from_hex(val["hash"].as_str().unwrap_or(""))?;
         let txid = Sha256dHash::from_hex(val["txid"].as_str().unwrap_or(""))?;
-        let pubkey = PublicKey::from_slice(&Vec::<u8>::from_hex(val["pubkey"].as_str().unwrap_or(""))?)?;
+        let pubkey = PublicKey::from_str(val["pubkey"].as_str().unwrap_or(""))?;
         let sig = Signature::from_der(&Vec::<u8>::from_hex(val["sig"].as_str().unwrap_or(""))?)?;
         Ok(ChallengeProof {
             hash,
