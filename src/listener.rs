@@ -34,7 +34,7 @@ pub struct ChallengeProof {
 }
 
 impl ChallengeProof {
-    /// Parse serde json value into ChallengeProof
+    /// Parse serde json value into ChallengeProof struct result
     pub fn from_json(val: Value) -> Result<ChallengeProof> {
         let hash = Sha256dHash::from_hex(val["hash"].as_str().unwrap_or(""))?;
         let txid = Sha256dHash::from_hex(val["txid"].as_str().unwrap_or(""))?;
@@ -47,7 +47,7 @@ impl ChallengeProof {
         })
     }
 
-    /// Verify that the challenge signature is valid using ecdsa tools
+    /// Verify the challenge proof signature using the pubkey and challenge hash
     fn verify(challenge_proof: &ChallengeProof) -> Result<()> {
         let secp = Secp256k1::new();
         secp.verify(
@@ -62,7 +62,11 @@ impl ChallengeProof {
 // Future hyper return type for listener server responses
 type BoxFut = Box<Future<Item = Response<Body>, Error = hyper::Error> + Send>;
 
-/// Handle challengeproof POST request
+/// Handle the POST request /challengeproof. Validate body is in json format,
+/// parse this into a ChallengeProof struct and then verify that there is an
+/// active challenge, that the proof bid exists and that the sig is correct.
+/// Successful responses are pushed to the challenge response channel for the
+/// challenger to receive
 fn handle_challengeproof(
     req: Request<Body>,
     challenge: Arc<Mutex<ChallengeState>>,
@@ -108,7 +112,8 @@ fn handle_challengeproof(
     Box::new(resp)
 }
 
-/// Handle listener service requests
+/// Handler for the listener server. Only allows requests to /
+/// and to the /challengeproof POST uri for receiving challenges from guardnodes
 fn handle(
     req: Request<Body>,
     challenge: Arc<Mutex<ChallengeState>>,
@@ -130,7 +135,7 @@ fn handle(
     Box::new(future::ok(resp))
 }
 
-/// Create hyper response from status code and message
+/// Create hyper response from status code and message Body
 fn response(status: StatusCode, message: String) -> Response<Body> {
     Response::builder()
         .status(status)
@@ -138,7 +143,10 @@ fn response(status: StatusCode, message: String) -> Response<Body> {
         .unwrap()
 }
 
-/// Run listener service
+/// Run the listener server that listens to a specified address for incoming
+/// requests and passes these to handle(). The server runs in a new thread and
+/// can be shutdown via a future oneshot channel receiver from the main method
+/// of the coordinator
 pub fn run_listener(
     challenge: Arc<Mutex<ChallengeState>>,
     ch_resp: Sender<ChallengeResponse>,
@@ -155,7 +163,7 @@ pub fn run_listener(
     let server = Server::bind(&addr)
         .serve(listener_service)
         .with_graceful_shutdown(ch_recv)
-        .map_err(|e| eprintln!("server error: {}", e));
+        .map_err(|e| error!("server error: {}", e));
 
     thread::spawn(move || {
         rt::run(server);
