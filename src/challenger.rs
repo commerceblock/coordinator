@@ -70,9 +70,7 @@ pub fn get_challenge_responses(
             }
             Err(TryRecvError::Empty) => {} // ignore empty - it's allowed
             Err(TryRecvError::Disconnected) => {
-                return Err(CError::Coordinator(
-                    "Challenge response receiver disconnected",
-                ));
+                return Err(CError::Coordinator("Challenge response receiver disconnected"));
             }
         }
         let _ = dur_rx.try_recv().map(|_| time_to_break = true);
@@ -218,16 +216,10 @@ mod tests {
         let mut clientchain = MockClientChain::new();
         let dummy_hash = gen_dummy_hash(5);
 
-        assert!(
-            verify_challenge(&dummy_hash, &clientchain, time::Duration::from_nanos(1)).unwrap()
-                == true
-        );
+        assert!(verify_challenge(&dummy_hash, &clientchain, time::Duration::from_nanos(1)).unwrap() == true);
 
         clientchain.return_false = true;
-        assert!(
-            verify_challenge(&dummy_hash, &clientchain, time::Duration::from_nanos(1)).unwrap()
-                == false
-        );
+        assert!(verify_challenge(&dummy_hash, &clientchain, time::Duration::from_nanos(1)).unwrap() == false);
         clientchain.return_false = false;
 
         clientchain.return_err = true;
@@ -260,18 +252,12 @@ mod tests {
         let old_dummy_hash = gen_dummy_hash(8);
         let mut dummy_response_set = ChallengeResponseSet::new();
         let _ = dummy_response_set.insert(ChallengeResponse(dummy_hash, dummy_bid.clone()));
-        vtx.send(ChallengeResponse(dummy_hash, dummy_bid.clone()))
-            .unwrap();
-        vtx.send(ChallengeResponse(dummy_hash, dummy_bid.clone()))
-            .unwrap();
-        vtx.send(ChallengeResponse(old_dummy_hash, dummy_bid.clone()))
-            .unwrap();
-        vtx.send(ChallengeResponse(dummy_hash, dummy_bid.clone()))
-            .unwrap();
-        vtx.send(ChallengeResponse(old_dummy_hash, dummy_bid.clone()))
-            .unwrap();
-        let res =
-            get_challenge_responses(&dummy_hash, &vrx, time::Duration::from_millis(1)).unwrap();
+        vtx.send(ChallengeResponse(dummy_hash, dummy_bid.clone())).unwrap();
+        vtx.send(ChallengeResponse(dummy_hash, dummy_bid.clone())).unwrap();
+        vtx.send(ChallengeResponse(old_dummy_hash, dummy_bid.clone())).unwrap();
+        vtx.send(ChallengeResponse(dummy_hash, dummy_bid.clone())).unwrap();
+        vtx.send(ChallengeResponse(old_dummy_hash, dummy_bid.clone())).unwrap();
+        let res = get_challenge_responses(&dummy_hash, &vrx, time::Duration::from_millis(1)).unwrap();
         assert_eq!(res.len(), 1);
         assert_eq!(res, dummy_response_set);
 
@@ -332,9 +318,7 @@ mod tests {
         let res = get_request_bids(&dummy_request, &service);
         match res {
             Ok(_) => assert!(false, "should not return Ok"),
-            Err(CError::Coordinator("No bids found")) => {
-                assert!(false, "should not specific error")
-            }
+            Err(CError::Coordinator("No bids found")) => assert!(false, "should not specific error"),
             Err(_) => assert!(true),
         }
     }
@@ -372,12 +356,8 @@ mod tests {
         service.return_none = false;
 
         // then test when get_request returns Request
-        let _ = clientchain
-            .height
-            .replace(dummy_request.start_blockheight as u64);
-        let res = fetch_next(&service, &clientchain, &dummy_hash)
-            .unwrap()
-            .unwrap();
+        let _ = clientchain.height.replace(dummy_request.start_blockheight as u64);
+        let res = fetch_next(&service, &clientchain, &dummy_hash).unwrap().unwrap();
         assert_eq!(res.latest_challenge, None);
         assert_eq!(res.bids, dummy_set);
         assert_eq!(res.request, dummy_request);
@@ -402,26 +382,18 @@ mod tests {
 
         // test normal operation of run_challenge_request by adding some responses for
         // the first challenge
-        let _ = clientchain
-            .height
-            .replace(dummy_request.start_blockheight as u64); // set height for fetch_next to succeed
-        let challenge_state = fetch_next(&service, &clientchain, &dummy_hash)
-            .unwrap()
-            .unwrap();
+        let _ = clientchain.height.replace(dummy_request.start_blockheight as u64); // set height for fetch_next to succeed
+        let challenge_state = fetch_next(&service, &clientchain, &dummy_hash).unwrap().unwrap();
 
         let (vtx, vrx): (Sender<ChallengeResponse>, Receiver<ChallengeResponse>) = channel();
 
-        let _ = clientchain
-            .height
-            .replace((dummy_request.start_blockheight as u64) + 1); // set height +1 for challenge hash response
+        let _ = clientchain.height.replace((dummy_request.start_blockheight as u64) + 1); // set height +1 for challenge hash response
         let dummy_challenge_hash = clientchain.send_challenge().unwrap();
         let dummy_bid = challenge_state.bids.iter().next().unwrap().clone();
         vtx.send(ChallengeResponse(dummy_challenge_hash, dummy_bid.clone()))
             .unwrap();
 
-        let _ = clientchain
-            .height
-            .replace(dummy_request.start_blockheight as u64); // set height back to starting height
+        let _ = clientchain.height.replace(dummy_request.start_blockheight as u64); // set height back to starting height
         let res = run_challenge_request(
             &clientchain,
             Arc::new(Mutex::new(challenge_state)),
@@ -433,10 +405,7 @@ mod tests {
         match res {
             Ok(_) => {
                 assert!(true);
-                assert_eq!(
-                    dummy_challenge_hash,
-                    storage.challenge_responses.borrow()[0].0
-                );
+                assert_eq!(dummy_challenge_hash, storage.challenge_responses.borrow()[0].0);
                 assert_eq!(dummy_bid, storage.challenge_responses.borrow()[0].1);
                 assert_eq!(1, storage.challenge_responses.borrow().len());
             }
@@ -444,12 +413,8 @@ mod tests {
         }
 
         // test client chain failure
-        let _ = clientchain
-            .height
-            .replace(dummy_request.start_blockheight as u64); // set height for fetch_next to succeed
-        let challenge_state = fetch_next(&service, &clientchain, &dummy_hash)
-            .unwrap()
-            .unwrap();
+        let _ = clientchain.height.replace(dummy_request.start_blockheight as u64); // set height for fetch_next to succeed
+        let challenge_state = fetch_next(&service, &clientchain, &dummy_hash).unwrap().unwrap();
 
         clientchain.return_err = true;
         assert!(run_challenge_request(
@@ -464,12 +429,8 @@ mod tests {
         clientchain.return_err = false;
 
         // test storage failure
-        let _ = clientchain
-            .height
-            .replace(dummy_request.start_blockheight as u64); // set height for fetch_next to succeed
-        let challenge_state = fetch_next(&service, &clientchain, &dummy_hash)
-            .unwrap()
-            .unwrap();
+        let _ = clientchain.height.replace(dummy_request.start_blockheight as u64); // set height for fetch_next to succeed
+        let challenge_state = fetch_next(&service, &clientchain, &dummy_hash).unwrap().unwrap();
 
         storage.return_err = true;
         assert!(run_challenge_request(
@@ -484,12 +445,8 @@ mod tests {
 
         // test client chain returning false
         storage = MockStorage::new(); // reset storage;
-        let _ = clientchain
-            .height
-            .replace(dummy_request.start_blockheight as u64); // set height for fetch_next to succeed
-        let challenge_state = fetch_next(&service, &clientchain, &dummy_hash)
-            .unwrap()
-            .unwrap();
+        let _ = clientchain.height.replace(dummy_request.start_blockheight as u64); // set height for fetch_next to succeed
+        let challenge_state = fetch_next(&service, &clientchain, &dummy_hash).unwrap().unwrap();
 
         clientchain.return_false = true;
         vtx.send(ChallengeResponse(dummy_challenge_hash, dummy_bid.clone()))
@@ -514,12 +471,8 @@ mod tests {
 
         // test run when height is already passed
         storage = MockStorage::new(); // reset storage;
-        let _ = clientchain
-            .height
-            .replace(dummy_request.end_blockheight as u64 + 1); // set height for fetch_next to succeed
-        let challenge_state = fetch_next(&service, &clientchain, &dummy_hash)
-            .unwrap()
-            .unwrap();
+        let _ = clientchain.height.replace(dummy_request.end_blockheight as u64 + 1); // set height for fetch_next to succeed
+        let challenge_state = fetch_next(&service, &clientchain, &dummy_hash).unwrap().unwrap();
 
         vtx.send(ChallengeResponse(dummy_challenge_hash, dummy_bid.clone()))
             .unwrap();

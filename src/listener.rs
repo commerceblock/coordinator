@@ -37,8 +37,7 @@ impl ChallengeProof {
     pub fn from_json(val: Value) -> Result<ChallengeProof> {
         let hash = Sha256dHash::from_hex(val["hash"].as_str().unwrap_or(""))?;
         let txid = Sha256dHash::from_hex(val["txid"].as_str().unwrap_or(""))?;
-        let pubkey =
-            PublicKey::from_slice(&Vec::<u8>::from_hex(val["pubkey"].as_str().unwrap_or(""))?)?;
+        let pubkey = PublicKey::from_slice(&Vec::<u8>::from_hex(val["pubkey"].as_str().unwrap_or(""))?)?;
         let sig = Signature::from_der(&Vec::<u8>::from_hex(val["sig"].as_str().unwrap_or(""))?)?;
         Ok(ChallengeProof {
             hash,
@@ -124,10 +123,7 @@ fn handle(
             return handle_challengeproof(req, challenge, challenge_resp);
         }
 
-        _ => response(
-            StatusCode::NOT_FOUND,
-            format!("Invalid request {}", req.uri().path()),
-        ),
+        _ => response(StatusCode::NOT_FOUND, format!("Invalid request {}", req.uri().path())),
     };
 
     Box::new(future::ok(resp))
@@ -180,10 +176,7 @@ mod tests {
     }
 
     /// Geberate dummy challenge state
-    fn gen_challenge_state(
-        request_hash: &Sha256dHash,
-        challenge_hash: &Sha256dHash,
-    ) -> ChallengeState {
+    fn gen_challenge_state(request_hash: &Sha256dHash, challenge_hash: &Sha256dHash) -> ChallengeState {
         let service = MockService::new();
 
         let request = service.get_request(&request_hash).unwrap().unwrap();
@@ -197,8 +190,7 @@ mod tests {
 
     #[test]
     fn handle_challengeproof_test() {
-        let (resp_tx, resp_rx): (Sender<ChallengeResponse>, Receiver<ChallengeResponse>) =
-            channel();
+        let (resp_tx, resp_rx): (Sender<ChallengeResponse>, Receiver<ChallengeResponse>) = channel();
 
         let chl_hash = gen_dummy_hash(8);
         let _challenge_state = gen_challenge_state(&gen_dummy_hash(1), &chl_hash);
@@ -292,15 +284,17 @@ mod tests {
             "sig": "304402201742daea5ec3b7306b9164be862fc1659cc830032180b8b17beffe02645860d602201039eba402d22e630308e6af05da8dd4f05b51b7d672ca5fc9e3b0a57776365c"
         }"#;
         let request = Request::new(Body::from(data));
-        let _ =
-            handle_challengeproof(request, challenge_state.clone(), resp_tx.clone())
-                .map(|res| {
-                    assert_eq!(res.status(), StatusCode::BAD_REQUEST);
-                    res.into_body().concat2().map(|chunk| {
-                    assert!(String::from_utf8_lossy(&chunk).contains("no-active-challenge"));
-                }).wait()
-                })
-                .wait();
+        let _ = handle_challengeproof(request, challenge_state.clone(), resp_tx.clone())
+            .map(|res| {
+                assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+                res.into_body()
+                    .concat2()
+                    .map(|chunk| {
+                        assert!(String::from_utf8_lossy(&chunk).contains("no-active-challenge"));
+                    })
+                    .wait()
+            })
+            .wait();
         challenge_state.lock().unwrap().latest_challenge = Some(chl_hash);
         assert!(resp_rx.try_recv() == Err(TryRecvError::Empty)); // check receiver empty
 
@@ -395,10 +389,7 @@ mod tests {
         // Correct sig sent in the request body for bid and active challenge
         let secret_key = SecretKey::from_slice(&[0xaa; 32]).unwrap();
         let secp = Secp256k1::new();
-        let sig = secp.sign(
-            &Message::from_slice(&serialize(&chl_hash)).unwrap(),
-            &secret_key,
-        );
+        let sig = secp.sign(&Message::from_slice(&serialize(&chl_hash)).unwrap(), &secret_key);
         let data = format!(
             r#"
         {{

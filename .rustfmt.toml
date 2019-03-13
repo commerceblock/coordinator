@@ -1,3 +1,5 @@
 format_strings = true
 wrap_comments = true
 format_doc_comments = true
+merge_imports = false
+max_width = 120

@@ -27,8 +27,7 @@ pub fn run() -> Result<()> {
     // hardcoded genesis hash for now
     // TODO: from config
     let genesis_hash =
-        Sha256dHash::from_hex("73902d2a365fff2724e26d975148124268ec6a84991016683817ea2c973b199b")
-            .unwrap();
+        Sha256dHash::from_hex("73902d2a365fff2724e26d975148124268ec6a84991016683817ea2c973b199b").unwrap();
 
     loop {
         if let Some(challenge) = ::challenger::fetch_next(&service, &clientchain, &genesis_hash)? {
@@ -38,11 +37,9 @@ pub fn run() -> Result<()> {
 
             let (thread_tx, thread_rx) = oneshot::channel();
 
-            let (verify_tx, verify_rx): (Sender<ChallengeResponse>, Receiver<ChallengeResponse>) =
-                channel();
+            let (verify_tx, verify_rx): (Sender<ChallengeResponse>, Receiver<ChallengeResponse>) = channel();
 
-            let verify_handle =
-                ::listener::run_listener(shared_challenge.clone(), verify_tx, thread_rx);
+            let verify_handle = ::listener::run_listener(shared_challenge.clone(), verify_tx, thread_rx);
 
             ::challenger::run_challenge_request(
                 &clientchain,
