@@ -175,9 +175,9 @@ mod tests {
     use super::*;
     use bitcoin_hashes::hex::ToHex;
     use secp256k1::SecretKey;
+    use std::error::Error;
     use std::sync::mpsc::{channel, Receiver, TryRecvError};
 
-    use crate::error::CError;
     use crate::service::{MockService, Service};
 
     /// Generate dummy hash for tests
@@ -199,7 +199,65 @@ mod tests {
     }
 
     #[test]
-    fn verify_test() {
+    fn challengeproof_from_json_test() {
+        // good data
+        let data = r#"
+        {
+            "txid": "0000000000000000000000000000000000000000000000000000000000000000",
+            "pubkey": "03356190524d52d7e94e1bd43e8f23778e585a4fe1f275e65a06fa5ceedb67d111",
+            "hash": "0404040404040404040404040404040404040404040404040404040404040404",
+            "sig": "304402201742daea5ec3b7306b9164be862fc1659cc830032180b8b17beffe02645860d602201039eba402d22e630308e6af05da8dd4f05b51b7d672ca5fc9e3b0a57776365c"
+        }"#;
+        let proof = ChallengeProof::from_json(serde_json::from_str::<Value>(data).unwrap());
+        assert!(proof.is_ok());
+
+        // bad txid
+        let data = r#"
+        {
+            "txid": "",
+            "pubkey": "03356190524d52d7e94e1bd43e8f23778e585a4fe1f275e65a06fa5ceedb67d111",
+            "hash": "0404040404040404040404040404040404040404040404040404040404040404",
+            "sig": "304402201742daea5ec3b7306b9164be862fc1659cc830032180b8b17beffe02645860d602201039eba402d22e630308e6af05da8dd4f05b51b7d672ca5fc9e3b0a57776365c"
+        }"#;
+        let proof = ChallengeProof::from_json(serde_json::from_str::<Value>(data).unwrap());
+        assert_eq!(proof.err().unwrap().description(), "bitcoin hex error");
+
+        // bad pubkey
+        let data = r#"
+        {
+            "txid": "0000000000000000000000000000000000000000000000000000000000000000",
+            "pubkey": "0356190524d52d7e94e1bd43e8f23778e585a4fe1f275e65a06fa5ceedb67d111",
+            "hash": "0404040404040404040404040404040404040404040404040404040404040404",
+            "sig": "304402201742daea5ec3b7306b9164be862fc1659cc830032180b8b17beffe02645860d602201039eba402d22e630308e6af05da8dd4f05b51b7d672ca5fc9e3b0a57776365c"
+        }"#;
+        let proof = ChallengeProof::from_json(serde_json::from_str::<Value>(data).unwrap());
+        assert_eq!(proof.err().unwrap().description(), "secp256k1 error");
+
+        // bad hash
+        let data = r#"
+        {
+            "txid": "0000000000000000000000000000000000000000000000000000000000000000",
+            "pubkey": "03356190524d52d7e94e1bd43e8f23778e585a4fe1f275e65a06fa5ceedb67d111",
+            "hash": "04040404040404040404040404040404040404040404040404040404040404",
+            "sig": "304402201742daea5ec3b7306b9164be862fc1659cc830032180b8b17beffe02645860d602201039eba402d22e630308e6af05da8dd4f05b51b7d672ca5fc9e3b0a57776365c"
+        }"#;
+        let proof = ChallengeProof::from_json(serde_json::from_str::<Value>(data).unwrap());
+        assert_eq!(proof.err().unwrap().description(), "bitcoin hex error");
+
+        // bad sig
+        let data = r#"
+        {
+            "txid": "0000000000000000000000000000000000000000000000000000000000000000",
+            "pubkey": "03356190524d52d7e94e1bd43e8f23778e585a4fe1f275e65a06fa5ceedb67d111",
+            "hash": "0404040404040404040404040404040404040404040404040404040404040404",
+            "sig": "4402201742daea5ec3b7306b9164be862fc1659cc830032180b8b17beffe02645860d602201039eba402d22e630308e6af05da8dd4f05b51b7d672ca5fc9e3b0a57776365c"
+        }"#;
+        let proof = ChallengeProof::from_json(serde_json::from_str::<Value>(data).unwrap());
+        assert_eq!(proof.err().unwrap().description(), "secp256k1 error");
+    }
+
+    #[test]
+    fn challengeproof_verify_test() {
         let chl_hash = gen_dummy_hash(11);
         let _challenge_state = gen_challenge_state(&gen_dummy_hash(3), &chl_hash);
         let bid_txid = _challenge_state.bids.iter().next().unwrap().txid;
@@ -220,10 +278,7 @@ mod tests {
         };
 
         let verify = ChallengeProof::verify(&proof);
-        match verify {
-            Ok(_) => assert!(true),
-            Err(_) => assert!(false, "should not return error"),
-        }
+        assert!(verify.is_ok());
 
         // verify bad sig
         let secret_key = SecretKey::from_slice(&[0xbb; 32]).unwrap();
@@ -239,10 +294,7 @@ mod tests {
         };
 
         let verify = ChallengeProof::verify(&proof);
-        match verify {
-            Ok(_) => assert!(false, "should not return true"),
-            Err(_) => assert!(true),
-        }
+        assert_eq!(verify.err().unwrap().description(), "secp256k1 error");
     }
 
     #[test]
