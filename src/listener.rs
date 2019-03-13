@@ -87,7 +87,7 @@ fn handle_challengeproof(
                         }
                         // check challenge proof sig is correct
                         if let Err(e) = ChallengeProof::verify(&proof) {
-                            return response(StatusCode::BAD_REQUEST, format!("bad-sig: {:?}", e));
+                            return response(StatusCode::BAD_REQUEST, format!("bad-sig: {}", e));
                         }
                         // send successful response to challenger
                         challenge_resp
@@ -97,9 +97,9 @@ fn handle_challengeproof(
                     }
                     response(StatusCode::BAD_REQUEST, format!("no-active-challenge"))
                 }
-                Err(e) => response(StatusCode::BAD_REQUEST, format!("bad-proof-data: {:?}", e)),
+                Err(e) => response(StatusCode::BAD_REQUEST, format!("bad-proof-data: {}", e)),
             },
-            Err(e) => response(StatusCode::BAD_REQUEST, format!("bad-json-data: {:?}", e)),
+            Err(e) => response(StatusCode::BAD_REQUEST, format!("bad-json-data: {}", e)),
         }
     });
     Box::new(resp)
@@ -123,7 +123,7 @@ fn handle(
 
         _ => response(
             StatusCode::NOT_FOUND,
-            format!("Invalid request {:?}", req.uri().path()),
+            format!("Invalid request {}", req.uri().path()),
         ),
     };
 
@@ -134,7 +134,7 @@ fn handle(
 fn response(status: StatusCode, message: String) -> Response<Body> {
     Response::builder()
         .status(status)
-        .body(Body::from(format!("{:?}", message)))
+        .body(Body::from(format!("{}", message)))
         .unwrap()
 }
 

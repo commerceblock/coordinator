@@ -59,7 +59,6 @@ impl Storage for MockStorage {
         if self.return_err {
             return Err(CError::Coordinator("save_challenge_state failed"));
         }
-        info! {"{:?}", challenge}
         self.challenge_states.borrow_mut().push(challenge);
         Ok(())
     }
