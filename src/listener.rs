@@ -177,6 +177,7 @@ mod tests {
     use secp256k1::SecretKey;
     use std::sync::mpsc::{channel, Receiver, TryRecvError};
 
+    use crate::error::CError;
     use crate::service::{MockService, Service};
 
     /// Generate dummy hash for tests
@@ -194,6 +195,53 @@ mod tests {
             request,
             bids,
             latest_challenge: Some(*challenge_hash),
+        }
+    }
+
+    #[test]
+    fn verify_test() {
+        let chl_hash = gen_dummy_hash(11);
+        let _challenge_state = gen_challenge_state(&gen_dummy_hash(3), &chl_hash);
+        let bid_txid = _challenge_state.bids.iter().next().unwrap().txid;
+        let bid_pubkey = _challenge_state.bids.iter().next().unwrap().pubkey;
+
+        // verify good sig
+        let secp = Secp256k1::new();
+        let secret_key = SecretKey::from_slice(&[0xaa; 32]).unwrap();
+        let sig = secp.sign(&Message::from_slice(&serialize(&chl_hash)).unwrap(), &secret_key);
+
+        let proof = ChallengeProof {
+            hash: chl_hash,
+            sig: sig,
+            bid: Bid {
+                txid: bid_txid,
+                pubkey: bid_pubkey,
+            },
+        };
+
+        let verify = ChallengeProof::verify(&proof);
+        match verify {
+            Ok(_) => assert!(true),
+            Err(_) => assert!(false, "should not return error"),
+        }
+
+        // verify bad sig
+        let secret_key = SecretKey::from_slice(&[0xbb; 32]).unwrap();
+        let sig = secp.sign(&Message::from_slice(&serialize(&chl_hash)).unwrap(), &secret_key);
+
+        let proof = ChallengeProof {
+            hash: chl_hash,
+            sig: sig,
+            bid: Bid {
+                txid: bid_txid,
+                pubkey: bid_pubkey,
+            },
+        };
+
+        let verify = ChallengeProof::verify(&proof);
+        match verify {
+            Ok(_) => assert!(false, "should not return true"),
+            Err(_) => assert!(true),
         }
     }
 
