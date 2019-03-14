@@ -3,7 +3,7 @@
 //! Methods and models for fetching, structuring and running challenge requests
 
 use std::collections::HashSet;
-use std::sync::mpsc::{channel, Receiver, TryRecvError};
+use std::sync::mpsc::{Receiver, RecvTimeoutError};
 use std::sync::{Arc, Mutex};
 use std::{thread, time};
 
@@ -52,28 +52,26 @@ pub fn get_challenge_responses(
 ) -> Result<ChallengeResponseSet> {
     let mut responses = ChallengeResponseSet::new();
 
-    let (dur_tx, dur_rx) = channel();
-    let _ = thread::spawn(move || {
-        // timer to kill receiving
-        thread::sleep(get_duration);
-        let _ = dur_tx.send("tick");
-    });
-
-    let mut time_to_break = false;
-    while time_to_break == false {
-        match verify_rx.try_recv() {
-            Ok(resp) => {
-                if resp.0 == *challenge_hash {
-                    // filter old invalid/responses
-                    let _ = responses.insert(resp);
+    let start_time = time::Instant::now();
+    loop {
+        let now = time::Instant::now();
+        if start_time + get_duration > now {
+            let duration = start_time + get_duration - now;
+            match verify_rx.recv_timeout(duration) {
+                Ok(resp) => {
+                    if resp.0 == *challenge_hash {
+                        // filter old invalid/responses
+                        let _ = responses.insert(resp);
+                    }
+                }
+                Err(RecvTimeoutError::Timeout) => {} // ignore timeout - it's allowed
+                Err(RecvTimeoutError::Disconnected) => {
+                    return Err(CError::Coordinator("Challenge response receiver disconnected"));
                 }
             }
-            Err(TryRecvError::Empty) => {} // ignore empty - it's allowed
-            Err(TryRecvError::Disconnected) => {
-                return Err(CError::Coordinator("Challenge response receiver disconnected"));
-            }
+        } else {
+            break;
         }
-        let _ = dur_rx.try_recv().map(|_| time_to_break = true);
     }
 
     Ok(responses)
@@ -263,7 +261,7 @@ mod tests {
 
         // then drop channel sender and test correct error is returned
         std::mem::drop(vtx);
-        let res = get_challenge_responses(&dummy_hash, &vrx, time::Duration::from_millis(0));
+        let res = get_challenge_responses(&dummy_hash, &vrx, time::Duration::from_millis(1));
         match res {
             Ok(_) => assert!(false, "should not return Ok"),
             Err(CError::Coordinator("Challenge response receiver disconnected")) => assert!(true),
