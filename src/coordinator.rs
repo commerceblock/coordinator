@@ -31,7 +31,7 @@ pub fn run() -> Result<()> {
 
     loop {
         if let Some(challenge) = ::challenger::fetch_next(&service, &clientchain, &genesis_hash)? {
-            storage.save_challenge_state(challenge.clone())?;
+            storage.save_challenge_state(&challenge)?;
 
             let mut shared_challenge = Arc::new(Mutex::new(challenge));
 
@@ -51,7 +51,11 @@ pub fn run() -> Result<()> {
             )?;
 
             println! {"***** Responses *****"}
-            for resp in storage.challenge_responses.borrow().iter() {
+            for resp in storage
+                .get_challenge_responses(&shared_challenge.lock().unwrap())
+                .unwrap()
+                .iter()
+            {
                 println! {"{:?}", resp}
             }
             thread_tx.send(()).expect("thread_tx send failed");

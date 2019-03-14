@@ -11,9 +11,11 @@ use crate::error::{CError, Result};
 /// and challenge information
 pub trait Storage {
     /// Store the state of a challenge request
-    fn save_challenge_state(&self, challenge: ChallengeState) -> Result<()>;
-    /// Store responses to a specific challenge
-    fn save_challenge_responses(&self, responses: ChallengeResponseSet) -> Result<()>;
+    fn save_challenge_state(&self, challenge: &ChallengeState) -> Result<()>;
+    /// Store responses to a specific challenge request
+    fn save_challenge_responses(&self, responses: &ChallengeResponseSet) -> Result<()>;
+    /// Get challenge responses for a specific request
+    fn get_challenge_responses(&self, challenge: &ChallengeState) -> Result<Vec<ChallengeResponse>>;
 }
 
 /// Database implementation of Storage trait
@@ -55,20 +57,25 @@ impl MockStorage {
 
 impl Storage for MockStorage {
     /// Store the state of a challenge request
-    fn save_challenge_state(&self, challenge: ChallengeState) -> Result<()> {
+    fn save_challenge_state(&self, challenge: &ChallengeState) -> Result<()> {
         if self.return_err {
             return Err(CError::Coordinator("save_challenge_state failed"));
         }
-        self.challenge_states.borrow_mut().push(challenge);
+        self.challenge_states.borrow_mut().push(challenge.clone());
         Ok(())
     }
 
-    /// Store responses to a specific challenge
-    fn save_challenge_responses(&self, responses: ChallengeResponseSet) -> Result<()> {
+    /// Store responses to a specific challenge request
+    fn save_challenge_responses(&self, responses: &ChallengeResponseSet) -> Result<()> {
         if self.return_err {
             return Err(CError::Coordinator("save_challenge_responses failed"));
         }
-        self.challenge_responses.borrow_mut().extend(responses);
+        self.challenge_responses.borrow_mut().extend(responses.clone());
         Ok(())
+    }
+
+    /// Get challenge responses for a specific request
+    fn get_challenge_responses(&self, _challenge: &ChallengeState) -> Result<Vec<ChallengeResponse>> {
+        Ok(self.challenge_responses.borrow().to_vec())
     }
 }

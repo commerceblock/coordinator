@@ -109,7 +109,7 @@ pub fn run_challenge_request<K: ClientChain, D: Storage>(
         }
 
         info! {"fetching responses..."}
-        storage.save_challenge_responses(get_challenge_responses(
+        storage.save_challenge_responses(&get_challenge_responses(
             &challenge_hash,
             &verify_rx,
             responses_duration,
@@ -122,7 +122,7 @@ pub fn run_challenge_request<K: ClientChain, D: Storage>(
 
 /// Tuple struct to store a verified challenge response
 /// for a winning bid on a specific challenge hash
-#[derive(Debug, Hash)]
+#[derive(Debug, Hash, Clone)]
 pub struct ChallengeResponse(pub Sha256dHash, pub Bid);
 
 impl PartialEq for ChallengeResponse {
