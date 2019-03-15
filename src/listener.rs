@@ -59,9 +59,6 @@ impl ChallengeProof {
     }
 }
 
-// Future hyper return type for listener server responses
-type BoxFut = Box<Future<Item = Response<Body>, Error = hyper::Error> + Send>;
-
 /// Handle the POST request /challengeproof. Validate body is in json format,
 /// parse this into a ChallengeProof struct and then verify that there is an
 /// active challenge, that the proof bid exists and that the sig is correct.
@@ -71,7 +68,7 @@ fn handle_challengeproof(
     req: Request<Body>,
     challenge: Arc<Mutex<ChallengeState>>,
     challenge_resp: Sender<ChallengeResponse>,
-) -> BoxFut {
+) -> impl Future<Item = Response<Body>, Error = hyper::Error> + Send {
     let resp = req.into_body().concat2().map(move |body| {
         // parse request body
         match serde_json::from_slice::<Value>(body.as_ref()) {
@@ -109,7 +106,7 @@ fn handle_challengeproof(
             Err(e) => response(StatusCode::BAD_REQUEST, format!("bad-json-data: {}", e)),
         }
     });
-    Box::new(resp)
+    resp
 }
 
 /// Handler for the listener server. Only allows requests to /
@@ -118,7 +115,7 @@ fn handle(
     req: Request<Body>,
     challenge: Arc<Mutex<ChallengeState>>,
     challenge_resp: Sender<ChallengeResponse>,
-) -> BoxFut {
+) -> impl Future<Item = Response<Body>, Error = hyper::Error> + Send {
     let resp = match (req.method(), req.uri().path()) {
         (&Method::GET, "/") => response(
             StatusCode::OK,
@@ -126,13 +123,13 @@ fn handle(
         ),
 
         (&Method::POST, "/challengeproof") => {
-            return handle_challengeproof(req, challenge, challenge_resp);
+            return future::Either::A(handle_challengeproof(req, challenge, challenge_resp));
         }
 
         _ => response(StatusCode::NOT_FOUND, format!("Invalid request {}", req.uri().path())),
     };
 
-    Box::new(future::ok(resp))
+    future::Either::B(future::ok(resp))
 }
 
 /// Create hyper response from status code and message Body
