@@ -514,7 +514,7 @@ dependencies = [
 [[package]]
 name = "ocean-rpc"
 version = "0.3.0"
-source = "git+https://github.com/commerceblock/rust-ocean-rpc#1e1692f2d438f889b1081b56647377e7eaea8adb"
+source = "git+https://github.com/commerceblock/rust-ocean-rpc#7f7ed45473efd141bf5dfd7f99c16ef7d7d8d295"
 dependencies = [
  "bitcoin 0.15.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "bitcoin-amount 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -532,7 +532,7 @@ dependencies = [
 [[package]]
 name = "ocean-rpc-json"
 version = "0.3.0"
-source = "git+https://github.com/commerceblock/rust-ocean-rpc#1e1692f2d438f889b1081b56647377e7eaea8adb"
+source = "git+https://github.com/commerceblock/rust-ocean-rpc#7f7ed45473efd141bf5dfd7f99c16ef7d7d8d295"
 dependencies = [
  "bitcoin 0.15.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "bitcoin-amount 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",

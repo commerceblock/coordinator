@@ -5,7 +5,7 @@
 use std::cell::RefCell;
 
 use bitcoin::util::hash::Sha256dHash;
-use ocean_rpc::Client;
+use ocean_rpc::{Client, RpcApi};
 
 use crate::error::{CError, Result};
 
@@ -27,10 +27,48 @@ pub struct RpcClientChain {
 
 impl RpcClientChain {
     /// Create an RpcClientChain with underlying rpc client connectivity
-    pub fn new() -> Self {
-        RpcClientChain {
-            client: Client::new(String::new(), Some(<String>::new()), Some(<String>::new())),
+    pub fn new(url: String, user: Option<String>, pass: Option<String>) -> Result<Self> {
+        let client = Client::new(url, user, pass);
+        let unspent = client.list_unspent(None, None, None, None, None)?;
+
+        // Check challenge asset hash is in the wallet
+        // TODO: asset == challenge_asset from config
+        // TODO: address == challenge_address from config
+        // TODO: replace "CBT" with challenge label when added
+        let mut found = false;
+        for tx in unspent.iter() {
+            if tx.assetlabel == Some("CBT".into()) {
+                found = true;
+                break;
+            }
         }
+
+        // TODO: custom error for clientchain
+        if !found {
+            return Err(CError::Coordinator("no challenge asset balance found"));
+        }
+
+        Ok(RpcClientChain { client })
+    }
+}
+
+impl ClientChain for RpcClientChain {
+    /// Get client chain blockheight
+    fn get_blockheight(&self) -> Result<u64> {
+        match self.client.get_block_count() {
+            Ok(res) => Ok(res),
+            Err(e) => Err(CError::OceanRpc(e)),
+        }
+    }
+
+    /// Send challenge transaction to client chain
+    fn send_challenge(&self) -> Result<Sha256dHash> {
+        Ok(Sha256dHash::from(&[0u8; 32] as &[u8]))
+    }
+
+    /// Verify challenge transaction has been included in the chain
+    fn verify_challenge(&self, _txid: &Sha256dHash) -> Result<bool> {
+        Ok(true)
     }
 }
 

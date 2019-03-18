@@ -10,7 +10,7 @@ use bitcoin::util::hash::Sha256dHash;
 use futures::sync::oneshot;
 
 use crate::challenger::ChallengeResponse;
-use crate::clientchain::MockClientChain;
+use crate::clientchain::RpcClientChain;
 use crate::error::Result;
 use crate::service::MockService;
 use crate::storage::{MockStorage, Storage};
@@ -21,7 +21,11 @@ pub fn run() -> Result<()> {
     info!("Running coordinator!");
 
     let service = MockService::new();
-    let clientchain = MockClientChain::new();
+    let clientchain = RpcClientChain::new(
+        String::from("http://127.0.0.1:5555"),
+        Some(String::from("user1")),
+        Some(String::from("password1")),
+    )?;
     let storage = MockStorage::new();
 
     // hardcoded genesis hash for now
