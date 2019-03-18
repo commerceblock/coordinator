@@ -67,8 +67,16 @@ impl ClientChain for RpcClientChain {
     }
 
     /// Verify challenge transaction has been included in the chain
-    fn verify_challenge(&self, _txid: &Sha256dHash) -> Result<bool> {
-        Ok(true)
+    fn verify_challenge(&self, txid: &Sha256dHash) -> Result<bool> {
+        let tx = self.client.get_raw_transaction_verbose(txid, None)?;
+
+        if let (Some(_hash), Some(n_conf)) = (tx.blockhash, tx.confirmations) {
+            if n_conf > 0 {
+                return Ok(true);
+            }
+        }
+
+        Ok(false)
     }
 }
 
