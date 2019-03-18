@@ -25,6 +25,7 @@ pub fn run() -> Result<()> {
         String::from("http://127.0.0.1:5555"),
         Some(String::from("user1")),
         Some(String::from("password1")),
+        "CBT",
     )?;
     let storage = MockStorage::new();
 
@@ -50,7 +51,7 @@ pub fn run() -> Result<()> {
                 shared_challenge.clone(),
                 &verify_rx,
                 &storage,
-                time::Duration::from_secs(300),
+                time::Duration::from_secs(100),
                 time::Duration::from_secs(60),
             )?;
 
