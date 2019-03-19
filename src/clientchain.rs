@@ -3,7 +3,9 @@
 //! Client chain interface and implementations
 
 use std::cell::RefCell;
+use std::collections::HashMap;
 
+use bitcoin::consensus::encode::serialize;
 use bitcoin::util::hash::Sha256dHash;
 use ocean_rpc::{json, Client, RpcApi};
 
@@ -62,28 +64,54 @@ impl<'a> ClientChain for RpcClientChain<'a> {
 
     /// Send challenge transaction to client chain
     fn send_challenge(&self) -> Result<Sha256dHash> {
+        // get any unspent for the challenge asset
         let unspent = get_first_unspent(&self.client, self.asset)?;
-        // send any of the unspent in the wallet paying
-        // all the funds to the exact same address
-        let txid = self.client.send_to_address(
-            &unspent.address,
+
+        // construct the challenge transaction excluding fees
+        // which are not required for policy transactions
+        let utxos = vec![json::CreateRawTransactionInput {
+            txid: unspent.txid,
+            vout: unspent.vout,
+            sequence: None,
+        }];
+
+        let mut outs = HashMap::new();
+        let _ = outs.insert(
+            unspent.address.clone(),
             (unspent.amount.into_inner() / 100000000) as f64,
-            None,
-            None,
-            Some(false), // T or F? policy txs should not take fees anyway
-            Some(self.asset),
-        )?;
-        Ok(txid)
+        );
+
+        let mut outs_assets = HashMap::new();
+        let _ = outs_assets.insert(unspent.address.clone(), unspent.asset.to_string());
+
+        let tx = self
+            .client
+            .create_raw_transaction(&utxos, Some(&outs), Some(&outs_assets), None)?;
+
+        // sign the transaction and send via the client rpc
+        let signed_tx = self
+            .client
+            .sign_raw_transaction(serialize(&tx).as_slice().into(), None, None, None)?;
+
+        Ok(Sha256dHash::from_hex(
+            &self.client.send_raw_transaction(&signed_tx.hex)?,
+        )?)
     }
 
     /// Verify challenge transaction has been included in the chain
     fn verify_challenge(&self, txid: &Sha256dHash) -> Result<bool> {
-        let tx = self.client.get_raw_transaction_verbose(txid, None)?;
-        // check for blockhash and number of confirmations
-        if let (Some(_hash), Some(n_conf)) = (tx.blockhash, tx.confirmations) {
-            if n_conf > 0 {
-                return Ok(true);
+        match self.client.get_raw_transaction_verbose(txid, None) {
+            Ok(tx) => {
+                // check for blockhash and number of confirmations
+                if let (Some(_hash), Some(n_conf)) = (tx.blockhash, tx.confirmations) {
+                    if n_conf > 0 {
+                        return Ok(true);
+                    }
+                }
             }
+            // no error throwing as issue might have been caused by
+            // not successfuly sending the transaction and is not critical
+            Err(e) => warn!("verify challenge error{}", e),
         }
         Ok(false)
     }

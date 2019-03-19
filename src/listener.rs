@@ -81,13 +81,13 @@ fn handle_challengeproof(
                     if let Some(h) = challenge_lock.latest_challenge {
                         // check challenge proof bid exists
                         if !challenge_lock.bids.contains(&proof.bid) {
-                            return response(StatusCode::BAD_REQUEST, "bad-bid".to_string());
+                            return response(StatusCode::BAD_REQUEST, "bad-bid".to_owned());
                         }
                         // drop lock immediately
                         std::mem::drop(challenge_lock);
                         // check challenge proof hash is correct
                         if proof.hash != h {
-                            return response(StatusCode::BAD_REQUEST, "bad-hash".to_string());
+                            return response(StatusCode::BAD_REQUEST, "bad-hash".to_owned());
                         }
                         // check challenge proof sig is correct
                         if let Err(e) = ChallengeProof::verify(&proof) {
@@ -119,7 +119,7 @@ fn handle(
     let resp = match (req.method(), req.uri().path()) {
         (&Method::GET, "/") => response(
             StatusCode::OK,
-            "Challenge proof should be POSTed to /challengeproof".to_string(),
+            "Challenge proof should be POSTed to /challengeproof".to_owned(),
         ),
 
         (&Method::POST, "/challengeproof") => {

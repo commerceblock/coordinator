@@ -25,7 +25,7 @@ pub fn run() -> Result<()> {
         String::from("http://127.0.0.1:5555"),
         Some(String::from("user1")),
         Some(String::from("password1")),
-        "CBT",
+        "CHALLENGE",
     )?;
     let storage = MockStorage::new();
 
