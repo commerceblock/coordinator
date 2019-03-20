@@ -59,7 +59,7 @@ impl Storage for MockStorage {
     /// Store the state of a challenge request
     fn save_challenge_state(&self, challenge: &ChallengeState) -> Result<()> {
         if self.return_err {
-            return Err(CError::Coordinator("save_challenge_state failed"));
+            return Err(CError::Coordinator("save_challenge_state failed".to_owned()));
         }
         self.challenge_states.borrow_mut().push(challenge.clone());
         Ok(())
@@ -68,7 +68,7 @@ impl Storage for MockStorage {
     /// Store responses to a specific challenge request
     fn save_challenge_responses(&self, responses: &ChallengeResponseSet) -> Result<()> {
         if self.return_err {
-            return Err(CError::Coordinator("save_challenge_responses failed"));
+            return Err(CError::Coordinator("save_challenge_responses failed".to_owned()));
         }
         self.challenge_responses.borrow_mut().extend(responses.clone());
         Ok(())

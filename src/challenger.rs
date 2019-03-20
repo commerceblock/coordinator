@@ -66,7 +66,9 @@ pub fn get_challenge_responses(
                 }
                 Err(RecvTimeoutError::Timeout) => {} // ignore timeout - it's allowed
                 Err(RecvTimeoutError::Disconnected) => {
-                    return Err(CError::Coordinator("Challenge response receiver disconnected"));
+                    return Err(CError::Coordinator(
+                        "challenge response receiver disconnected".to_owned(),
+                    ));
                 }
             }
         } else {
@@ -162,7 +164,7 @@ fn check_request(request: &Request, height: u64) -> bool {
 fn get_request_bids<T: Service>(request: &Request, service: &T) -> Result<BidSet> {
     match service.get_request_bids(&request.genesis_blockhash)? {
         Some(bids) => return Ok(bids),
-        _ => Err(CError::Coordinator("No bids found")),
+        _ => Err(CError::Coordinator("no bids found".to_owned())),
     }
 }
 
@@ -268,7 +270,7 @@ mod tests {
         let res = get_challenge_responses(&dummy_hash, &vrx, time::Duration::from_millis(1));
         match res {
             Ok(_) => assert!(false, "should not return Ok"),
-            Err(CError::Coordinator("Challenge response receiver disconnected")) => assert!(true),
+            Err(CError::Coordinator(e)) => assert_eq!(String::from("challenge response receiver disconnected"), e),
             Err(_) => assert!(false, "should not return any error"),
         }
     }
@@ -310,7 +312,7 @@ mod tests {
         let res = get_request_bids(&dummy_request, &service);
         match res {
             Ok(_) => assert!(false, "should not return Ok"),
-            Err(CError::Coordinator("No bids found")) => assert!(true),
+            Err(CError::Coordinator(e)) => assert_eq!(String::from("no bids found"), e),
             Err(_) => assert!(false, "should not return any error"),
         }
         service.return_none = false;
@@ -320,7 +322,7 @@ mod tests {
         let res = get_request_bids(&dummy_request, &service);
         match res {
             Ok(_) => assert!(false, "should not return Ok"),
-            Err(CError::Coordinator("No bids found")) => assert!(false, "should not specific error"),
+            Err(CError::Coordinator(e)) => assert_ne!(String::from("no bids found"), e),
             Err(_) => assert!(true),
         }
     }

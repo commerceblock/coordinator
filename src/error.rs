@@ -23,7 +23,7 @@ pub enum CError {
     /// Secp256k1 error
     Secp256k1Error(Secp256k1Error),
     /// Coordinator error
-    Coordinator(&'static str),
+    Coordinator(String),
 }
 
 impl From<OceanRpcError> for CError {
@@ -32,8 +32,8 @@ impl From<OceanRpcError> for CError {
     }
 }
 
-impl From<&'static str> for CError {
-    fn from(e: &'static str) -> CError {
+impl From<String> for CError {
+    fn from(e: String) -> CError {
         CError::Coordinator(e)
     }
 }

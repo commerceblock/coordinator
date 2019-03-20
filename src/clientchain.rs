@@ -23,7 +23,10 @@ fn get_first_unspent(client: &Client, asset: &str) -> Result<json::ListUnspentRe
     }
 
     // TODO: custom error for clientchain
-    Err(CError::Coordinator("no challenge asset balance found"))
+    Err(CError::Coordinator(format!(
+        "no unspent found for challenge asset {}",
+        asset
+    )))
 }
 
 /// ClientChain trait defining desired functionality for interfacing
@@ -144,7 +147,7 @@ impl ClientChain for MockClientChain {
     /// Get client chain blockheight
     fn get_blockheight(&self) -> Result<u64> {
         if self.return_err {
-            return Err(CError::Coordinator("get_blockheight failed"));
+            return Err(CError::Coordinator("get_blockheight failed".to_owned()));
         }
 
         let mut height = self.height.borrow_mut();
@@ -155,7 +158,7 @@ impl ClientChain for MockClientChain {
     /// Send challenge transaction to client chain
     fn send_challenge(&self) -> Result<sha256d::Hash> {
         if self.return_err {
-            return Err(CError::Coordinator("send_challenge failed"));
+            return Err(CError::Coordinator("send_challenge failed".to_owned()));
         }
 
         // Use height to generate mock challenge hash
@@ -167,7 +170,7 @@ impl ClientChain for MockClientChain {
     /// Verify challenge transaction has been included in the chain
     fn verify_challenge(&self, _txid: &sha256d::Hash) -> Result<bool> {
         if self.return_err {
-            return Err(CError::Coordinator("verify_challenge failed"));
+            return Err(CError::Coordinator("verify_challenge failed".to_owned()));
         }
         if self.return_false {
             return Ok(false);

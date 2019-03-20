@@ -73,7 +73,7 @@ impl Service for MockService {
             return Ok(None);
         }
         if self.return_err {
-            return Err(CError::Coordinator("get_request failed"));
+            return Err(CError::Coordinator("get_request failed".to_owned()));
         }
         let dummy_req = Request {
             start_blockheight: 2,
@@ -91,7 +91,7 @@ impl Service for MockService {
             return Ok(None);
         }
         if self.return_err {
-            return Err(CError::Coordinator("get_request_bids failed"));
+            return Err(CError::Coordinator("get_request_bids failed".to_owned()));
         }
         let dummy_bid = Bid {
             txid: sha256d::Hash::from_hex("1234567890000000000000000000000000000000000000000000000000000000").unwrap(),
