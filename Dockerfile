@@ -3,5 +3,5 @@ FROM rust:1.33-stretch
 COPY . /usr/src/coordinator
 WORKDIR /usr/src/coordinator
 
-ENTRYPOINT ["/usr/local/cargo/bin/cargo"]
-CMD ["test","--verbose"]
+RUN /usr/local/cargo/bin/cargo build \
+    && /usr/local/cargo/bin/cargo test --verbose
