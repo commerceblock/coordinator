@@ -8,8 +8,8 @@ extern crate hyper;
 extern crate secp256k1;
 
 use bitcoin::consensus::encode::serialize;
-use bitcoin::util::hash::Sha256dHash;
-use bitcoin_hashes::hex::ToHex;
+use bitcoin_hashes::hex::{FromHex, ToHex};
+use bitcoin_hashes::sha256d;
 use hyper::{
     header::HeaderValue,
     rt::{self, Future, Stream},
@@ -20,7 +20,7 @@ use secp256k1::{Message, Secp256k1, SecretKey};
 fn main() {
     let client = Client::new();
 
-    let hash = Sha256dHash::from_hex("0404040404040404040404040404040404040404040404040404040404040404").unwrap();
+    let hash = sha256d::Hash::from_hex("0404040404040404040404040404040404040404040404040404040404040404").unwrap();
     let secp = Secp256k1::new();
     let secret_key = SecretKey::from_slice(&[0xaa; 32]).expect("32 bytes within curve order");
 

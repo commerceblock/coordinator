@@ -5,8 +5,7 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 
-use bitcoin::consensus::encode::serialize;
-use bitcoin::util::hash::Sha256dHash;
+use bitcoin_hashes::{hex::FromHex, sha256d, Hash};
 use ocean_rpc::{json, Client, RpcApi};
 
 use crate::error::{CError, Result};
@@ -33,9 +32,9 @@ pub trait ClientChain {
     /// Get client chain blockheight
     fn get_blockheight(&self) -> Result<u64>;
     /// Send challenge transaction to client chain
-    fn send_challenge(&self) -> Result<Sha256dHash>;
+    fn send_challenge(&self) -> Result<sha256d::Hash>;
     /// Verify challenge transaction has been included in the chain
-    fn verify_challenge(&self, txid: &Sha256dHash) -> Result<bool>;
+    fn verify_challenge(&self, txid: &sha256d::Hash) -> Result<bool>;
 }
 
 /// Rpc implementation of Service using an underlying ocean rpc connection
@@ -63,7 +62,7 @@ impl<'a> ClientChain for RpcClientChain<'a> {
     }
 
     /// Send challenge transaction to client chain
-    fn send_challenge(&self) -> Result<Sha256dHash> {
+    fn send_challenge(&self) -> Result<sha256d::Hash> {
         // get any unspent for the challenge asset
         let unspent = get_first_unspent(&self.client, self.asset)?;
 
@@ -84,22 +83,22 @@ impl<'a> ClientChain for RpcClientChain<'a> {
         let mut outs_assets = HashMap::new();
         let _ = outs_assets.insert(unspent.address.clone(), unspent.asset.to_string());
 
-        let tx = self
+        let tx_hex = self
             .client
-            .create_raw_transaction(&utxos, Some(&outs), Some(&outs_assets), None)?;
+            .create_raw_transaction_hex(&utxos, Some(&outs), Some(&outs_assets), None)?;
 
         // sign the transaction and send via the client rpc
-        let signed_tx = self
-            .client
-            .sign_raw_transaction(serialize(&tx).as_slice().into(), None, None, None)?;
+        let tx_signed =
+            self.client
+                .sign_raw_transaction((&Vec::<u8>::from_hex(&tx_hex)? as &[u8]).into(), None, None, None)?;
 
-        Ok(Sha256dHash::from_hex(
-            &self.client.send_raw_transaction(&signed_tx.hex)?,
+        Ok(sha256d::Hash::from_hex(
+            &self.client.send_raw_transaction(&tx_signed.hex)?,
         )?)
     }
 
     /// Verify challenge transaction has been included in the chain
-    fn verify_challenge(&self, txid: &Sha256dHash) -> Result<bool> {
+    fn verify_challenge(&self, txid: &sha256d::Hash) -> Result<bool> {
         match self.client.get_raw_transaction_verbose(txid, None) {
             Ok(tx) => {
                 // check for blockhash and number of confirmations
@@ -154,17 +153,19 @@ impl ClientChain for MockClientChain {
     }
 
     /// Send challenge transaction to client chain
-    fn send_challenge(&self) -> Result<Sha256dHash> {
+    fn send_challenge(&self) -> Result<sha256d::Hash> {
         if self.return_err {
             return Err(CError::Coordinator("send_challenge failed"));
         }
 
         // Use height to generate mock challenge hash
-        Ok(Sha256dHash::from(&[(*self.height.borrow() % 16) as u8; 32] as &[u8]))
+        Ok(sha256d::Hash::from_slice(
+            &[(*self.height.borrow() % 16) as u8; 32] as &[u8],
+        )?)
     }
 
     /// Verify challenge transaction has been included in the chain
-    fn verify_challenge(&self, _txid: &Sha256dHash) -> Result<bool> {
+    fn verify_challenge(&self, _txid: &sha256d::Hash) -> Result<bool> {
         if self.return_err {
             return Err(CError::Coordinator("verify_challenge failed"));
         }

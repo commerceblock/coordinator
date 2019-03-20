@@ -6,7 +6,7 @@ use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::{thread, time};
 
-use bitcoin::util::hash::Sha256dHash;
+use bitcoin_hashes::{hex::FromHex, sha256d};
 use futures::sync::oneshot;
 
 use crate::challenger::ChallengeResponse;
@@ -32,7 +32,7 @@ pub fn run() -> Result<()> {
     // hardcoded genesis hash for now
     // TODO: from config
     let genesis_hash =
-        Sha256dHash::from_hex("73902d2a365fff2724e26d975148124268ec6a84991016683817ea2c973b199b").unwrap();
+        sha256d::Hash::from_hex("73902d2a365fff2724e26d975148124268ec6a84991016683817ea2c973b199b").unwrap();
 
     loop {
         if let Some(challenge) = ::challenger::fetch_next(&service, &clientchain, &genesis_hash)? {

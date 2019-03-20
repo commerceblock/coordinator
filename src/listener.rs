@@ -8,8 +8,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 
 use bitcoin::consensus::serialize;
-use bitcoin::util::hash::Sha256dHash;
-use bitcoin_hashes::hex::FromHex;
+use bitcoin_hashes::{hex::FromHex, sha256d};
 use futures::future;
 use futures::sync::oneshot;
 use hyper::rt::{self, Future, Stream};
@@ -26,7 +25,7 @@ use crate::request::Bid;
 #[derive(Debug)]
 pub struct ChallengeProof {
     /// Challenge (transaction id) hash
-    pub hash: Sha256dHash,
+    pub hash: sha256d::Hash,
     /// Challenge signature for hash and pubkey
     pub sig: Signature,
     /// Pubkey used to generate challenge signature
@@ -36,8 +35,8 @@ pub struct ChallengeProof {
 impl ChallengeProof {
     /// Parse serde json value into ChallengeProof struct result
     pub fn from_json(val: Value) -> Result<ChallengeProof> {
-        let hash = Sha256dHash::from_hex(val["hash"].as_str().unwrap_or(""))?;
-        let txid = Sha256dHash::from_hex(val["txid"].as_str().unwrap_or(""))?;
+        let hash = sha256d::Hash::from_hex(val["hash"].as_str().unwrap_or(""))?;
+        let txid = sha256d::Hash::from_hex(val["txid"].as_str().unwrap_or(""))?;
         let pubkey = PublicKey::from_str(val["pubkey"].as_str().unwrap_or(""))?;
         let sig = Signature::from_der(&Vec::<u8>::from_hex(val["sig"].as_str().unwrap_or(""))?)?;
         Ok(ChallengeProof {
@@ -170,20 +169,22 @@ pub fn run_listener(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bitcoin_hashes::hex::ToHex;
-    use secp256k1::SecretKey;
     use std::error::Error;
     use std::sync::mpsc::{channel, Receiver, TryRecvError};
+
+    use bitcoin_hashes::hex::ToHex;
+    use bitcoin_hashes::Hash;
+    use secp256k1::SecretKey;
 
     use crate::service::{MockService, Service};
 
     /// Generate dummy hash for tests
-    fn gen_dummy_hash(i: u8) -> Sha256dHash {
-        Sha256dHash::from(&[i as u8; 32] as &[u8])
+    fn gen_dummy_hash(i: u8) -> sha256d::Hash {
+        sha256d::Hash::from_slice(&[i as u8; 32] as &[u8]).unwrap()
     }
 
     /// Geberate dummy challenge state
-    fn gen_challenge_state(request_hash: &Sha256dHash, challenge_hash: &Sha256dHash) -> ChallengeState {
+    fn gen_challenge_state(request_hash: &sha256d::Hash, challenge_hash: &sha256d::Hash) -> ChallengeState {
         let service = MockService::new();
 
         let request = service.get_request(&request_hash).unwrap().unwrap();
@@ -217,7 +218,7 @@ mod tests {
             "sig": "304402201742daea5ec3b7306b9164be862fc1659cc830032180b8b17beffe02645860d602201039eba402d22e630308e6af05da8dd4f05b51b7d672ca5fc9e3b0a57776365c"
         }"#;
         let proof = ChallengeProof::from_json(serde_json::from_str::<Value>(data).unwrap());
-        assert_eq!(proof.err().unwrap().description(), "bitcoin hex error");
+        assert_eq!(proof.err().unwrap().description(), "bitcoin hashes error");
 
         // bad pubkey
         let data = r#"
@@ -239,7 +240,7 @@ mod tests {
             "sig": "304402201742daea5ec3b7306b9164be862fc1659cc830032180b8b17beffe02645860d602201039eba402d22e630308e6af05da8dd4f05b51b7d672ca5fc9e3b0a57776365c"
         }"#;
         let proof = ChallengeProof::from_json(serde_json::from_str::<Value>(data).unwrap());
-        assert_eq!(proof.err().unwrap().description(), "bitcoin hex error");
+        assert_eq!(proof.err().unwrap().description(), "bitcoin hashes error");
 
         // bad sig
         let data = r#"

@@ -4,7 +4,7 @@
 
 use std::str::FromStr;
 
-use bitcoin::util::hash::Sha256dHash;
+use bitcoin_hashes::{hex::FromHex, sha256d};
 use ocean_rpc::Client;
 use secp256k1::key::PublicKey;
 
@@ -17,10 +17,10 @@ pub trait Service {
     fn get_requests(&self) -> Result<Option<Vec<Request>>>;
 
     /// Try get active request, by genesis hash, from service chain
-    fn get_request(&self, hash: &Sha256dHash) -> Result<Option<Request>>;
+    fn get_request(&self, hash: &sha256d::Hash) -> Result<Option<Request>>;
 
     /// Try get active request bids, by genesis hash, from service chain
-    fn get_request_bids(&self, hash: &Sha256dHash) -> Result<Option<BidSet>>;
+    fn get_request_bids(&self, hash: &sha256d::Hash) -> Result<Option<BidSet>>;
 }
 
 /// Rpc implementation of Service using an underlying ocean rpc connection
@@ -68,7 +68,7 @@ impl Service for MockService {
     }
 
     /// Try get active request, by genesis hash, from service chain
-    fn get_request(&self, hash: &Sha256dHash) -> Result<Option<Request>> {
+    fn get_request(&self, hash: &sha256d::Hash) -> Result<Option<Request>> {
         if self.return_none {
             return Ok(None);
         }
@@ -86,7 +86,7 @@ impl Service for MockService {
     }
 
     /// Try get active request bids, by genesis hash, from service chain
-    fn get_request_bids(&self, _hash: &Sha256dHash) -> Result<Option<BidSet>> {
+    fn get_request_bids(&self, _hash: &sha256d::Hash) -> Result<Option<BidSet>> {
         if self.return_none {
             return Ok(None);
         }
@@ -94,7 +94,7 @@ impl Service for MockService {
             return Err(CError::Coordinator("get_request_bids failed"));
         }
         let dummy_bid = Bid {
-            txid: Sha256dHash::from_hex("1234567890000000000000000000000000000000000000000000000000000000").unwrap(),
+            txid: sha256d::Hash::from_hex("1234567890000000000000000000000000000000000000000000000000000000").unwrap(),
             // pubkey corresponding to SecretKey::from_slice(&[0xaa; 32])
             pubkey: PublicKey::from_str("026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3").unwrap(),
         };
