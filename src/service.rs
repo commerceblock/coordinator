@@ -5,10 +5,10 @@
 use std::str::FromStr;
 
 use bitcoin_hashes::{hex::FromHex, sha256d};
-use ocean_rpc::Client;
 use secp256k1::key::PublicKey;
 
 use crate::error::{CError, Result};
+use crate::ocean::RpcClient;
 use crate::request::{Bid, BidSet, Request};
 
 /// Service trait defining functionality for interfacing with service chain
@@ -25,15 +25,16 @@ pub trait Service {
 
 /// Rpc implementation of Service using an underlying ocean rpc connection
 pub struct RpcService {
-    client: Client,
+    /// Rpc client instance
+    client: RpcClient,
 }
 
 impl RpcService {
     /// Create an RpcService with underlying rpc client connectivity
-    pub fn new() -> Self {
-        RpcService {
-            client: Client::new(String::new(), Some(<String>::new()), Some(<String>::new())),
-        }
+    pub fn new() -> Result<Self> {
+        Ok(RpcService {
+            client: RpcClient::new(String::new(), Some(<String>::new()), Some(<String>::new()))?,
+        })
     }
 }
 

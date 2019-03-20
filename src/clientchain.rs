@@ -43,7 +43,9 @@ pub trait ClientChain {
 
 /// Rpc implementation of Service using an underlying ocean rpc connection
 pub struct RpcClientChain<'a> {
+    /// Rpc client instance
     client: RpcClient,
+    /// Challenge asset id
     asset: &'a str,
 }
 

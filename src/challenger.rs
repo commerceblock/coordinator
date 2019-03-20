@@ -15,29 +15,30 @@ use crate::request::{Bid, BidSet, Request};
 use crate::service::Service;
 use crate::storage::Storage;
 
-static NUM_VERIFY_ATTEMPTS: u32 = 5;
+/// Number of verify attempts for challenge transaction
+pub const CHALLENGER_VERIFY_ATTEMPTS: u32 = 5;
 
 /// Attempts to verify that a challenge has been included in the client chain
-/// Method tries a fixed number of attempts NUM_VERIFY_ATTEMPTS for a variable
-/// delay time to allow easy configuration
-pub fn verify_challenge<K: ClientChain>(
+/// Method tries a fixed number of attempts CHALLENGER_VERIFY_ATTEMPTS for a
+/// variable delay time to allow easy configuration
+fn verify_challenge<K: ClientChain>(
     hash: &sha256d::Hash,
     clientchain: &K,
     attempt_delay: time::Duration,
 ) -> Result<bool> {
     info! {"verifying challenge hash: {}", hash}
-    for i in 0..NUM_VERIFY_ATTEMPTS {
+    for i in 0..CHALLENGER_VERIFY_ATTEMPTS {
         // fixed number of attempts?
         if clientchain.verify_challenge(&hash)? {
             info! {"challenge verified"}
             return Ok(true);
         }
         warn! {"attempt {} failed", i+1}
-        if i + 1 == NUM_VERIFY_ATTEMPTS {
+        if i + 1 == CHALLENGER_VERIFY_ATTEMPTS {
             break;
         }
-        info! {"sleeping for {:?}...", attempt_delay/NUM_VERIFY_ATTEMPTS}
-        thread::sleep(attempt_delay / NUM_VERIFY_ATTEMPTS)
+        info! {"sleeping for {:?}...", attempt_delay/CHALLENGER_VERIFY_ATTEMPTS}
+        thread::sleep(attempt_delay / CHALLENGER_VERIFY_ATTEMPTS)
     }
     Ok(false)
 }
@@ -45,7 +46,7 @@ pub fn verify_challenge<K: ClientChain>(
 /// Get responses to the challenge by reading data from the channel receiver
 /// Channel is read for a configurable duration and then the method returns
 /// all the responses that have been received for a specific challenge hash
-pub fn get_challenge_responses(
+fn get_challenge_responses(
     challenge_hash: &sha256d::Hash,
     verify_rx: &Receiver<ChallengeResponse>,
     get_duration: time::Duration,

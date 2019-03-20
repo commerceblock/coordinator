@@ -23,18 +23,18 @@ use crate::request::Bid;
 
 /// Messsage type for challenge proofs sent by guardnodes
 #[derive(Debug)]
-pub struct ChallengeProof {
+struct ChallengeProof {
     /// Challenge (transaction id) hash
-    pub hash: sha256d::Hash,
+    hash: sha256d::Hash,
     /// Challenge signature for hash and pubkey
-    pub sig: Signature,
+    sig: Signature,
     /// Pubkey used to generate challenge signature
-    pub bid: Bid,
+    bid: Bid,
 }
 
 impl ChallengeProof {
     /// Parse serde json value into ChallengeProof struct result
-    pub fn from_json(val: Value) -> Result<ChallengeProof> {
+    fn from_json(val: Value) -> Result<ChallengeProof> {
         let hash = sha256d::Hash::from_hex(val["hash"].as_str().unwrap_or(""))?;
         let txid = sha256d::Hash::from_hex(val["txid"].as_str().unwrap_or(""))?;
         let pubkey = PublicKey::from_str(val["pubkey"].as_str().unwrap_or(""))?;
