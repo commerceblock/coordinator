@@ -51,7 +51,7 @@ pub fn run() -> Result<()> {
                 shared_challenge.clone(),
                 &verify_rx,
                 &storage,
-                time::Duration::from_secs(100),
+                time::Duration::from_secs(150),
                 time::Duration::from_secs(60),
             )?;
 

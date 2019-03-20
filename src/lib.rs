@@ -34,6 +34,7 @@ pub mod clientchain;
 pub mod coordinator;
 pub mod error;
 pub mod listener;
+pub mod ocean;
 pub mod request;
 pub mod service;
 pub mod storage;

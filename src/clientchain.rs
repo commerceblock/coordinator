@@ -6,13 +6,14 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 
 use bitcoin_hashes::{hex::FromHex, sha256d, Hash};
-use ocean_rpc::{json, Client, RpcApi};
+use ocean_rpc::{json, RpcApi};
 
 use crate::error::{CError, Result};
+use crate::ocean::RpcClient;
 
 /// Method that returns the first unspent for a specified asset label
 /// or an error if the client wallet does not have any unspent/funds
-fn get_first_unspent(client: &Client, asset: &str) -> Result<json::ListUnspentResult> {
+fn get_first_unspent(client: &RpcClient, asset: &str) -> Result<json::ListUnspentResult> {
     // Check challenge asset hash is in the wallet
     // TODO maybe: address == challenge_address
     let unspent = client.list_unspent(None, None, None, None, None)?;
@@ -42,14 +43,14 @@ pub trait ClientChain {
 
 /// Rpc implementation of Service using an underlying ocean rpc connection
 pub struct RpcClientChain<'a> {
-    client: Client,
+    client: RpcClient,
     asset: &'a str,
 }
 
 impl<'a> RpcClientChain<'a> {
     /// Create an RpcClientChain with underlying rpc client connectivity
     pub fn new(url: String, user: Option<String>, pass: Option<String>, asset: &'a str) -> Result<Self> {
-        let client = Client::new(url, user, pass);
+        let client = RpcClient::new(url, user, pass)?;
 
         // check we have funds for challenge asset
         let _ = get_first_unspent(&client, asset)?;
