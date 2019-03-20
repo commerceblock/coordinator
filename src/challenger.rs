@@ -7,7 +7,7 @@ use std::sync::mpsc::{Receiver, RecvTimeoutError};
 use std::sync::{Arc, Mutex};
 use std::{thread, time};
 
-use bitcoin::util::hash::Sha256dHash;
+use bitcoin_hashes::sha256d;
 
 use crate::clientchain::ClientChain;
 use crate::error::{CError, Result};
@@ -15,13 +15,13 @@ use crate::request::{Bid, BidSet, Request};
 use crate::service::Service;
 use crate::storage::Storage;
 
-static NUM_VERIFY_ATTEMPTS: u8 = 5;
+static NUM_VERIFY_ATTEMPTS: u32 = 5;
 
 /// Attempts to verify that a challenge has been included in the client chain
-/// Method tries a fixed number of attempts NUM_VERIFY_ATTEMPTS with variable
-// delay time between these to allow easy configuration
+/// Method tries a fixed number of attempts NUM_VERIFY_ATTEMPTS for a variable
+/// delay time to allow easy configuration
 pub fn verify_challenge<K: ClientChain>(
-    hash: &Sha256dHash,
+    hash: &sha256d::Hash,
     clientchain: &K,
     attempt_delay: time::Duration,
 ) -> Result<bool> {
@@ -36,8 +36,8 @@ pub fn verify_challenge<K: ClientChain>(
         if i + 1 == NUM_VERIFY_ATTEMPTS {
             break;
         }
-        info! {"sleeping for {}sec...", attempt_delay.as_secs()}
-        thread::sleep(attempt_delay)
+        info! {"sleeping for {:?}...", attempt_delay/NUM_VERIFY_ATTEMPTS}
+        thread::sleep(attempt_delay / NUM_VERIFY_ATTEMPTS)
     }
     Ok(false)
 }
@@ -46,7 +46,7 @@ pub fn verify_challenge<K: ClientChain>(
 /// Channel is read for a configurable duration and then the method returns
 /// all the responses that have been received for a specific challenge hash
 pub fn get_challenge_responses(
-    challenge_hash: &Sha256dHash,
+    challenge_hash: &sha256d::Hash,
     verify_rx: &Receiver<ChallengeResponse>,
     get_duration: time::Duration,
 ) -> Result<ChallengeResponseSet> {
@@ -90,11 +90,12 @@ pub fn run_challenge_request<K: ClientChain, D: Storage>(
     verify_duration: time::Duration,
     responses_duration: time::Duration,
 ) -> Result<()> {
-    info! {"Running challenge request: {:?}", challenge_state.lock().unwrap().request};
+    let request = challenge_state.lock().unwrap().request.clone(); // clone as const and drop mutex
+    info! {"Running challenge request: {:?}", request};
     loop {
         let challenge_height = clientchain.get_blockheight()?;
         info! {"client chain height: {}", challenge_height}
-        if challenge_state.lock().unwrap().request.end_blockheight < challenge_height as usize {
+        if request.end_blockheight < challenge_height as usize {
             break;
         }
 
@@ -103,6 +104,7 @@ pub fn run_challenge_request<K: ClientChain, D: Storage>(
         challenge_state.lock().unwrap().latest_challenge = Some(challenge_hash);
 
         if !verify_challenge(&challenge_hash, clientchain, verify_duration)? {
+            challenge_state.lock().unwrap().latest_challenge = None; // stop receiving responses
             continue;
         }
 
@@ -121,7 +123,7 @@ pub fn run_challenge_request<K: ClientChain, D: Storage>(
 /// Tuple struct to store a verified challenge response
 /// for a winning bid on a specific challenge hash
 #[derive(Debug, Hash, Clone)]
-pub struct ChallengeResponse(pub Sha256dHash, pub Bid);
+pub struct ChallengeResponse(pub sha256d::Hash, pub Bid);
 
 impl PartialEq for ChallengeResponse {
     fn eq(&self, other: &ChallengeResponse) -> bool {
@@ -143,7 +145,7 @@ pub struct ChallengeState {
     /// Request winning bids that respond to challenges
     pub bids: BidSet,
     /// Latest challenge txid hash in the client chain
-    pub latest_challenge: Option<Sha256dHash>,
+    pub latest_challenge: Option<sha256d::Hash>,
 }
 
 /// Check if request start height has been reached in order to initiate
@@ -170,7 +172,7 @@ fn get_request_bids<T: Service>(request: &Request, service: &T) -> Result<BidSet
 pub fn fetch_next<T: Service, K: ClientChain>(
     service: &T,
     clientchain: &K,
-    genesis: &Sha256dHash,
+    genesis: &sha256d::Hash,
 ) -> Result<Option<ChallengeState>> {
     info!("Fetching challenge request!");
     match service.get_request(&genesis)? {
@@ -200,13 +202,15 @@ mod tests {
 
     use std::sync::mpsc::{channel, Receiver, Sender};
 
+    use bitcoin_hashes::Hash;
+
     use crate::clientchain::MockClientChain;
     use crate::service::MockService;
     use crate::storage::MockStorage;
 
     /// Generate dummy hash for tests
-    fn gen_dummy_hash(i: u8) -> Sha256dHash {
-        Sha256dHash::from(&[i as u8; 32] as &[u8])
+    fn gen_dummy_hash(i: u8) -> sha256d::Hash {
+        sha256d::Hash::from_slice(&[i as u8; 32] as &[u8]).unwrap()
     }
 
     #[test]
