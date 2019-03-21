@@ -11,14 +11,16 @@ use futures::sync::oneshot;
 
 use crate::challenger::ChallengeResponse;
 use crate::clientchain::RpcClientChain;
+use crate::config::Config;
 use crate::error::Result;
 use crate::service::MockService;
 use crate::storage::{MockStorage, Storage};
 
 /// Run coordinator main method
 /// Currently using mock interfaces until ocean rpcs are finished
-pub fn run() -> Result<()> {
+pub fn run(config: Arc<Config>) -> Result<()> {
     info!("Running coordinator!");
+    info!("{:?}", config);
 
     let service = MockService::new();
     let clientchain = RpcClientChain::new(

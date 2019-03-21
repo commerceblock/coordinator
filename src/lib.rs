@@ -21,16 +21,18 @@ extern crate log;
 
 extern crate bitcoin;
 extern crate bitcoin_hashes;
+extern crate config as config_rs;
 extern crate futures;
 extern crate hyper;
 extern crate ocean_rpc;
 extern crate rust_ocean as _ocean;
 extern crate secp256k1;
-extern crate serde as _serde;
+extern crate serde as serde;
 extern crate serde_json;
 
 pub mod challenger;
 pub mod clientchain;
+pub mod config;
 pub mod coordinator;
 pub mod error;
 pub mod listener;
