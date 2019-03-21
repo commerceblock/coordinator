@@ -23,12 +23,7 @@ pub fn run(config: Arc<Config>) -> Result<()> {
     info!("{:?}", config);
 
     let service = MockService::new();
-    let clientchain = RpcClientChain::new(
-        String::from("http://127.0.0.1:5555"),
-        Some(String::from("user1")),
-        Some(String::from("password1")),
-        "CHALLENGE",
-    )?;
+    let clientchain = RpcClientChain::new(&config.clientchain)?;
     let storage = MockStorage::new();
 
     // client chain genesis hash

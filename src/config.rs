@@ -10,7 +10,7 @@ use crate::error::Result;
 
 #[derive(Debug, Deserialize)]
 /// Clientchain specific config
-pub struct Clientchain {
+pub struct ClientChainConfig {
     /// Client rpc host
     pub host: String,
     /// Client rpc user
@@ -35,7 +35,7 @@ pub struct Config {
     /// Verify duration
     pub verify_duration: u64,
     /// Clientchain configuration
-    pub clientchain: Clientchain,
+    pub clientchain: ClientChainConfig,
 }
 
 impl Config {
