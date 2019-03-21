@@ -30,6 +30,10 @@ pub struct Clientchain {
 pub struct Config {
     /// Env logger log level
     pub log_level: String,
+    /// Challenge duration
+    pub challenge_duration: u64,
+    /// Verify duration
+    pub verify_duration: u64,
     /// Clientchain configuration
     pub clientchain: Clientchain,
 }

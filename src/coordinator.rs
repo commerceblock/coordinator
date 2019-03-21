@@ -31,10 +31,8 @@ pub fn run(config: Arc<Config>) -> Result<()> {
     )?;
     let storage = MockStorage::new();
 
-    // hardcoded genesis hash for now
-    // TODO: from config
-    let genesis_hash =
-        sha256d::Hash::from_hex("73902d2a365fff2724e26d975148124268ec6a84991016683817ea2c973b199b").unwrap();
+    // client chain genesis hash
+    let genesis_hash = sha256d::Hash::from_hex(&config.clientchain.genesis_hash)?;
 
     loop {
         if let Some(challenge) = ::challenger::fetch_next(&service, &clientchain, &genesis_hash)? {
@@ -53,8 +51,8 @@ pub fn run(config: Arc<Config>) -> Result<()> {
                 shared_challenge.clone(),
                 &verify_rx,
                 &storage,
-                time::Duration::from_secs(150),
-                time::Duration::from_secs(60),
+                time::Duration::from_secs(config.verify_duration),
+                time::Duration::from_secs(config.challenge_duration),
             )?;
 
             println! {"***** Responses *****"}

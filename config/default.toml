@@ -1,6 +1,12 @@
 # Log level option used to set RUST_LOG for the rust env logger
 log_level = "coordinator"
 
+# Duration that we wait for challenge responses from guardnodes, in seconds
+challenge_duration = 60
+
+# Duration that we attempt to verify a challenge transaction before skipping, in seconds
+verify_duration = 150
+
 [clientchain]
 host = "http://127.0.0.1:5555"
 user = "user1"
