@@ -1,5 +1,3 @@
-//! Mock Client
-//!
 //! Mock Example of client sending a POST request to server
 
 extern crate bitcoin;

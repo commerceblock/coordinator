@@ -9,7 +9,7 @@ use crate::error::Result;
 /// Extension of ocean_rpc::Client that retries rpc calls
 pub struct RpcClient {
     /// Ocean rpc client instance
-    client: Client,
+    pub client: Client,
 }
 
 impl RpcClient {
