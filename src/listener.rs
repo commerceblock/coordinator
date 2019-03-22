@@ -2,6 +2,7 @@
 //!
 //! Listener interface and implementations
 
+use std::net::ToSocketAddrs;
 use std::str::FromStr;
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
@@ -144,11 +145,15 @@ fn response(status: StatusCode, message: String) -> Response<Body> {
 /// can be shutdown via a future oneshot channel receiver from the main method
 /// of the coordinator
 pub fn run_listener(
+    listener_host: &String,
     challenge: Arc<Mutex<ChallengeState>>,
     ch_resp: Sender<ChallengeResponse>,
     ch_recv: oneshot::Receiver<()>,
 ) -> thread::JoinHandle<()> {
-    let addr = ([127, 0, 0, 1], 9999).into();
+    let addr: Vec<_> = listener_host
+        .to_socket_addrs()
+        .expect("Unable to resolve domain")
+        .collect();
 
     let listener_service = move || {
         let challenge = Arc::clone(&challenge);
@@ -156,7 +161,7 @@ pub fn run_listener(
         service_fn(move |req: Request<Body>| handle(req, challenge.clone(), challenge_resp.clone()))
     };
 
-    let server = Server::bind(&addr)
+    let server = Server::bind(&addr[0])
         .serve(listener_service)
         .with_graceful_shutdown(ch_recv)
         .map_err(|e| error!("server error: {}", e));

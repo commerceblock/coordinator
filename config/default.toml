@@ -7,6 +7,9 @@ challenge_duration = 60
 # Duration that we attempt to verify a challenge transaction before skipping, in seconds
 verify_duration = 150
 
+# Host address that the listener binds to and receives guardnode requests
+listener_host = "localhost:9999"
+
 [clientchain]
 host = "http://127.0.0.1:5555"
 user = "user1"

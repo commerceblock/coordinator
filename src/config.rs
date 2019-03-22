@@ -34,6 +34,8 @@ pub struct Config {
     pub challenge_duration: u64,
     /// Verify duration
     pub verify_duration: u64,
+    /// Listener host address
+    pub listener_host: String,
     /// Clientchain configuration
     pub clientchain: ClientChainConfig,
 }

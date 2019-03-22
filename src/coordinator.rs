@@ -39,7 +39,8 @@ pub fn run(config: Arc<Config>) -> Result<()> {
 
             let (verify_tx, verify_rx): (Sender<ChallengeResponse>, Receiver<ChallengeResponse>) = channel();
 
-            let verify_handle = ::listener::run_listener(shared_challenge.clone(), verify_tx, thread_rx);
+            let verify_handle =
+                ::listener::run_listener(&config.listener_host, shared_challenge.clone(), verify_tx, thread_rx);
 
             ::challenger::run_challenge_request(
                 &clientchain,
