@@ -10,7 +10,7 @@ use std::{thread, time};
 use bitcoin_hashes::sha256d;
 
 use crate::clientchain::ClientChain;
-use crate::error::{Error, Result};
+use crate::error::{CError, Error, Result};
 use crate::request::{Bid, BidSet, Request};
 use crate::service::Service;
 use crate::storage::Storage;
@@ -67,9 +67,7 @@ fn get_challenge_responses(
                 }
                 Err(RecvTimeoutError::Timeout) => {} // ignore timeout - it's allowed
                 Err(RecvTimeoutError::Disconnected) => {
-                    return Err(Error::Coordinator(
-                        "challenge response receiver disconnected".to_owned(),
-                    ));
+                    return Err(Error::from(CError::ReceiverDisconnected));
                 }
             }
         } else {
@@ -165,7 +163,7 @@ fn check_request(request: &Request, height: u64) -> bool {
 fn get_request_bids<T: Service>(request: &Request, service: &T) -> Result<BidSet> {
     match service.get_request_bids(&request.genesis_blockhash)? {
         Some(bids) => return Ok(bids),
-        _ => Err(Error::Coordinator("no bids found".to_owned())),
+        _ => Err(Error::from(CError::MissingBids)),
     }
 }
 
@@ -208,6 +206,7 @@ mod tests {
     use bitcoin_hashes::Hash;
 
     use crate::clientchain::MockClientChain;
+    use crate::error::Error;
     use crate::service::MockService;
     use crate::storage::MockStorage;
 
@@ -271,7 +270,7 @@ mod tests {
         let res = get_challenge_responses(&dummy_hash, &vrx, time::Duration::from_millis(1));
         match res {
             Ok(_) => assert!(false, "should not return Ok"),
-            Err(Error::Coordinator(e)) => assert_eq!(String::from("challenge response receiver disconnected"), e),
+            Err(Error::Coordinator(e)) => assert_eq!(CError::ReceiverDisconnected.to_string(), e.to_string()),
             Err(_) => assert!(false, "should not return any error"),
         }
     }
@@ -313,7 +312,7 @@ mod tests {
         let res = get_request_bids(&dummy_request, &service);
         match res {
             Ok(_) => assert!(false, "should not return Ok"),
-            Err(Error::Coordinator(e)) => assert_eq!(String::from("no bids found"), e),
+            Err(Error::Coordinator(e)) => assert_eq!(CError::MissingBids.to_string(), e.to_string()),
             Err(_) => assert!(false, "should not return any error"),
         }
         service.return_none = false;
@@ -323,7 +322,7 @@ mod tests {
         let res = get_request_bids(&dummy_request, &service);
         match res {
             Ok(_) => assert!(false, "should not return Ok"),
-            Err(Error::Coordinator(e)) => assert_ne!(String::from("no bids found"), e),
+            Err(Error::Coordinator(e)) => assert_ne!(CError::MissingBids.to_string(), e.to_string()),
             Err(_) => assert!(true),
         }
     }

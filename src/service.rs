@@ -7,7 +7,7 @@ use std::str::FromStr;
 use bitcoin_hashes::{hex::FromHex, sha256d};
 use secp256k1::key::PublicKey;
 
-use crate::error::{Error, Result};
+use crate::error::{CError, Error, Result};
 use crate::ocean::RpcClient;
 use crate::request::{Bid, BidSet, Request};
 
@@ -74,7 +74,7 @@ impl Service for MockService {
             return Ok(None);
         }
         if self.return_err {
-            return Err(Error::Coordinator("get_request failed".to_owned()));
+            return Err(Error::from(CError::Generic("get_request failed".to_owned())));
         }
         let dummy_req = Request {
             start_blockheight: 2,
@@ -92,7 +92,7 @@ impl Service for MockService {
             return Ok(None);
         }
         if self.return_err {
-            return Err(Error::Coordinator("get_request_bids failed".to_owned()));
+            return Err(Error::from(CError::Generic("get_request_bids failed".to_owned())));
         }
         let dummy_bid = Bid {
             txid: sha256d::Hash::from_hex("1234567890000000000000000000000000000000000000000000000000000000").unwrap(),

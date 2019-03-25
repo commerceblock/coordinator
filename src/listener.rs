@@ -51,7 +51,7 @@ impl ChallengeProof {
     fn verify(challenge_proof: &ChallengeProof) -> Result<()> {
         let secp = Secp256k1::new();
         secp.verify(
-            &Message::from_slice(&serialize(&challenge_proof.hash)).unwrap(),
+            &Message::from_slice(&serialize(&challenge_proof.hash))?,
             &challenge_proof.sig,
             &challenge_proof.bid.pubkey,
         )?;

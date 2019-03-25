@@ -9,7 +9,7 @@ use bitcoin_hashes::{hex::FromHex, sha256d, Hash};
 use ocean_rpc::{json, RpcApi};
 
 use crate::config::ClientChainConfig;
-use crate::error::{Error, Result};
+use crate::error::{CError, Error, Result};
 use crate::ocean::RpcClient;
 
 /// Method that returns the first unspent for a specified asset label
@@ -24,10 +24,7 @@ fn get_first_unspent(client: &RpcClient, asset: &str, asset_hash: &sha256d::Hash
     }
 
     // TODO: custom error for clientchain
-    Err(Error::Coordinator(format!(
-        "no unspent found for challenge asset {}",
-        asset
-    )))
+    Err(Error::from(CError::MissingUnspent))
 }
 
 /// ClientChain trait defining desired functionality for interfacing
@@ -162,7 +159,7 @@ impl ClientChain for MockClientChain {
     /// Get client chain blockheight
     fn get_blockheight(&self) -> Result<u64> {
         if self.return_err {
-            return Err(Error::Coordinator("get_blockheight failed".to_owned()));
+            return Err(Error::from(CError::Generic("get_blockheight failed".to_owned())));
         }
 
         let mut height = self.height.borrow_mut();
@@ -173,7 +170,7 @@ impl ClientChain for MockClientChain {
     /// Send challenge transaction to client chain
     fn send_challenge(&self) -> Result<sha256d::Hash> {
         if self.return_err {
-            return Err(Error::Coordinator("send_challenge failed".to_owned()));
+            return Err(Error::from(CError::Generic("send_challenge failed".to_owned())));
         }
 
         // Use height to generate mock challenge hash
@@ -185,7 +182,7 @@ impl ClientChain for MockClientChain {
     /// Verify challenge transaction has been included in the chain
     fn verify_challenge(&self, _txid: &sha256d::Hash) -> Result<bool> {
         if self.return_err {
-            return Err(Error::Coordinator("verify_challenge failed".to_owned()));
+            return Err(Error::from(CError::Generic("verify_challenge failed".to_owned())));
         }
         if self.return_false {
             return Ok(false);
