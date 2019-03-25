@@ -50,14 +50,28 @@ pub struct MockService {
     /// Flag that when set returns None on all inherited methods that return
     /// Option
     pub return_none: bool,
+    /// Current active request
+    pub request: Request,
 }
 
 impl MockService {
     /// Create a MockService with all flags turned off by default
     pub fn new() -> Self {
+        let request = Request {
+            start_blockheight: 2,
+            end_blockheight: 5,
+            genesis_blockhash: sha256d::Hash::from_hex(
+                "0000000000000000000000000000000000000000000000000000000000000000",
+            )
+            .unwrap(),
+            fee_percentage: 5,
+            num_tickets: 10,
+        };
+
         MockService {
             return_err: false,
             return_none: false,
+            request,
         }
     }
 }
@@ -76,13 +90,9 @@ impl Service for MockService {
         if self.return_err {
             return Err(Error::from(CError::Generic("get_request failed".to_owned())));
         }
-        let dummy_req = Request {
-            start_blockheight: 2,
-            end_blockheight: 5,
-            genesis_blockhash: *hash,
-            fee_percentage: 5,
-            num_tickets: 10,
-        };
+
+        let mut dummy_req = self.request.clone();
+        dummy_req.genesis_blockhash = *hash;
         Ok(Some(dummy_req))
     }
 

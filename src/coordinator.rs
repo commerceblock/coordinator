@@ -10,27 +10,36 @@ use bitcoin_hashes::{hex::FromHex, sha256d};
 use futures::sync::oneshot;
 
 use crate::challenger::ChallengeResponse;
-use crate::clientchain::RpcClientChain;
+use crate::clientchain::{ClientChain, RpcClientChain};
 use crate::config::Config;
 use crate::error::Result;
-use crate::service::MockService;
+use crate::service::{MockService, Service};
 use crate::storage::{MockStorage, Storage};
 
 /// Run coordinator main method
-/// Currently using mock interfaces until ocean rpcs are finished
-pub fn run(config: Arc<Config>) -> Result<()> {
+pub fn run(config: Config) -> Result<()> {
     info!("Running coordinator!");
-    info!("{:?}", config);
 
     let service = MockService::new();
     let clientchain = RpcClientChain::new(&config.clientchain)?;
     let storage = MockStorage::new();
-
-    // client chain genesis hash
     let genesis_hash = sha256d::Hash::from_hex(&config.clientchain.genesis_hash)?;
 
+    run_inner(&config, &service, &clientchain, &storage, genesis_hash)
+}
+
+/// Inner run coordinator method with interfaces
+pub fn run_inner<T: Service, K: ClientChain, D: Storage>(
+    config: &Config,
+    service: &T,
+    clientchain: &K,
+    storage: &D,
+    genesis_hash: sha256d::Hash,
+) -> Result<()> {
+    // This loop runs until a challenge request is successfully
+    // finished or an error occurs
     loop {
-        match ::challenger::fetch_next(&service, &clientchain, &genesis_hash) {
+        match ::challenger::fetch_next(service, clientchain, &genesis_hash) {
             Ok(next) => {
                 if let Some(challenge) = next {
                     // first attempt to store the challenge state information
@@ -48,27 +57,27 @@ pub fn run(config: Arc<Config>) -> Result<()> {
                         ::listener::run_listener(&config.listener_host, shared_challenge.clone(), verify_tx, thread_rx);
 
                     // run challenge request storing expected responses
-                    if let Err(e) = ::challenger::run_challenge_request(
-                        &clientchain,
+                    ::challenger::run_challenge_request(
+                        clientchain,
                         shared_challenge.clone(),
                         &verify_rx,
-                        &storage,
+                        storage,
                         time::Duration::from_secs(config.verify_duration),
                         time::Duration::from_secs(config.challenge_duration),
-                    ) {
-                        warn!("challenger run error: {}", e);
-                    } else {
-                        // if challenge request succeeds print responses
-                        // TODO: how to propagate responses to fee payer
-                        println! {"***** Responses *****"}
-                        for resp in storage
-                            .get_challenge_responses(&shared_challenge.lock().unwrap())
-                            .unwrap()
-                            .iter()
-                        {
-                            println! {"{:?}", resp}
-                        }
+                    )?;
+
+                    // if challenge request succeeds print responses
+                    // TODO: how to propagate responses to fee payer
+                    println! {"***** Responses *****"}
+                    for resp in storage
+                        .get_challenge_responses(&shared_challenge.lock().unwrap())
+                        .unwrap()
+                        .iter()
+                    {
+                        println! {"{:?}", resp}
                     }
+
+                    // stop listener service
                     thread_tx.send(()).expect("thread_tx send failed");
                     verify_handle.join().expect("verify_handle join failed");
                     break;

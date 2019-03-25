@@ -9,12 +9,11 @@ extern crate env_logger;
 
 use std::env;
 use std::process;
-use std::sync::Arc;
 
 fn main() {
     // Fetch config which is set from default values in config
     // and any values overriden by the corresponding env variable
-    let config = Arc::new(coordinator::config::Config::new().unwrap());
+    let config = coordinator::config::Config::new().unwrap();
 
     // To see results set RUST_LOG to one of the following:
     // info, warning, debug, error, coordinator(for all)

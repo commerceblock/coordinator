@@ -22,7 +22,11 @@ use hyper::{
 use ocean_rpc::RpcApi;
 use secp256k1::{Message, Secp256k1, SecretKey};
 
+use coordinator::clientchain::RpcClientChain;
 use coordinator::ocean::RpcClient;
+use coordinator::request::Request as ServiceRequest;
+use coordinator::service::MockService;
+use coordinator::storage::MockStorage;
 
 /// Demo coordinator with listener and challenge service running
 /// mock implementation for service chain interface and ocean
@@ -66,7 +70,24 @@ fn main() {
     });
 
     // run coordinator
-    if let Err(e) = coordinator::coordinator::run(Arc::new(config)) {
+    let mut service = MockService::new();
+    let clientchain = RpcClientChain::new(&config.clientchain).unwrap();
+    let storage = MockStorage::new();
+    let genesis_hash = sha256d::Hash::from_hex(&config.clientchain.genesis_hash).unwrap();
+    if let Err(e) = coordinator::coordinator::run_inner(&config, &service, &clientchain, &storage, genesis_hash) {
+        error!("{}", e);
+    }
+
+    // change request and run again
+    let new_request = ServiceRequest {
+        start_blockheight: 7,
+        end_blockheight: 10,
+        genesis_blockhash: genesis_hash,
+        fee_percentage: 5,
+        num_tickets: 10,
+    };
+    service.request = new_request;
+    if let Err(e) = coordinator::coordinator::run_inner(&config, &service, &clientchain, &storage, genesis_hash) {
         error!("{}", e);
     }
 }
