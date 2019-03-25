@@ -174,7 +174,7 @@ pub fn run_listener(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::error::Error;
+
     use std::sync::mpsc::{channel, Receiver, TryRecvError};
 
     use bitcoin_hashes::hex::ToHex;
@@ -223,7 +223,7 @@ mod tests {
             "sig": "304402201742daea5ec3b7306b9164be862fc1659cc830032180b8b17beffe02645860d602201039eba402d22e630308e6af05da8dd4f05b51b7d672ca5fc9e3b0a57776365c"
         }"#;
         let proof = ChallengeProof::from_json(serde_json::from_str::<Value>(data).unwrap());
-        assert_eq!(proof.err().unwrap().description(), "bitcoin hashes error");
+        assert!(proof.err().unwrap().to_string().contains("bitcoin hashes error"));
 
         // bad pubkey
         let data = r#"
@@ -234,7 +234,7 @@ mod tests {
             "sig": "304402201742daea5ec3b7306b9164be862fc1659cc830032180b8b17beffe02645860d602201039eba402d22e630308e6af05da8dd4f05b51b7d672ca5fc9e3b0a57776365c"
         }"#;
         let proof = ChallengeProof::from_json(serde_json::from_str::<Value>(data).unwrap());
-        assert_eq!(proof.err().unwrap().description(), "secp256k1 error");
+        assert!(proof.err().unwrap().to_string().contains("secp256k1 error"));
 
         // bad hash
         let data = r#"
@@ -245,7 +245,7 @@ mod tests {
             "sig": "304402201742daea5ec3b7306b9164be862fc1659cc830032180b8b17beffe02645860d602201039eba402d22e630308e6af05da8dd4f05b51b7d672ca5fc9e3b0a57776365c"
         }"#;
         let proof = ChallengeProof::from_json(serde_json::from_str::<Value>(data).unwrap());
-        assert_eq!(proof.err().unwrap().description(), "bitcoin hashes error");
+        assert!(proof.err().unwrap().to_string().contains("bitcoin hashes error"));
 
         // bad sig
         let data = r#"
@@ -256,7 +256,7 @@ mod tests {
             "sig": "4402201742daea5ec3b7306b9164be862fc1659cc830032180b8b17beffe02645860d602201039eba402d22e630308e6af05da8dd4f05b51b7d672ca5fc9e3b0a57776365c"
         }"#;
         let proof = ChallengeProof::from_json(serde_json::from_str::<Value>(data).unwrap());
-        assert_eq!(proof.err().unwrap().description(), "secp256k1 error");
+        assert!(proof.err().unwrap().to_string().contains("secp256k1 error"));
     }
 
     #[test]
@@ -297,7 +297,7 @@ mod tests {
         };
 
         let verify = ChallengeProof::verify(&proof);
-        assert_eq!(verify.err().unwrap().description(), "secp256k1 error");
+        assert!(verify.err().unwrap().to_string().contains("secp256k1 error"));
     }
 
     #[test]

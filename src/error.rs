@@ -20,11 +20,11 @@ pub enum CError {
     /// Inherit all errors from ocean rpc
     OceanRpc(OceanRpcError),
     /// Bitcoin hashes error
-    BitcoinHashesError(HashesError),
+    BitcoinHashes(HashesError),
     /// Secp256k1 error
-    Secp256k1Error(Secp256k1Error),
+    Secp256k1(Secp256k1Error),
     /// Config error
-    ConfigError(ConfigError),
+    Config(ConfigError),
     /// Coordinator error
     Coordinator(String),
 }
@@ -43,19 +43,19 @@ impl From<String> for CError {
 
 impl From<HashesError> for CError {
     fn from(e: HashesError) -> CError {
-        CError::BitcoinHashesError(e)
+        CError::BitcoinHashes(e)
     }
 }
 
 impl From<Secp256k1Error> for CError {
     fn from(e: Secp256k1Error) -> CError {
-        CError::Secp256k1Error(e)
+        CError::Secp256k1(e)
     }
 }
 
 impl From<ConfigError> for CError {
     fn from(e: ConfigError) -> CError {
-        CError::ConfigError(e)
+        CError::Config(e)
     }
 }
 
@@ -63,31 +63,21 @@ impl fmt::Display for CError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             CError::OceanRpc(ref e) => write!(f, "ocean rpc error: {}", e),
-            CError::BitcoinHashesError(ref e) => write!(f, "bitcoin hashes error: {}", e),
-            CError::Secp256k1Error(ref e) => write!(f, "secp256k1 error: {}", e),
-            CError::ConfigError(ref e) => write!(f, "config error: {}", e),
+            CError::BitcoinHashes(ref e) => write!(f, "bitcoin hashes error: {}", e),
+            CError::Secp256k1(ref e) => write!(f, "secp256k1 error: {}", e),
+            CError::Config(ref e) => write!(f, "config error: {}", e),
             CError::Coordinator(ref e) => write!(f, "service error: {}", e),
         }
     }
 }
 
 impl error::Error for CError {
-    fn description(&self) -> &str {
-        match *self {
-            CError::OceanRpc(_) => "ocean rpc error",
-            CError::BitcoinHashesError(_) => "bitcoin hashes error",
-            CError::Secp256k1Error(_) => "secp256k1 error",
-            CError::ConfigError(_) => "config error",
-            CError::Coordinator(_) => "service error",
-        }
-    }
-
     fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         match *self {
             CError::OceanRpc(ref e) => Some(e),
-            CError::BitcoinHashesError(ref e) => Some(e),
-            CError::Secp256k1Error(ref e) => Some(e),
-            CError::ConfigError(ref e) => Some(e),
+            CError::BitcoinHashes(ref e) => Some(e),
+            CError::Secp256k1(ref e) => Some(e),
+            CError::Config(ref e) => Some(e),
             CError::Coordinator(_) => None,
         }
     }
