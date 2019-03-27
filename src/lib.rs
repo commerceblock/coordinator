@@ -27,6 +27,7 @@ extern crate ocean_rpc;
 extern crate rust_ocean as _ocean;
 extern crate secp256k1;
 extern crate serde as serde;
+#[macro_use]
 extern crate serde_json;
 #[macro_use]
 extern crate mongodb;

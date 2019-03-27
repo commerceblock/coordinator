@@ -69,13 +69,10 @@ pub fn run_inner<T: Service, K: ClientChain, D: Storage>(
                     // if challenge request succeeds print responses
                     // TODO: how to propagate responses to fee payer
                     println! {"***** Responses *****"}
-                    for resp in storage
+                    let resp = storage
                         .get_challenge_responses(shared_challenge.lock().unwrap().request.txid)
-                        .unwrap()
-                        .iter()
-                    {
-                        println! {"{:?}", resp}
-                    }
+                        .unwrap();
+                    println! {"{}", serde_json::to_string_pretty(&resp).unwrap()};
 
                     // stop listener service
                     thread_tx.send(()).expect("thread_tx send failed");

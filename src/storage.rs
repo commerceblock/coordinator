@@ -6,7 +6,8 @@ use std::cell::RefCell;
 
 use bitcoin_hashes::sha256d;
 use mongodb::db::{Database, ThreadedDatabase};
-use mongodb::{Client, ThreadedClient};
+use mongodb::{Bson, Client, ThreadedClient};
+use serde_json::Value;
 
 use crate::challenger::{ChallengeResponse, ChallengeResponseSet, ChallengeState};
 use crate::error::{CError, Error, Result};
@@ -19,7 +20,7 @@ pub trait Storage {
     /// Store responses for a specific challenge request
     fn save_challenge_responses(&self, request_hash: sha256d::Hash, responses: &ChallengeResponseSet) -> Result<()>;
     /// Get challenge responses for a specific request
-    fn get_challenge_responses(&self, request_hash: sha256d::Hash) -> Result<Vec<ChallengeResponse>>;
+    fn get_challenge_responses(&self, request_hash: sha256d::Hash) -> Result<Value>;
 }
 
 /// Database implementation of Storage trait
@@ -85,23 +86,14 @@ impl Storage for MongoStorage {
         let request_id = request.get("_id").unwrap().clone();
 
         let mut bids = vec![];
-        let coll = self.db.collection("Bid");
         for resp in responses.iter() {
-            let bid = coll.find_one(
-                Some(doc! {
-                    "request_id": request_id.clone(),
-                    "txid": resp.1.txid.to_string()
-                }),
-                None,
-            );
-
-            bids.push(bid.unwrap().unwrap().get("_id").unwrap().clone());
+            bids.push(Bson::String(resp.1.txid.to_string()));
         }
 
         let _ = self.db.collection("Response").insert_one(
             doc! {
                 "request_id": request_id,
-                "bid": bids
+                "bid_txids": bids
             },
             None,
         )?;
@@ -109,8 +101,42 @@ impl Storage for MongoStorage {
     }
 
     /// Get challenge responses for a specific request
-    fn get_challenge_responses(&self, request_hash: sha256d::Hash) -> Result<Vec<ChallengeResponse>> {
-        Ok(vec![])
+    fn get_challenge_responses(&self, request_hash: sha256d::Hash) -> Result<Value> {
+        let mut resp_aggr = self.db.collection("Request").aggregate(
+            [
+                doc! {
+                    "$lookup": {
+                        "from": "Response",
+                        "localField": "_id",
+                        "foreignField": "request_id",
+                        "as": "challenges"
+                    }
+                },
+                doc! {
+                    "$match": {
+                        "txid": request_hash.to_string()
+                    }
+                },
+                doc! {
+                    "$unwind": "$challenges"
+                },
+                doc! {
+                    "$project": {
+                        "_id": 0,
+                        "challenge_txids": "$challenges.bid_txids"
+                    }
+                },
+            ]
+            .to_vec(),
+            None,
+        )?;
+
+        let mut challenge_responses = vec![];
+        while resp_aggr.has_next()? {
+            let resp_value: Value = Bson::Document(resp_aggr.next().unwrap()?).into();
+            challenge_responses.push(resp_value);
+        }
+        Ok(json!({ "challenge_responses": challenge_responses }))
     }
 }
 
@@ -148,7 +174,7 @@ impl Storage for MockStorage {
     }
 
     /// Store responses for a specific challenge request
-    fn save_challenge_responses(&self, request_hash: sha256d::Hash, responses: &ChallengeResponseSet) -> Result<()> {
+    fn save_challenge_responses(&self, _request_hash: sha256d::Hash, responses: &ChallengeResponseSet) -> Result<()> {
         if self.return_err {
             return Err(Error::from(CError::Generic(
                 "save_challenge_responses failed".to_owned(),
@@ -159,7 +185,12 @@ impl Storage for MockStorage {
     }
 
     /// Get challenge responses for a specific request
-    fn get_challenge_responses(&self, request_hash: sha256d::Hash) -> Result<Vec<ChallengeResponse>> {
-        Ok(self.challenge_responses.borrow().to_vec())
+    fn get_challenge_responses(&self, _request_hash: sha256d::Hash) -> Result<Value> {
+        let mut challenge_responses = vec![];
+        for resp in self.challenge_responses.borrow().to_vec().iter() {
+            let resp_value = serde_json::Value::String(resp.1.txid.to_string());
+            challenge_responses.push(resp_value);
+        }
+        Ok(json!({ "challenge_responses": challenge_responses }))
     }
 }
