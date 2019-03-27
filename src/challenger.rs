@@ -110,11 +110,10 @@ pub fn run_challenge_request<K: ClientChain, D: Storage>(
         }
 
         info! {"fetching responses..."}
-        storage.save_challenge_responses(&get_challenge_responses(
-            &challenge_hash,
-            &verify_rx,
-            responses_duration,
-        )?)?;
+        storage.save_challenge_responses(
+            request.txid,
+            &get_challenge_responses(&challenge_hash, &verify_rx, responses_duration)?,
+        )?;
         challenge_state.lock().unwrap().latest_challenge = None; // stop receiving responses
     }
     info! {"Challenge request ended"}

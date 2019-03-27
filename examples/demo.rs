@@ -78,18 +78,20 @@ fn main() {
         error!("{}", e);
     }
 
-    // change request and run again
-    let new_request = ServiceRequest {
-        txid: sha256d::Hash::from_slice(&[0xfe as u8; 32]).unwrap(),
-        start_blockheight: 7,
-        end_blockheight: 10,
-        genesis_blockhash: genesis_hash,
-        fee_percentage: 5,
-        num_tickets: 10,
-    };
-    service.request = new_request;
-    if let Err(e) = coordinator::coordinator::run_inner(&config, &service, &clientchain, &storage, genesis_hash) {
-        error!("{}", e);
+    // do multiple requests
+    for x in (10..20).step_by(3) {
+        let new_request = ServiceRequest {
+            txid: sha256d::Hash::from_slice(&[x as u8; 32]).unwrap(),
+            start_blockheight: x,
+            end_blockheight: x + 2,
+            genesis_blockhash: genesis_hash,
+            fee_percentage: 5,
+            num_tickets: 10,
+        };
+        service.request = new_request;
+        if let Err(e) = coordinator::coordinator::run_inner(&config, &service, &clientchain, &storage, genesis_hash) {
+            error!("{}", e);
+        }
     }
 }
 

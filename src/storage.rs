@@ -4,6 +4,7 @@
 
 use std::cell::RefCell;
 
+use bitcoin_hashes::sha256d;
 use mongodb::db::{Database, ThreadedDatabase};
 use mongodb::{Client, ThreadedClient};
 
@@ -15,10 +16,10 @@ use crate::error::{CError, Error, Result};
 pub trait Storage {
     /// Store the state of a challenge request
     fn save_challenge_state(&self, challenge: &ChallengeState) -> Result<()>;
-    /// Store responses to a specific challenge request
-    fn save_challenge_responses(&self, responses: &ChallengeResponseSet) -> Result<()>;
+    /// Store responses for a specific challenge request
+    fn save_challenge_responses(&self, request_hash: sha256d::Hash, responses: &ChallengeResponseSet) -> Result<()>;
     /// Get challenge responses for a specific request
-    fn get_challenge_responses(&self, challenge: &ChallengeState) -> Result<Vec<ChallengeResponse>>;
+    fn get_challenge_responses(&self, request_hash: sha256d::Hash) -> Result<Vec<ChallengeResponse>>;
 }
 
 /// Database implementation of Storage trait
@@ -71,13 +72,13 @@ impl Storage for MongoStorage {
         Ok(())
     }
 
-    /// Store responses to a specific challenge request
-    fn save_challenge_responses(&self, responses: &ChallengeResponseSet) -> Result<()> {
+    /// Store responses for a specific challenge request
+    fn save_challenge_responses(&self, request_hash: sha256d::Hash, responses: &ChallengeResponseSet) -> Result<()> {
         Ok(())
     }
 
     /// Get challenge responses for a specific request
-    fn get_challenge_responses(&self, _challenge: &ChallengeState) -> Result<Vec<ChallengeResponse>> {
+    fn get_challenge_responses(&self, request_hash: sha256d::Hash) -> Result<Vec<ChallengeResponse>> {
         Ok(vec![])
     }
 }
@@ -115,8 +116,8 @@ impl Storage for MockStorage {
         Ok(())
     }
 
-    /// Store responses to a specific challenge request
-    fn save_challenge_responses(&self, responses: &ChallengeResponseSet) -> Result<()> {
+    /// Store responses for a specific challenge request
+    fn save_challenge_responses(&self, request_hash: sha256d::Hash, responses: &ChallengeResponseSet) -> Result<()> {
         if self.return_err {
             return Err(Error::from(CError::Generic(
                 "save_challenge_responses failed".to_owned(),
@@ -127,7 +128,7 @@ impl Storage for MockStorage {
     }
 
     /// Get challenge responses for a specific request
-    fn get_challenge_responses(&self, _challenge: &ChallengeState) -> Result<Vec<ChallengeResponse>> {
+    fn get_challenge_responses(&self, request_hash: sha256d::Hash) -> Result<Vec<ChallengeResponse>> {
         Ok(self.challenge_responses.borrow().to_vec())
     }
 }

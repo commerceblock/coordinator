@@ -70,7 +70,7 @@ pub fn run_inner<T: Service, K: ClientChain, D: Storage>(
                     // TODO: how to propagate responses to fee payer
                     println! {"***** Responses *****"}
                     for resp in storage
-                        .get_challenge_responses(&shared_challenge.lock().unwrap())
+                        .get_challenge_responses(shared_challenge.lock().unwrap().request.txid)
                         .unwrap()
                         .iter()
                     {
