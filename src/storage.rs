@@ -123,7 +123,7 @@ impl Storage for MongoStorage {
                 doc! {
                     "$project": {
                         "_id": 0,
-                        "challenge_txids": "$challenges.bid_txids"
+                        "response_bid_txids": "$challenges.bid_txids"
                     }
                 },
             ]

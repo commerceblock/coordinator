@@ -46,7 +46,7 @@ fn verify_challenge<K: ClientChain>(
 /// Get responses to the challenge by reading data from the channel receiver
 /// Channel is read for a configurable duration and then the method returns
 /// all the responses that have been received for a specific challenge hash
-fn get_challenge_responses(
+fn get_challenge_response(
     challenge_hash: &sha256d::Hash,
     verify_rx: &Receiver<ChallengeResponse>,
     get_duration: time::Duration,
@@ -112,7 +112,7 @@ pub fn run_challenge_request<K: ClientChain, D: Storage>(
         info! {"fetching responses..."}
         storage.save_challenge_responses(
             request.txid,
-            &get_challenge_responses(&challenge_hash, &verify_rx, responses_duration)?,
+            &get_challenge_response(&challenge_hash, &verify_rx, responses_duration)?,
         )?;
         challenge_state.lock().unwrap().latest_challenge = None; // stop receiving responses
     }
@@ -233,7 +233,7 @@ mod tests {
     }
 
     #[test]
-    fn get_challenge_responses_test() {
+    fn get_challenge_response_test() {
         let service = MockService::new();
 
         let dummy_hash = gen_dummy_hash(3);
@@ -248,7 +248,7 @@ mod tests {
         let (vtx, vrx): (Sender<ChallengeResponse>, Receiver<ChallengeResponse>) = channel();
 
         // first test with empty response
-        let res = get_challenge_responses(&dummy_hash, &vrx, time::Duration::from_millis(1));
+        let res = get_challenge_response(&dummy_hash, &vrx, time::Duration::from_millis(1));
         assert_eq!(res.unwrap().len(), 0);
 
         // then test with a few dummy responses and old hashes that are ignored
@@ -260,13 +260,13 @@ mod tests {
         vtx.send(ChallengeResponse(old_dummy_hash, dummy_bid.clone())).unwrap();
         vtx.send(ChallengeResponse(dummy_hash, dummy_bid.clone())).unwrap();
         vtx.send(ChallengeResponse(old_dummy_hash, dummy_bid.clone())).unwrap();
-        let res = get_challenge_responses(&dummy_hash, &vrx, time::Duration::from_millis(1)).unwrap();
+        let res = get_challenge_response(&dummy_hash, &vrx, time::Duration::from_millis(1)).unwrap();
         assert_eq!(res.len(), 1);
         assert_eq!(res, dummy_response_set);
 
         // then drop channel sender and test correct error is returned
         std::mem::drop(vtx);
-        let res = get_challenge_responses(&dummy_hash, &vrx, time::Duration::from_millis(1));
+        let res = get_challenge_response(&dummy_hash, &vrx, time::Duration::from_millis(1));
         match res {
             Ok(_) => assert!(false, "should not return Ok"),
             Err(Error::Coordinator(e)) => assert_eq!(CError::ReceiverDisconnected.to_string(), e.to_string()),
