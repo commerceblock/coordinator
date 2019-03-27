@@ -42,20 +42,18 @@ impl Storage for MongoStorage {
     /// Store the state of a challenge request
     fn save_challenge_state(&self, challenge: &ChallengeState) -> Result<()> {
         let request_id;
-        let coll = self.db.collection("request");
+        let coll = self.db.collection("Request");
         let doc = doc! {
             "txid": challenge.request.txid.to_string(),
         };
         match coll.find_one(Some(doc.clone()), None)? {
             Some(res) => request_id = res.get("_id").unwrap().clone(),
             None => {
-                println!("request inserting...");
-                let res = coll.insert_one(doc.clone(), None)?;
-                request_id = res.inserted_id.unwrap();
+                request_id = coll.insert_one(doc.clone(), None)?.inserted_id.unwrap();
             }
         }
 
-        let coll = self.db.collection("bid");
+        let coll = self.db.collection("Bid");
         for bid in challenge.bids.iter() {
             let doc = doc! {
                 "request_id": request_id.clone(),
@@ -74,6 +72,39 @@ impl Storage for MongoStorage {
 
     /// Store responses for a specific challenge request
     fn save_challenge_responses(&self, request_hash: sha256d::Hash, responses: &ChallengeResponseSet) -> Result<()> {
+        let request = self
+            .db
+            .collection("Request")
+            .find_one(
+                Some(doc! {
+                    "txid": request_hash.to_string(),
+                }),
+                None,
+            )?
+            .unwrap();
+        let request_id = request.get("_id").unwrap().clone();
+
+        let mut bids = vec![];
+        let coll = self.db.collection("Bid");
+        for resp in responses.iter() {
+            let bid = coll.find_one(
+                Some(doc! {
+                    "request_id": request_id.clone(),
+                    "txid": resp.1.txid.to_string()
+                }),
+                None,
+            );
+
+            bids.push(bid.unwrap().unwrap().get("_id").unwrap().clone());
+        }
+
+        let _ = self.db.collection("Response").insert_one(
+            doc! {
+                "request_id": request_id,
+                "bid": bids
+            },
+            None,
+        )?;
         Ok(())
     }
 
