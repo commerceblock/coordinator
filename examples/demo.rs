@@ -14,7 +14,7 @@ use std::sync::Arc;
 use std::{env, thread, time};
 
 use bitcoin::consensus::encode::serialize;
-use bitcoin_hashes::{hex::FromHex, hex::ToHex, sha256d};
+use bitcoin_hashes::{hex::FromHex, hex::ToHex, sha256d, Hash};
 use hyper::{
     rt::{self, Future},
     Body, Client, Method, Request,
@@ -80,6 +80,7 @@ fn main() {
 
     // change request and run again
     let new_request = ServiceRequest {
+        txid: sha256d::Hash::from_slice(&[0xfe as u8; 32]).unwrap(),
         start_blockheight: 7,
         end_blockheight: 10,
         genesis_blockhash: genesis_hash,

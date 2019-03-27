@@ -11,6 +11,8 @@ use secp256k1::key::PublicKey;
 /// to be stored
 #[derive(Debug, PartialEq, Clone)]
 pub struct Request {
+    /// Ocean transaction ID of the request transaction
+    pub txid: sha256d::Hash,
     /// Request start block height
     pub start_blockheight: usize,
     /// Request end block height

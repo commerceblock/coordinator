@@ -43,7 +43,7 @@ impl Storage for MongoStorage {
         let request_id;
         let coll = self.db.collection("request");
         let doc = doc! {
-            "height": challenge.request.start_blockheight as u32,
+            "txid": challenge.request.txid.to_string(),
         };
         match coll.find_one(Some(doc.clone()), None)? {
             Some(res) => request_id = res.get("_id").unwrap().clone(),

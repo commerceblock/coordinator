@@ -4,7 +4,7 @@
 
 use std::str::FromStr;
 
-use bitcoin_hashes::{hex::FromHex, sha256d};
+use bitcoin_hashes::{hex::FromHex, sha256d, Hash};
 use secp256k1::key::PublicKey;
 
 use crate::error::{CError, Error, Result};
@@ -58,6 +58,7 @@ impl MockService {
     /// Create a MockService with all flags turned off by default
     pub fn new() -> Self {
         let request = Request {
+            txid: sha256d::Hash::from_slice(&[0xff as u8; 32]).unwrap(),
             start_blockheight: 2,
             end_blockheight: 5,
             genesis_blockhash: sha256d::Hash::from_hex(

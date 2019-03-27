@@ -174,9 +174,7 @@ impl ClientChain for MockClientChain {
         }
 
         // Use height to generate mock challenge hash
-        Ok(sha256d::Hash::from_slice(
-            &[(*self.height.borrow() % 16) as u8; 32] as &[u8],
-        )?)
+        Ok(sha256d::Hash::from_slice(&[(*self.height.borrow() % 16) as u8; 32])?)
     }
 
     /// Verify challenge transaction has been included in the chain

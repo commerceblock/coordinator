@@ -185,7 +185,7 @@ mod tests {
 
     /// Generate dummy hash for tests
     fn gen_dummy_hash(i: u8) -> sha256d::Hash {
-        sha256d::Hash::from_slice(&[i as u8; 32] as &[u8]).unwrap()
+        sha256d::Hash::from_slice(&[i as u8; 32]).unwrap()
     }
 
     /// Geberate dummy challenge state
