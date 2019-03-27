@@ -14,6 +14,7 @@ futures = "0.1"
 config = "0.9"
 serde = { version = "1.0", features = ["derive"] }
 serde_json="1.0"
+mongodb = "0.3.11"
 rust-ocean = { git = "https://github.com/commerceblock/rust-ocean"}
 ocean-rpc = { git = "https://github.com/commerceblock/rust-ocean-rpc"}
 bitcoin = { version = "0.17", features = [ "serde-decimal" ] }

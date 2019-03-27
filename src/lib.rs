@@ -18,7 +18,6 @@
 
 #[macro_use]
 extern crate log;
-
 extern crate bitcoin;
 extern crate bitcoin_hashes;
 extern crate config as config_rs;
@@ -29,6 +28,8 @@ extern crate rust_ocean as _ocean;
 extern crate secp256k1;
 extern crate serde as serde;
 extern crate serde_json;
+#[macro_use]
+extern crate mongodb;
 
 pub mod challenger;
 pub mod clientchain;

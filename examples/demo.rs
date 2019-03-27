@@ -26,7 +26,7 @@ use coordinator::clientchain::RpcClientChain;
 use coordinator::ocean::RpcClient;
 use coordinator::request::Request as ServiceRequest;
 use coordinator::service::MockService;
-use coordinator::storage::MockStorage;
+use coordinator::storage::MongoStorage;
 
 /// Demo coordinator with listener and challenge service running
 /// mock implementation for service chain interface and ocean
@@ -72,7 +72,7 @@ fn main() {
     // run coordinator
     let mut service = MockService::new();
     let clientchain = RpcClientChain::new(&config.clientchain).unwrap();
-    let storage = MockStorage::new();
+    let storage = MongoStorage::new();
     let genesis_hash = sha256d::Hash::from_hex(&config.clientchain.genesis_hash).unwrap();
     if let Err(e) = coordinator::coordinator::run_inner(&config, &service, &clientchain, &storage, genesis_hash) {
         error!("{}", e);

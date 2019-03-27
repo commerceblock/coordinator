@@ -8,6 +8,7 @@ use std::result;
 
 use bitcoin_hashes::Error as HashesError;
 use config_rs::ConfigError;
+use mongodb::Error as MongoDbError;
 use ocean_rpc::Error as OceanRpcError;
 use secp256k1::Error as Secp256k1Error;
 
@@ -67,6 +68,8 @@ pub enum Error {
     BitcoinHashes(HashesError),
     /// Secp256k1 error
     Secp256k1(Secp256k1Error),
+    /// Mongodb error
+    MongoDb(MongoDbError),
     /// Config error
     Config(ConfigError),
     /// Coordinator error
@@ -97,6 +100,12 @@ impl From<Secp256k1Error> for Error {
     }
 }
 
+impl From<MongoDbError> for Error {
+    fn from(e: MongoDbError) -> Error {
+        Error::MongoDb(e)
+    }
+}
+
 impl From<ConfigError> for Error {
     fn from(e: ConfigError) -> Error {
         Error::Config(e)
@@ -109,6 +118,7 @@ impl fmt::Display for Error {
             Error::OceanRpc(ref e) => write!(f, "ocean rpc error: {}", e),
             Error::BitcoinHashes(ref e) => write!(f, "bitcoin hashes error: {}", e),
             Error::Secp256k1(ref e) => write!(f, "secp256k1 error: {}", e),
+            Error::MongoDb(ref e) => write!(f, "mongodb error: {}", e),
             Error::Config(ref e) => write!(f, "config error: {}", e),
             Error::Coordinator(ref e) => write!(f, "coordinator error: {}", e),
         }
@@ -121,6 +131,7 @@ impl error::Error for Error {
             Error::OceanRpc(ref e) => Some(e),
             Error::BitcoinHashes(ref e) => Some(e),
             Error::Secp256k1(ref e) => Some(e),
+            Error::MongoDb(ref e) => Some(e),
             Error::Config(ref e) => Some(e),
             Error::Coordinator(_) => None,
         }

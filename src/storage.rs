@@ -4,6 +4,9 @@
 
 use std::cell::RefCell;
 
+use mongodb::db::{Database, ThreadedDatabase};
+use mongodb::{Client, ThreadedClient};
+
 use crate::challenger::{ChallengeResponse, ChallengeResponseSet, ChallengeState};
 use crate::error::{CError, Error, Result};
 
@@ -19,18 +22,65 @@ pub trait Storage {
 }
 
 /// Database implementation of Storage trait
-pub struct DbStorage {}
+pub struct MongoStorage {
+    db: Database,
+}
 
-impl DbStorage {
+impl MongoStorage {
     /// Create DbStorage instance
     pub fn new() -> Self {
-        DbStorage {}
+        // TODO: add user/pass option
+        let client = Client::with_uri("mongodb://localhost:27017/coordinator").expect("Failed to initialize client.");
+        MongoStorage {
+            db: client.db("coordinator"),
+        }
     }
 }
 
-//
-// TODO: implement Storage trait for DbStorage
-//
+impl Storage for MongoStorage {
+    /// Store the state of a challenge request
+    fn save_challenge_state(&self, challenge: &ChallengeState) -> Result<()> {
+        let request_id;
+        let coll = self.db.collection("request");
+        let doc = doc! {
+            "height": challenge.request.start_blockheight as u32,
+        };
+        match coll.find_one(Some(doc.clone()), None)? {
+            Some(res) => request_id = res.get("_id").unwrap().clone(),
+            None => {
+                println!("request inserting...");
+                let res = coll.insert_one(doc.clone(), None)?;
+                request_id = res.inserted_id.unwrap();
+            }
+        }
+
+        let coll = self.db.collection("bid");
+        for bid in challenge.bids.iter() {
+            let doc = doc! {
+                "request_id": request_id.clone(),
+                "txid": bid.txid.to_string(),
+                "pubkey": bid.pubkey.to_string()
+            };
+            match coll.find_one(Some(doc.clone()), None)? {
+                Some(_) => (),
+                None => {
+                    let _ = coll.insert_one(doc.clone(), None)?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Store responses to a specific challenge request
+    fn save_challenge_responses(&self, responses: &ChallengeResponseSet) -> Result<()> {
+        Ok(())
+    }
+
+    /// Get challenge responses for a specific request
+    fn get_challenge_responses(&self, _challenge: &ChallengeState) -> Result<Vec<ChallengeResponse>> {
+        Ok(vec![])
+    }
+}
 
 /// Mock implementation of Storage storing data in memory for testing
 #[derive(Debug)]
