@@ -206,3 +206,48 @@ impl Storage for MockStorage {
         Ok(challenge_responses)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use mongodb::oid::ObjectId;
+
+    #[test]
+    fn challenge_responses_doc_test() {
+        let id = ObjectId::new().unwrap();
+        let mut ids = ChallengeResponseIds::new();
+
+        let doc = challenge_responses_to_doc(&Bson::ObjectId(id.clone()), &ids);
+        assert_eq!(
+            doc! {
+                "request_id": id.clone(),
+                "bid_txids": []
+            },
+            doc
+        );
+        assert_eq!(ids, doc_to_challenge_responses(&doc));
+
+        let _ = ids.insert("test".to_owned());
+        let doc = challenge_responses_to_doc(&Bson::ObjectId(id.clone()), &ids);
+        assert_eq!(
+            doc! {
+                "request_id": id.clone(),
+                "bid_txids": ["test"]
+            },
+            doc
+        );
+        assert_eq!(ids, doc_to_challenge_responses(&doc));
+
+        let _ = ids.insert("test2".to_owned());
+        let _ = ids.insert("test3".to_owned());
+        let _ = ids.insert("test4".to_owned());
+        let doc = challenge_responses_to_doc(&Bson::ObjectId(id.clone()), &ids);
+        assert_eq!(&id, doc.get("request_id").unwrap().as_object_id().unwrap());
+        for id in doc.get_array("bid_txids").unwrap().iter() {
+            assert!(ids.contains(id.as_str().unwrap()));
+        }
+        assert_eq!(4, doc.get_array("bid_txids").unwrap().len());
+        assert_eq!(ids, doc_to_challenge_responses(&doc));
+    }
+}
