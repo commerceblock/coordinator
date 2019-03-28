@@ -14,7 +14,7 @@ use crate::clientchain::{ClientChain, RpcClientChain};
 use crate::config::Config;
 use crate::error::Result;
 use crate::service::{MockService, Service};
-use crate::storage::{MockStorage, Storage};
+use crate::storage::{MongoStorage, Storage};
 
 /// Run coordinator main method
 pub fn run(config: Config) -> Result<()> {
@@ -22,7 +22,7 @@ pub fn run(config: Config) -> Result<()> {
 
     let service = MockService::new();
     let clientchain = RpcClientChain::new(&config.clientchain)?;
-    let storage = MockStorage::new();
+    let storage = MongoStorage::new(&config.storage)?;
     let genesis_hash = sha256d::Hash::from_hex(&config.clientchain.genesis_hash)?;
 
     run_inner(&config, &service, &clientchain, &storage, genesis_hash)

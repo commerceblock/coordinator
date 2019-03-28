@@ -72,7 +72,7 @@ fn main() {
     // run coordinator
     let mut service = MockService::new();
     let clientchain = RpcClientChain::new(&config.clientchain).unwrap();
-    let storage = MongoStorage::new();
+    let storage = MongoStorage::new(&config.storage).unwrap();
     let genesis_hash = sha256d::Hash::from_hex(&config.clientchain.genesis_hash).unwrap();
     if let Err(e) = coordinator::coordinator::run_inner(&config, &service, &clientchain, &storage, genesis_hash) {
         error!("{}", e);

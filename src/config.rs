@@ -25,6 +25,19 @@ pub struct ClientChainConfig {
     pub genesis_hash: String,
 }
 
+#[derive(Debug, Deserialize)]
+/// Storage specific config
+pub struct StorageConfig {
+    /// Storage host
+    pub host: String,
+    /// Storage user
+    pub user: String,
+    /// Storage pass
+    pub pass: String,
+    /// Storage name
+    pub name: String,
+}
+
 /// Config struct storing all config
 #[derive(Debug, Deserialize)]
 pub struct Config {
@@ -38,6 +51,8 @@ pub struct Config {
     pub listener_host: String,
     /// Clientchain configuration
     pub clientchain: ClientChainConfig,
+    /// Storage configuration
+    pub storage: StorageConfig,
 }
 
 impl Config {
@@ -71,6 +86,22 @@ impl Config {
         }
         if let Ok(v) = env::var("CO_CLIENTCHAIN_GENESIS_HASH") {
             let _ = conf_rs.set("clientchain.genesis_hash", v)?;
+        }
+
+        // Override storage config from env variables
+        // Currently doesn't seem to be supported by config_rs
+        // https://github.com/mehcode/config-rs/issues/104
+        if let Ok(v) = env::var("CO_STORAGE_HOST") {
+            let _ = conf_rs.set("storage.host", v)?;
+        }
+        if let Ok(v) = env::var("CO_STORAGE_USER") {
+            let _ = conf_rs.set("storage.user", v)?;
+        }
+        if let Ok(v) = env::var("CO_STORAGE_PASS") {
+            let _ = conf_rs.set("storage.pass", v)?;
+        }
+        if let Ok(v) = env::var("CO_STORAGE_NAME") {
+            let _ = conf_rs.set("storage.name", v)?;
         }
 
         Ok(conf_rs.try_into()?)

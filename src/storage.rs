@@ -10,6 +10,7 @@ use mongodb::ordered::OrderedDocument;
 use mongodb::{Bson, Client, ThreadedClient};
 
 use crate::challenger::{ChallengeResponseIds, ChallengeState};
+use crate::config::StorageConfig;
 use crate::error::{CError, Error, Result};
 
 /// Storage trait defining required functionality for objects that store request
@@ -30,12 +31,17 @@ pub struct MongoStorage {
 
 impl MongoStorage {
     /// Create DbStorage instance
-    pub fn new() -> Self {
-        // TODO: add user/pass option
-        let client = Client::with_uri("mongodb://localhost:27017/coordinator").expect("Failed to initialize client.");
-        MongoStorage {
-            db: client.db("coordinator"),
+    pub fn new(storage_config: &StorageConfig) -> Result<Self> {
+        let mut uri = String::from("mongodb://");
+        if storage_config.user != "" && storage_config.pass != "" {
+            uri += &format!("{}:{}@", storage_config.user, storage_config.pass);
         }
+        uri += &format!("{}/{}", storage_config.host, storage_config.name);
+
+        let client = Client::with_uri(&uri)?;
+        Ok(MongoStorage {
+            db: client.db("coordinator"),
+        })
     }
 }
 
