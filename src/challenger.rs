@@ -50,8 +50,8 @@ fn get_challenge_response(
     challenge_hash: &sha256d::Hash,
     verify_rx: &Receiver<ChallengeResponse>,
     get_duration: time::Duration,
-) -> Result<ChallengeResponseSet> {
-    let mut responses = ChallengeResponseSet::new();
+) -> Result<ChallengeResponseIds> {
+    let mut responses = ChallengeResponseIds::new();
 
     let start_time = time::Instant::now();
     loop {
@@ -62,7 +62,7 @@ fn get_challenge_response(
                 Ok(resp) => {
                     if resp.0 == *challenge_hash {
                         // filter old invalid/responses
-                        let _ = responses.insert(resp);
+                        let _ = responses.insert(resp.1.txid.to_string());
                     }
                 }
                 Err(RecvTimeoutError::Timeout) => {} // ignore timeout - it's allowed
@@ -132,8 +132,8 @@ impl PartialEq for ChallengeResponse {
 }
 impl Eq for ChallengeResponse {}
 
-/// Type defining a set of Challenge Responses
-pub type ChallengeResponseSet = HashSet<ChallengeResponse>;
+/// Type defining a set of Challenge Responses Ids
+pub type ChallengeResponseIds = HashSet<String>;
 
 /// Mainstains challenge state with information on
 /// challenge requests and bids as well as the
@@ -253,8 +253,8 @@ mod tests {
 
         // then test with a few dummy responses and old hashes that are ignored
         let old_dummy_hash = gen_dummy_hash(8);
-        let mut dummy_response_set = ChallengeResponseSet::new();
-        let _ = dummy_response_set.insert(ChallengeResponse(dummy_hash, dummy_bid.clone()));
+        let mut dummy_response_set = ChallengeResponseIds::new();
+        let _ = dummy_response_set.insert(dummy_bid.txid.to_string());
         vtx.send(ChallengeResponse(dummy_hash, dummy_bid.clone())).unwrap();
         vtx.send(ChallengeResponse(dummy_hash, dummy_bid.clone())).unwrap();
         vtx.send(ChallengeResponse(old_dummy_hash, dummy_bid.clone())).unwrap();
@@ -408,8 +408,7 @@ mod tests {
         match res {
             Ok(_) => {
                 assert!(true);
-                assert_eq!(dummy_challenge_hash, storage.challenge_responses.borrow()[0].0);
-                assert_eq!(dummy_bid, storage.challenge_responses.borrow()[0].1);
+                assert_eq!(dummy_bid.txid.to_string(), storage.challenge_responses.borrow()[0]);
                 assert_eq!(1, storage.challenge_responses.borrow().len());
             }
             Err(_) => assert!(false, "should not return error"),

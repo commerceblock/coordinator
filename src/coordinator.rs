@@ -70,7 +70,7 @@ pub fn run_inner<T: Service, K: ClientChain, D: Storage>(
                     // TODO: how to propagate responses to fee payer
                     println! {"***** Responses *****"}
                     let resp = storage
-                        .get_challenge_responses(shared_challenge.lock().unwrap().request.txid)
+                        .get_all_challenge_responses(shared_challenge.lock().unwrap().request.txid)
                         .unwrap();
                     println! {"{}", serde_json::to_string_pretty(&resp).unwrap()};
 
