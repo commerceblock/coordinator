@@ -6,6 +6,7 @@ use std::cell::RefCell;
 
 use bitcoin_hashes::sha256d;
 use mongodb::db::{Database, ThreadedDatabase};
+use mongodb::ordered::OrderedDocument;
 use mongodb::{Bson, Client, ThreadedClient};
 
 use crate::challenger::{ChallengeResponseIds, ChallengeState};
@@ -72,6 +73,10 @@ impl Storage for MongoStorage {
 
     /// Store responses for a specific challenge request
     fn save_challenge_responses(&self, request_hash: sha256d::Hash, responses: &ChallengeResponseIds) -> Result<()> {
+        if responses.len() == 0 {
+            return Ok(());
+        }
+
         let request = self
             .db
             .collection("Request")
@@ -83,14 +88,10 @@ impl Storage for MongoStorage {
             )?
             .unwrap();
 
-        let bids = responses.iter().map(|x| Bson::String(x.clone())).collect::<Vec<_>>();
-        let _ = self.db.collection("Response").insert_one(
-            doc! {
-                "request_id": request.get("_id").unwrap().clone(),
-                "bid_txids": bids
-            },
-            None,
-        )?;
+        let _ = self
+            .db
+            .collection("Response")
+            .insert_one(challenge_responses_to_doc(request.get("_id").unwrap(), responses), None)?;
         Ok(())
     }
 
@@ -119,19 +120,29 @@ impl Storage for MongoStorage {
         let mut all_resps: Vec<ChallengeResponseIds> = Vec::new();
         if let Some(resp) = resp_aggr.next() {
             for challenge in resp?.get_array("challenges").unwrap().iter() {
-                let challenge_doc = challenge.as_document().unwrap();
-                all_resps.push(
-                    challenge_doc
-                        .get_array("bid_txids")
-                        .unwrap()
-                        .iter()
-                        .map(|x| x.as_str().unwrap().to_owned())
-                        .collect(),
-                )
+                all_resps.push(doc_to_challenge_responses(challenge.as_document().unwrap()))
             }
         }
         Ok(all_resps)
     }
+}
+
+/// Util method that generates a Response document from challenge responses
+fn challenge_responses_to_doc(request_id: &Bson, responses: &ChallengeResponseIds) -> OrderedDocument {
+    let bids = responses.iter().map(|x| Bson::String(x.clone())).collect::<Vec<_>>();
+    doc! {
+        "request_id": request_id.clone(),
+        "bid_txids": bids
+    }
+}
+
+/// Util method that generates challenge responses from a Response document
+fn doc_to_challenge_responses(doc: &OrderedDocument) -> ChallengeResponseIds {
+    doc.get_array("bid_txids")
+        .unwrap()
+        .iter()
+        .map(|x| x.as_str().unwrap().to_owned())
+        .collect()
 }
 
 /// Mock implementation of Storage storing data in memory for testing
@@ -143,7 +154,7 @@ pub struct MockStorage {
     /// Store challenge states in memory
     pub challenge_states: RefCell<Vec<ChallengeState>>,
     /// Store challenge responses in memory
-    pub challenge_responses: RefCell<Vec<String>>,
+    pub challenge_responses: RefCell<Vec<OrderedDocument>>,
 }
 
 impl MockStorage {
@@ -168,27 +179,30 @@ impl Storage for MockStorage {
     }
 
     /// Store responses for a specific challenge request
-    fn save_challenge_responses(&self, _request_hash: sha256d::Hash, responses: &ChallengeResponseIds) -> Result<()> {
+    fn save_challenge_responses(&self, request_hash: sha256d::Hash, responses: &ChallengeResponseIds) -> Result<()> {
         if self.return_err {
             return Err(Error::from(CError::Generic(
                 "save_challenge_responses failed".to_owned(),
             )));
         }
-        self.challenge_responses.borrow_mut().extend(responses.clone());
+        if responses.len() == 0 {
+            return Ok(());
+        }
+        self.challenge_responses.borrow_mut().push(challenge_responses_to_doc(
+            &Bson::String(request_hash.to_string()),
+            responses,
+        ));
         Ok(())
     }
 
     /// Get all challenge responses for a specific request
-    fn get_all_challenge_responses(&self, _request_hash: sha256d::Hash) -> Result<Vec<ChallengeResponseIds>> {
+    fn get_all_challenge_responses(&self, request_hash: sha256d::Hash) -> Result<Vec<ChallengeResponseIds>> {
         let mut challenge_responses = vec![];
-        challenge_responses.push(
-            self.challenge_responses
-                .borrow()
-                .to_vec()
-                .iter()
-                .map(|x| x.to_owned())
-                .collect(),
-        );
+        for doc in self.challenge_responses.borrow().to_vec().iter() {
+            if doc.get("request_id").unwrap().as_str().unwrap() == request_hash.to_string() {
+                challenge_responses.push(doc_to_challenge_responses(doc));
+            }
+        }
         Ok(challenge_responses)
     }
 }

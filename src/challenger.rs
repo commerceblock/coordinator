@@ -408,7 +408,10 @@ mod tests {
         match res {
             Ok(_) => {
                 assert!(true);
-                assert_eq!(dummy_bid.txid.to_string(), storage.challenge_responses.borrow()[0]);
+                let resps = storage.get_all_challenge_responses(dummy_request.txid).unwrap();
+                assert_eq!(1, resps.len());
+                assert_eq!(1, resps[0].len());
+                assert_eq!(dummy_bid.txid.to_string(), *resps[0].iter().next().unwrap());
                 assert_eq!(1, storage.challenge_responses.borrow().len());
             }
             Err(_) => assert!(false, "should not return error"),
