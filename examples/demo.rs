@@ -23,6 +23,7 @@ use ocean_rpc::RpcApi;
 use secp256k1::{Message, Secp256k1, SecretKey};
 
 use coordinator::clientchain::RpcClientChain;
+use coordinator::coordinator as coordinator_main;
 use coordinator::ocean::RpcClient;
 use coordinator::request::Request as ServiceRequest;
 use coordinator::service::MockService;
@@ -74,12 +75,8 @@ fn main() {
     let clientchain = RpcClientChain::new(&config.clientchain).unwrap();
     let storage = MongoStorage::new(&config.storage).unwrap();
     let genesis_hash = sha256d::Hash::from_hex(&config.clientchain.genesis_hash).unwrap();
-    if let Err(e) = coordinator::coordinator::run_inner(&config, &service, &clientchain, &storage, genesis_hash) {
-        error!("{}", e);
-    }
-
     // do multiple requests
-    for x in (10..20).step_by(3) {
+    for x in (1..20).step_by(4) {
         let new_request = ServiceRequest {
             txid: sha256d::Hash::from_slice(&[x as u8; 32]).unwrap(),
             start_blockheight: x,
@@ -89,8 +86,13 @@ fn main() {
             num_tickets: 10,
         };
         service.request = new_request;
-        if let Err(e) = coordinator::coordinator::run_inner(&config, &service, &clientchain, &storage, genesis_hash) {
-            error!("{}", e);
+        loop {
+            if let Some(_) =
+                coordinator_main::run_request(&config, &service, &clientchain, &storage, genesis_hash).unwrap()
+            {
+                break;
+            }
+            thread::sleep(time::Duration::from_secs(1))
         }
     }
 }
