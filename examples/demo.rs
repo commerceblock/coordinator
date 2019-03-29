@@ -54,19 +54,50 @@ fn main() {
     let client_rpc_clone = client_rpc.clone();
     thread::spawn(move || loop {
         thread::sleep(time::Duration::from_secs(5));
-        if let Err(e) = client_rpc_clone.client.generate(1) {
+        if let Err(e) = client_rpc_clone.clone().client.generate(1) {
             error!("{}", e);
         }
     });
 
-    // guard node
+    // add two guardnodes with valid keys and one without
+    // keys based on mockservice request bids
     let asset_hash = config.clientchain.asset_hash.clone();
     let listener_host = config.listener_host.clone();
+    let client_rpc_clone = client_rpc.clone();
     thread::spawn(move || {
         guardnode(
-            &client_rpc.clone(),
+            &client_rpc_clone,
             sha256d::Hash::from_hex(&asset_hash).unwrap(),
-            listener_host,
+            listener_host.clone(),
+            sha256d::Hash::from_hex("1234567890000000000000000000000000000000000000000000000000000000").unwrap(),
+            SecretKey::from_slice(&[0xaa; 32]).unwrap(),
+            String::from("026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3"),
+        );
+    });
+    let asset_hash = config.clientchain.asset_hash.clone();
+    let listener_host = config.listener_host.clone();
+    let client_rpc_clone = client_rpc.clone();
+    thread::spawn(move || {
+        guardnode(
+            &client_rpc_clone,
+            sha256d::Hash::from_hex(&asset_hash).unwrap(),
+            listener_host.clone(),
+            sha256d::Hash::from_hex("0000000001234567890000000000000000000000000000000000000000000000").unwrap(),
+            SecretKey::from_slice(&[0xbb; 32]).unwrap(),
+            String::from("0268680737c76dabb801cb2204f57dbe4e4579e4f710cd67dc1b4227592c81e9b5"),
+        );
+    });
+    let asset_hash = config.clientchain.asset_hash.clone();
+    let listener_host = config.listener_host.clone();
+    let client_rpc_clone = client_rpc.clone();
+    thread::spawn(move || {
+        guardnode(
+            &client_rpc_clone,
+            sha256d::Hash::from_hex(&asset_hash).unwrap(),
+            listener_host.clone(),
+            sha256d::Hash::from_hex("9876543210000000000000000000000000000000000000000000000000000000").unwrap(),
+            SecretKey::from_slice(&[0xab; 32]).unwrap(),
+            String::from("0268680737c76dabb801cb2204f57dbe4e4579e4f710cd67dc1b4227592c81e9b5"),
         );
     });
 
@@ -101,9 +132,15 @@ fn main() {
 /// searching for a transaction that includes the challenge asset
 /// The hash of the tx found is signed and send to the coordinator
 /// Bid info (key/txid) are based on MockService data for demo purpose
-fn guardnode(client_rpc: &RpcClient, asset_hash: sha256d::Hash, listener_host: String) {
+fn guardnode(
+    client_rpc: &RpcClient,
+    asset_hash: sha256d::Hash,
+    listener_host: String,
+    guard_txid: sha256d::Hash,
+    guard_key: SecretKey,
+    guard_pubkey: String,
+) {
     let secp = Secp256k1::new();
-    let secret_key = SecretKey::from_slice(&[0xaa; 32]).expect("32 bytes within curve order");
     let mut prev_block_count = 0;
     loop {
         if let Ok(block_count) = client_rpc.get_block_count() {
@@ -117,15 +154,17 @@ fn guardnode(client_rpc: &RpcClient, asset_hash: sha256d::Hash, listener_host: S
                     for out in tx.output.iter() {
                         if out.asset == rust_ocean::confidential::Asset::Explicit(asset_hash) {
                             let msg = Message::from_slice(&serialize(&tx.txid())).unwrap();
-                            let sig = secp.sign(&msg, &secret_key);
+                            let sig = secp.sign(&msg, &guard_key);
                             let data = format!(
                                 r#"
                             {{
-                                "txid": "1234567890000000000000000000000000000000000000000000000000000000",
-                                "pubkey": "026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3",
+                                "txid": "{}",
+                                "pubkey": "{}",
                                 "hash": "{}",
                                 "sig": "{}"
                             }}"#,
+                                guard_txid.to_string(),
+                                guard_pubkey,
                                 tx.txid(),
                                 sig.serialize_der().to_hex()
                             );

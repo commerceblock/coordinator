@@ -181,7 +181,7 @@ mod tests {
     use bitcoin_hashes::Hash;
     use secp256k1::SecretKey;
 
-    use crate::service::{MockService, Service};
+    use crate::request::{BidSet, Request as ServiceRequest};
 
     /// Generate dummy hash for tests
     fn gen_dummy_hash(i: u8) -> sha256d::Hash {
@@ -190,10 +190,20 @@ mod tests {
 
     /// Geberate dummy challenge state
     fn gen_challenge_state(request_hash: &sha256d::Hash, challenge_hash: &sha256d::Hash) -> ChallengeState {
-        let service = MockService::new();
-
-        let request = service.get_request(&request_hash).unwrap().unwrap();
-        let bids = service.get_request_bids(&request_hash).unwrap().unwrap();
+        let request = ServiceRequest {
+            txid: sha256d::Hash::from_slice(&[0xff as u8; 32]).unwrap(),
+            start_blockheight: 2,
+            end_blockheight: 5,
+            genesis_blockhash: *request_hash,
+            fee_percentage: 5,
+            num_tickets: 10,
+        };
+        let mut bids = BidSet::new();
+        let _ = bids.insert(Bid {
+            txid: sha256d::Hash::from_hex("1234567890000000000000000000000000000000000000000000000000000000").unwrap(),
+            // pubkey corresponding to SecretKey::from_slice(&[0xaa; 32])
+            pubkey: PublicKey::from_str("026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3").unwrap(),
+        });
         ChallengeState {
             request,
             bids,

@@ -105,13 +105,22 @@ impl Service for MockService {
         if self.return_err {
             return Err(Error::from(CError::Generic("get_request_bids failed".to_owned())));
         }
-        let dummy_bid = Bid {
+        let mut bid_set = BidSet::new();
+        let _ = bid_set.insert(Bid {
             txid: sha256d::Hash::from_hex("1234567890000000000000000000000000000000000000000000000000000000").unwrap(),
             // pubkey corresponding to SecretKey::from_slice(&[0xaa; 32])
             pubkey: PublicKey::from_str("026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3").unwrap(),
-        };
-        let mut bid_set = BidSet::new();
-        let _ = bid_set.insert(dummy_bid);
+        });
+        let _ = bid_set.insert(Bid {
+            txid: sha256d::Hash::from_hex("0000000001234567890000000000000000000000000000000000000000000000").unwrap(),
+            // pubkey corresponding to SecretKey::from_slice(&[0xbb; 32])
+            pubkey: PublicKey::from_str("0268680737c76dabb801cb2204f57dbe4e4579e4f710cd67dc1b4227592c81e9b5").unwrap(),
+        });
+        let _ = bid_set.insert(Bid {
+            txid: sha256d::Hash::from_hex("0000000000000000001234567890000000000000000000000000000000000000").unwrap(),
+            // pubkey corresponding to SecretKey::from_slice(&[0xcc; 32])
+            pubkey: PublicKey::from_str("02b95c249d84f417e3e395a127425428b540671cc15881eb828c17b722a53fc599").unwrap(),
+        });
         Ok(Some(bid_set))
     }
 }

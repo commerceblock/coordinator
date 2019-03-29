@@ -291,16 +291,7 @@ mod tests {
         let mut service = MockService::new();
         let dummy_hash = gen_dummy_hash(10);
         let dummy_request = service.get_request(&dummy_hash).unwrap().unwrap();
-        let dummy_bid = service
-            .get_request_bids(&dummy_hash)
-            .unwrap()
-            .unwrap()
-            .iter()
-            .next()
-            .unwrap()
-            .clone();
-        let mut dummy_set = BidSet::new();
-        let _ = dummy_set.insert(dummy_bid);
+        let dummy_set = service.get_request_bids(&dummy_hash).unwrap().unwrap();
 
         // first test with some bids
         let res = get_request_bids(&dummy_request, &service).unwrap();
@@ -333,16 +324,7 @@ mod tests {
 
         let mut service = MockService::new();
         let dummy_request = service.get_request(&dummy_hash).unwrap().unwrap();
-        let dummy_bid = service
-            .get_request_bids(&dummy_hash)
-            .unwrap()
-            .unwrap()
-            .iter()
-            .next()
-            .unwrap()
-            .clone();
-        let mut dummy_set = BidSet::new();
-        let _ = dummy_set.insert(dummy_bid);
+        let dummy_set = service.get_request_bids(&dummy_hash).unwrap().unwrap();
 
         // first test what happens when clientchain fails
         clientchain.return_err = true;
