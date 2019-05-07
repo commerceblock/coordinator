@@ -9,6 +9,27 @@ use std::env;
 use crate::error::Result;
 
 #[derive(Debug, Serialize, Deserialize)]
+/// Service specific config
+pub struct ServiceConfig {
+    /// Client rpc host
+    pub host: String,
+    /// Client rpc user
+    pub user: String,
+    /// Client rpc pass
+    pub pass: String,
+}
+
+impl Default for ServiceConfig {
+    fn default() -> ServiceConfig {
+        ServiceConfig {
+            host: String::from(""),
+            user: String::from(""),
+            pass: String::from(""),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 /// Clientchain specific config
 pub struct ClientChainConfig {
     /// Client rpc host
@@ -73,6 +94,8 @@ pub struct Config {
     pub verify_duration: u64,
     /// Listener host address
     pub listener_host: String,
+    /// Service configuration
+    pub service: ServiceConfig,
     /// Clientchain configuration
     pub clientchain: ClientChainConfig,
     /// Storage configuration
@@ -86,6 +109,7 @@ impl Default for Config {
             challenge_duration: 60,
             verify_duration: 150,
             listener_host: String::from("localhost:80"),
+            service: ServiceConfig::default(),
             clientchain: ClientChainConfig::default(),
             storage: StorageConfig::default(),
         }
@@ -105,6 +129,19 @@ impl Config {
             .merge(File::with_name("config/default").required(false))?
             // Override any config from env
             .merge(Environment::with_prefix("CO"))?;
+
+        // Override service config from env variables
+        // Currently doesn't seem to be supported by config_rs
+        // https://github.com/mehcode/config-rs/issues/104
+        if let Ok(v) = env::var("CO_SERVICE_HOST") {
+            let _ = conf_rs.set("service.host", v)?;
+        }
+        if let Ok(v) = env::var("CO_SERVICE_USER") {
+            let _ = conf_rs.set("service.user", v)?;
+        }
+        if let Ok(v) = env::var("CO_SERVICE_PASS") {
+            let _ = conf_rs.set("service.pass", v)?;
+        }
 
         // Override clientchain config from env variables
         // Currently doesn't seem to be supported by config_rs

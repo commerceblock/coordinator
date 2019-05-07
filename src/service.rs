@@ -8,6 +8,7 @@ use bitcoin_hashes::{hex::FromHex, sha256d, Hash};
 use ocean_rpc::RpcApi;
 use secp256k1::key::PublicKey;
 
+use crate::config::ServiceConfig;
 use crate::error::{CError, Error, Result};
 use crate::ocean::RpcClient;
 use crate::request::{Bid, BidSet, Request};
@@ -32,9 +33,13 @@ pub struct RpcService {
 
 impl RpcService {
     /// Create an RpcService with underlying rpc client connectivity
-    pub fn new() -> Result<Self> {
+    pub fn new(service_config: &ServiceConfig) -> Result<Self> {
         Ok(RpcService {
-            client: RpcClient::new(String::new(), Some(<String>::new()), Some(<String>::new()))?,
+            client: RpcClient::new(
+                service_config.host.clone(),
+                Some(service_config.user.clone()),
+                Some(service_config.pass.clone()),
+            )?,
         })
     }
 }

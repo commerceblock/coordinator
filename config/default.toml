@@ -10,6 +10,11 @@ verify_duration = 150
 # Host address that the listener binds to and receives guardnode requests
 listener_host = "localhost:9999"
 
+[service]
+host = "http://127.0.0.1:5555"
+user = "user1"
+pass = "password1"
+
 [clientchain]
 host = "http://127.0.0.1:5555"
 user = "user1"

@@ -13,14 +13,14 @@ use crate::challenger::ChallengeResponse;
 use crate::clientchain::{ClientChain, RpcClientChain};
 use crate::config::Config;
 use crate::error::Result;
-use crate::service::{MockService, Service};
+use crate::service::{RpcService, Service};
 use crate::storage::{MongoStorage, Storage};
 
 /// Run coordinator main method
 pub fn run(config: Config) -> Result<()> {
     info!("Running coordinator!");
 
-    let service = MockService::new();
+    let service = RpcService::new(&config.service)?;
     let clientchain = RpcClientChain::new(&config.clientchain)?;
     let storage = MongoStorage::new(&config.storage)?;
     let genesis_hash = sha256d::Hash::from_hex(&config.clientchain.genesis_hash)?;
