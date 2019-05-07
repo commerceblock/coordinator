@@ -5,6 +5,7 @@
 use std::str::FromStr;
 
 use bitcoin_hashes::{hex::FromHex, sha256d, Hash};
+use ocean_rpc::RpcApi;
 use secp256k1::key::PublicKey;
 
 use crate::error::{CError, Error, Result};
@@ -38,9 +39,41 @@ impl RpcService {
     }
 }
 
-//
-// TODO: implement Service trait for RpcService
-//
+impl Service for RpcService {
+    /// Get all active requests, if any, from service chain
+    fn get_requests(&self) -> Result<Option<Vec<Request>>> {
+        let resp = self.client.get_requests(None)?;
+        let mut requests = vec![];
+        for res in resp {
+            requests.push(Request::from_json(&res));
+        }
+        Ok(Some(requests))
+    }
+
+    /// Try get active request, by genesis hash, from service chain
+    fn get_request(&self, hash: &sha256d::Hash) -> Result<Option<Request>> {
+        let resp = self.client.get_requests(Some(hash))?;
+        if resp.len() > 0 {
+            return Ok(Some(Request::from_json(&resp[0])));
+        }
+        Ok(None)
+    }
+
+    /// Try get active request bids, by genesis hash, from service chain
+    fn get_request_bids(&self, hash: &sha256d::Hash) -> Result<Option<BidSet>> {
+        let resp = self.client.get_request_bids(hash)?;
+        match resp {
+            Some(res) => {
+                let mut bids = BidSet::new();
+                for bid in res.bids {
+                    let _ = bids.insert(Bid::from_json(&bid));
+                }
+                return Ok(Some(bids));
+            }
+            None => Ok(None),
+        }
+    }
+}
 
 /// Mock implementation of Service using some mock logic for testing
 pub struct MockService {

@@ -4,6 +4,8 @@
 
 use std::collections::HashSet;
 
+use ocean_rpc::json::{GetRequestBidsResultBid, GetRequestsResult};
+
 use bitcoin_hashes::sha256d;
 use secp256k1::key::PublicKey;
 
@@ -25,13 +27,19 @@ pub struct Request {
     pub num_tickets: u32,
 }
 
-// TODO
-// from json:RequestResult implementation
-// impl Request {
-//     pub fn from_json(getrequestresult) -> Self {
-
-//     }
-// }
+impl Request {
+    /// Return an instance of Request from an ocean json rpc GetRequestsResult
+    pub fn from_json(res: &GetRequestsResult) -> Self {
+        Request {
+            txid: res.txid,
+            start_blockheight: res.start_block_height as usize,
+            end_blockheight: res.end_block_height as usize,
+            genesis_blockhash: res.genesis_block,
+            fee_percentage: res.fee_percentage,
+            num_tickets: res.num_tickets,
+        }
+    }
+}
 
 /// Bid struct storing successful bids and modelling data that need to be stored
 #[derive(Clone, Debug, PartialEq, Hash, Eq)]
@@ -42,13 +50,14 @@ pub struct Bid {
     pub pubkey: PublicKey,
 }
 
+impl Bid {
+    /// Return an instance of Bid from an ocean json rpc GetRequestBidsResultBid
+    pub fn from_json(res: &GetRequestBidsResultBid) -> Self {
+        Bid {
+            txid: res.txid,
+            pubkey: res.fee_pub_key,
+        }
+    }
+}
 /// Type defining a set of Bids
 pub type BidSet = HashSet<Bid>;
-
-// TODO
-// from json:RequestResult implementation
-// impl Bid {
-//     pub fn from_json(getrequestbidsresult) -> Self {
-
-//     }
-// }
