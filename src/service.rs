@@ -21,7 +21,7 @@ pub trait Service {
     /// Try get active request, by genesis hash, from service chain
     fn get_request(&self, hash: &sha256d::Hash) -> Result<Option<Request>>;
 
-    /// Try get active request bids, by genesis hash, from service chain
+    /// Try get active request bids, by transaction hash, from service chain
     fn get_request_bids(&self, hash: &sha256d::Hash) -> Result<Option<BidSet>>;
 }
 
@@ -64,7 +64,7 @@ impl Service for RpcService {
         Ok(None)
     }
 
-    /// Try get active request bids, by genesis hash, from service chain
+    /// Try get active request bids, by transaction hash, from service chain
     fn get_request_bids(&self, hash: &sha256d::Hash) -> Result<Option<BidSet>> {
         let resp = self.client.get_request_bids(hash)?;
         match resp {
@@ -135,7 +135,7 @@ impl Service for MockService {
         Ok(Some(dummy_req))
     }
 
-    /// Try get active request bids, by genesis hash, from service chain
+    /// Try get active request bids, by transaction hash, from service chain
     fn get_request_bids(&self, _hash: &sha256d::Hash) -> Result<Option<BidSet>> {
         if self.return_none {
             return Ok(None);

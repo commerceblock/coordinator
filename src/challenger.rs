@@ -160,7 +160,7 @@ fn check_request(request: &Request, height: u64) -> bool {
 
 /// Attempt to fetch the winnings bids for a request in the service chain
 fn get_request_bids<T: Service>(request: &Request, service: &T) -> Result<BidSet> {
-    match service.get_request_bids(&request.genesis_blockhash)? {
+    match service.get_request_bids(&request.txid)? {
         Some(bids) => return Ok(bids),
         _ => Err(Error::from(CError::MissingBids)),
     }
