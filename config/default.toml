@@ -20,7 +20,7 @@ host = "http://127.0.0.1:5555"
 user = "user1"
 pass = "password1"
 asset_hash = "73be00507b15f79efccd0184b7ca8367372dfd5334ae8991a492f5f354073c88"
-genesis_hash = "73902d2a365fff2724e26d975148124268ec6a84991016683817ea2c973b199b"
+genesis_hash = "706f645393a41142e5fc1e1bf6c496bddb26bcada8b9429d4f33a2552eb6e66c"
 asset = "CHALLENGE"
 
 [storage]

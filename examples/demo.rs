@@ -14,9 +14,9 @@ use std::sync::Arc;
 use std::{env, thread, time};
 
 use bitcoin::consensus::encode::serialize;
-use bitcoin_hashes::{hex::FromHex, hex::ToHex, sha256d, Hash};
+use bitcoin_hashes::{hex::FromHex, hex::ToHex, sha256d};
 use hyper::{
-    rt::{self, Future},
+    rt::{self, Future, Stream},
     Body, Client, Method, Request,
 };
 use ocean_rpc::RpcApi;
@@ -25,8 +25,7 @@ use secp256k1::{Message, Secp256k1, SecretKey};
 use coordinator::clientchain::RpcClientChain;
 use coordinator::coordinator as coordinator_main;
 use coordinator::ocean::RpcClient;
-use coordinator::request::Request as ServiceRequest;
-use coordinator::service::MockService;
+use coordinator::service::RpcService;
 use coordinator::storage::MongoStorage;
 
 /// Demo coordinator with listener and challenge service running
@@ -59,6 +58,10 @@ fn main() {
         }
     });
 
+    let genesis_hash = sha256d::Hash::from_hex(&config.clientchain.genesis_hash).unwrap();
+    let request_txid = &client_rpc.get_requests(Some(&genesis_hash)).unwrap()[0].txid;
+    let guardnode_txid = client_rpc.get_request_bids(request_txid).unwrap().unwrap().bids[0].txid;
+
     // add two guardnodes with valid keys and one without
     // keys based on mockservice request bids
     let asset_hash = config.clientchain.asset_hash.clone();
@@ -69,62 +72,23 @@ fn main() {
             &client_rpc_clone,
             sha256d::Hash::from_hex(&asset_hash).unwrap(),
             listener_host.clone(),
-            sha256d::Hash::from_hex("1234567890000000000000000000000000000000000000000000000000000000").unwrap(),
+            guardnode_txid,
             SecretKey::from_slice(&[0xaa; 32]).unwrap(),
             String::from("026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3"),
         );
     });
-    let asset_hash = config.clientchain.asset_hash.clone();
-    let listener_host = config.listener_host.clone();
-    let client_rpc_clone = client_rpc.clone();
-    thread::spawn(move || {
-        guardnode(
-            &client_rpc_clone,
-            sha256d::Hash::from_hex(&asset_hash).unwrap(),
-            listener_host.clone(),
-            sha256d::Hash::from_hex("0000000001234567890000000000000000000000000000000000000000000000").unwrap(),
-            SecretKey::from_slice(&[0xbb; 32]).unwrap(),
-            String::from("0268680737c76dabb801cb2204f57dbe4e4579e4f710cd67dc1b4227592c81e9b5"),
-        );
-    });
-    let asset_hash = config.clientchain.asset_hash.clone();
-    let listener_host = config.listener_host.clone();
-    let client_rpc_clone = client_rpc.clone();
-    thread::spawn(move || {
-        guardnode(
-            &client_rpc_clone,
-            sha256d::Hash::from_hex(&asset_hash).unwrap(),
-            listener_host.clone(),
-            sha256d::Hash::from_hex("9876543210000000000000000000000000000000000000000000000000000000").unwrap(),
-            SecretKey::from_slice(&[0xab; 32]).unwrap(),
-            String::from("0268680737c76dabb801cb2204f57dbe4e4579e4f710cd67dc1b4227592c81e9b5"),
-        );
-    });
 
     // run coordinator
-    let mut service = MockService::new();
+    let service = RpcService::new(&config.service).unwrap();
     let clientchain = RpcClientChain::new(&config.clientchain).unwrap();
     let storage = MongoStorage::new(&config.storage).unwrap();
-    let genesis_hash = sha256d::Hash::from_hex(&config.clientchain.genesis_hash).unwrap();
     // do multiple requests
-    for x in (1..20).step_by(4) {
-        let new_request = ServiceRequest {
-            txid: sha256d::Hash::from_slice(&[x as u8; 32]).unwrap(),
-            start_blockheight: x,
-            end_blockheight: x + 2,
-            genesis_blockhash: genesis_hash,
-            fee_percentage: 5,
-            num_tickets: 10,
-        };
-        service.request = new_request;
-        loop {
-            if let Some(_) =
-                coordinator_main::run_request(&config, &service, &clientchain, &storage, genesis_hash).unwrap()
-            {
-                break;
-            }
-            thread::sleep(time::Duration::from_secs(1))
+    loop {
+        if let Some(_) = coordinator_main::run_request(&config, &service, &clientchain, &storage, genesis_hash).unwrap()
+        {
+            break;
         }
+        thread::sleep(time::Duration::from_secs(1))
     }
 }
 
@@ -175,8 +139,11 @@ fn guardnode(
                             let client = Client::new();
                             let ep = client
                                 .request(req)
-                                .map(|res| {
+                                .and_then(|res| {
                                     println!("VOILA\n{}", res.status());
+                                    res.into_body().concat2().map(|chunk| {
+                                        println!("body: {}", String::from_utf8_lossy(&chunk));
+                                    })
                                 })
                                 .map_err(|err| {
                                     println!("{}", err);
