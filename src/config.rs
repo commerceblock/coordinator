@@ -125,14 +125,24 @@ impl Config {
             // First merge struct default config
             .merge(ConfigRs::try_from(&Config::default())?)?
             // Add in defaults from file config/default.toml if exists
-            // This is especially useful for local testing config
+            // This is especially useful for local testing config as
+            // the default file is not actually loaded in production
+            // This could be done with include_str! if ever required
             .merge(File::with_name("config/default").required(false))?
-            // Override any config from env
+            // Override any config from env using CO prefix and a
+            // "_" separator for the nested config in Config
             .merge(Environment::with_prefix("CO"))?;
 
         // Override service config from env variables
         // Currently doesn't seem to be supported by config_rs
         // https://github.com/mehcode/config-rs/issues/104
+        // A possible alternative would be using a "__" separator
+        // e.g. Environment::with_prefix("CO").separator("__")) and
+        // setting envs as below but is less readable and confusing
+        // CO_CLIENTCHAIN__ASSET_HASH=73be005...
+        // CO_CLIENTCHAIN__ASSET=CHALLENGE
+        // CO_CLIENTCHAIN__HOST=http://127.0.0.1:5555
+        // CO_CLIENTCHAIN__GENESIS_HASH=706f6...
         if let Ok(v) = env::var("CO_SERVICE_HOST") {
             let _ = conf_rs.set("service.host", v)?;
         }
@@ -143,9 +153,6 @@ impl Config {
             let _ = conf_rs.set("service.pass", v)?;
         }
 
-        // Override clientchain config from env variables
-        // Currently doesn't seem to be supported by config_rs
-        // https://github.com/mehcode/config-rs/issues/104
         if let Ok(v) = env::var("CO_CLIENTCHAIN_HOST") {
             let _ = conf_rs.set("clientchain.host", v)?;
         }
@@ -165,9 +172,6 @@ impl Config {
             let _ = conf_rs.set("clientchain.genesis_hash", v)?;
         }
 
-        // Override storage config from env variables
-        // Currently doesn't seem to be supported by config_rs
-        // https://github.com/mehcode/config-rs/issues/104
         if let Ok(v) = env::var("CO_STORAGE_HOST") {
             let _ = conf_rs.set("storage.host", v)?;
         }

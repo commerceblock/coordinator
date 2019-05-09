@@ -1,5 +1,5 @@
 # Log level option used to set RUST_LOG for the rust env logger
-log_level = "coordinator"
+log_level = "coordinator,demo"
 
 # Duration that we wait for challenge responses from guardnodes, in seconds
 challenge_duration = 60
