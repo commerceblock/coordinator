@@ -29,3 +29,5 @@ asset = "CHALLENGE"
 [storage]
 host = "localhost:27017"
 name = "coordinator"
+user = "user"
+pass = "pass"

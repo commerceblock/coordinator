@@ -32,20 +32,18 @@ pub struct MongoStorage {
 impl MongoStorage {
     /// Create DbStorage instance
     pub fn new(storage_config: &StorageConfig) -> Result<Self> {
-        let mut uri = String::from("mongodb://");
-        //if let (Some(user), Some(pass)) = (storage_config.user, storage_config.pass)
-        // {
+        let uri = &format!("mongodb://{}/{}", storage_config.host, storage_config.name);
+        let client = Client::with_uri(&uri)?;
+        let db = client.db("coordinator");
+
         if let Some(ref user) = storage_config.user {
             if let Some(ref pass) = storage_config.pass {
-                uri += &format!("{}:{}@", user, pass);
+                db.auth(user, pass)?;
             }
         }
-        uri += &format!("{}/{}", storage_config.host, storage_config.name);
+        let _ = db.list_collections(None)?; // check connectivity
 
-        let client = Client::with_uri(&uri)?;
-        Ok(MongoStorage {
-            db: client.db("coordinator"),
-        })
+        Ok(MongoStorage { db })
     }
 }
 
