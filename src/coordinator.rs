@@ -57,7 +57,7 @@ pub fn run_request<T: Service, K: ClientChain, D: Storage>(
             storage.save_challenge_state(&challenge)?;
 
             // create a challenge state mutex to share between challenger and listener
-            let mut shared_challenge = Arc::new(Mutex::new(challenge));
+            let shared_challenge = Arc::new(Mutex::new(challenge));
             // and a channel for sending responses from listener to challenger
             let (verify_tx, verify_rx): (Sender<ChallengeResponse>, Receiver<ChallengeResponse>) = channel();
 
