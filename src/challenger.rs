@@ -89,15 +89,19 @@ pub fn run_challenge_request<K: ClientChain, D: Storage>(
     verify_rx: &Receiver<ChallengeResponse>,
     storage: &D,
     verify_duration: time::Duration,
-    responses_duration: time::Duration,
+    challenge_duration: time::Duration,
+    challenge_frequency: u64,
 ) -> Result<()> {
     let request = challenge_state.lock().unwrap().request.clone(); // clone as const and drop mutex
     info! {"Running challenge request: {:?}", request};
+    let mut prev_challenge_height: u64 = 0;
     loop {
         let challenge_height = clientchain.get_blockheight()?;
         info! {"client chain height: {}", challenge_height}
         if request.end_blockheight < challenge_height as usize {
             break;
+        } else if (challenge_height - prev_challenge_height) < challenge_frequency {
+            continue;
         }
 
         info! {"sending challenge..."}
@@ -112,9 +116,10 @@ pub fn run_challenge_request<K: ClientChain, D: Storage>(
         info! {"fetching responses..."}
         storage.save_challenge_responses(
             request.txid,
-            &get_challenge_response(&challenge_hash, &verify_rx, responses_duration)?,
+            &get_challenge_response(&challenge_hash, &verify_rx, challenge_duration)?,
         )?;
         challenge_state.lock().unwrap().latest_challenge = None; // stop receiving responses
+        prev_challenge_height = challenge_height; // update prev height
     }
     info! {"Challenge request ended"}
     Ok(())
@@ -378,6 +383,29 @@ mod tests {
         vtx.send(ChallengeResponse(dummy_challenge_hash, dummy_bid.clone()))
             .unwrap();
 
+        // first test with large challenge frequency and observe that no responses are
+        // fetched
+        let _ = clientchain.height.replace(dummy_request.start_blockheight as u64); // set height back to starting height
+        let res = run_challenge_request(
+            &clientchain,
+            Arc::new(Mutex::new(challenge_state.clone())),
+            &vrx,
+            &storage,
+            time::Duration::from_millis(10),
+            time::Duration::from_millis(10),
+            3,
+        );
+        match res {
+            Ok(_) => {
+                let resps = storage.get_all_challenge_responses(dummy_request.txid).unwrap();
+                assert_eq!(0, resps.len());
+            }
+            Err(_) => assert!(false, "should not return error"),
+        }
+
+        // then test with normal frequency and observe that response is fetched
+        vtx.send(ChallengeResponse(dummy_challenge_hash, dummy_bid.clone()))
+            .unwrap(); // send again
         let _ = clientchain.height.replace(dummy_request.start_blockheight as u64); // set height back to starting height
         let res = run_challenge_request(
             &clientchain,
@@ -386,10 +414,10 @@ mod tests {
             &storage,
             time::Duration::from_millis(10),
             time::Duration::from_millis(10),
+            1,
         );
         match res {
             Ok(_) => {
-                assert!(true);
                 let resps = storage.get_all_challenge_responses(dummy_request.txid).unwrap();
                 assert_eq!(1, resps.len());
                 assert_eq!(1, resps[0].len());
@@ -411,6 +439,7 @@ mod tests {
             &storage,
             time::Duration::from_millis(10),
             time::Duration::from_millis(10),
+            1,
         )
         .is_err());
         clientchain.return_err = false;
@@ -427,6 +456,7 @@ mod tests {
             &storage,
             time::Duration::from_millis(10),
             time::Duration::from_millis(10),
+            1,
         )
         .is_err());
 
@@ -446,10 +476,10 @@ mod tests {
             &storage,
             time::Duration::from_millis(10),
             time::Duration::from_millis(10),
+            1,
         );
         match res {
             Ok(_) => {
-                assert!(true);
                 assert_eq!(0, storage.challenge_responses.borrow().len());
             }
             Err(_) => assert!(false, "should not return error"),
@@ -470,10 +500,10 @@ mod tests {
             &storage,
             time::Duration::from_millis(10),
             time::Duration::from_millis(10),
+            1,
         );
         match res {
             Ok(_) => {
-                assert!(true);
                 assert_eq!(0, storage.challenge_responses.borrow().len());
             }
             Err(_) => assert!(false, "should not return error"),

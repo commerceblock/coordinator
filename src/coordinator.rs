@@ -74,6 +74,7 @@ pub fn run_request<T: Service, K: ClientChain, D: Storage>(
                 storage,
                 time::Duration::from_secs(config.verify_duration),
                 time::Duration::from_secs(config.challenge_duration),
+                config.challenge_frequency,
             )?;
 
             // stop listener service
