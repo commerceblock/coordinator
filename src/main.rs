@@ -18,6 +18,7 @@ fn main() {
     // To see results set RUST_LOG to one of the following:
     // info, warning, debug, error, coordinator(for all)
     env::set_var("RUST_LOG", &config.log_level);
+    env::set_var("RUST_BACKTRACE", "1");
     // Init env logger with value set from config
     env_logger::init();
 

@@ -38,6 +38,7 @@ fn main() {
     config.verify_duration = 10;
 
     env::set_var("RUST_LOG", &config.log_level);
+    env::set_var("RUST_BACKTRACE", "1");
     env_logger::init();
 
     let client_rpc = Arc::new(
