@@ -34,13 +34,15 @@ pub struct RpcService {
 impl RpcService {
     /// Create an RpcService with underlying rpc client connectivity
     pub fn new(service_config: &ServiceConfig) -> Result<Self> {
-        Ok(RpcService {
-            client: RpcClient::new(
-                service_config.host.clone(),
-                Some(service_config.user.clone()),
-                Some(service_config.pass.clone()),
-            )?,
-        })
+        let client = RpcClient::new(
+            service_config.host.clone(),
+            Some(service_config.user.clone()),
+            Some(service_config.pass.clone()),
+        )?;
+
+        let _ = client.get_block_count()?; // check connectivity
+
+        Ok(RpcService { client })
     }
 }
 
