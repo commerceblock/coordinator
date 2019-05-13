@@ -9,7 +9,7 @@ use std::thread;
 use base64::decode;
 use bitcoin_hashes::sha256d;
 use hyper::StatusCode;
-use jsonrpc_http_server::jsonrpc_core::{IoHandler, Params, Value};
+use jsonrpc_http_server::jsonrpc_core::{Error, IoHandler, Params, Value};
 use jsonrpc_http_server::{hyper::header, AccessControlAllowOrigin, DomainsValidation, Response, ServerBuilder};
 use serde::{Deserialize, Serialize};
 
@@ -27,6 +27,18 @@ struct GetChallengeResponsesResponse {
     responses: Vec<ChallengeResponseIds>,
 }
 
+fn get_challenge_responses(params: Params, storage: Arc<Storage>) -> Result<Value, Error> {
+    let try_parse = params.parse::<GetChallengeResponsesParams>();
+    match try_parse {
+        Ok(parse) => {
+            let responses = storage.get_all_challenge_responses(parse.txid).unwrap();
+            let res_serialized = serde_json::to_string(&GetChallengeResponsesResponse { responses }).unwrap();
+            return Ok(Value::String(res_serialized));
+        }
+        Err(e) => return Err(e),
+    }
+}
+
 /// Run Api server for external requests that require information from the
 /// coordinator
 pub fn run_api_server<D: Storage + Send + Sync + 'static>(
@@ -35,15 +47,7 @@ pub fn run_api_server<D: Storage + Send + Sync + 'static>(
 ) -> thread::JoinHandle<()> {
     let mut io = IoHandler::default();
     io.add_method("get_challenge_responses", move |params: Params| {
-        let try_parse = params.parse::<GetChallengeResponsesParams>();
-        match try_parse {
-            Ok(parse) => {
-                let responses = storage.get_all_challenge_responses(parse.txid).unwrap();
-                let res_serialized = serde_json::to_string(&GetChallengeResponsesResponse { responses }).unwrap();
-                return Ok(Value::String(res_serialized));
-            }
-            Err(e) => return Err(e),
-        }
+        get_challenge_responses(params, storage.clone())
     });
 
     let our_auth = format! {"{}:{}", config.user, config.pass};
