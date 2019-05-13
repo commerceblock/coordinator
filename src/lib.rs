@@ -18,6 +18,7 @@
 
 #[macro_use]
 extern crate log;
+extern crate base64;
 extern crate bitcoin;
 extern crate bitcoin_hashes;
 extern crate config as config_rs;
@@ -30,7 +31,9 @@ extern crate serde as serde;
 extern crate serde_json;
 #[macro_use]
 extern crate mongodb;
+extern crate jsonrpc_http_server;
 
+pub mod api;
 pub mod challenger;
 pub mod clientchain;
 pub mod config;

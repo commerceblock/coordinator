@@ -11,7 +11,12 @@ challenge_frequency = 1
 verify_duration = 150
 
 # Host address that the listener binds to and receives guardnode requests
-listener_host = "localhost:9999"
+listener_host = "127.0.0.1:9999"
+
+[api]
+host = "127.0.0.1:3333"
+user = "userApi"
+pass = "passwordApi"
 
 [service]
 host = "http://127.0.0.1:5555"

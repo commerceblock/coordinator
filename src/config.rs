@@ -9,6 +9,27 @@ use std::env;
 use crate::error::Result;
 
 #[derive(Debug, Serialize, Deserialize)]
+/// Api specific config
+pub struct ApiConfig {
+    /// Client rpc host
+    pub host: String,
+    /// Client rpc user
+    pub user: String,
+    /// Client rpc pass
+    pub pass: String,
+}
+
+impl Default for ApiConfig {
+    fn default() -> ApiConfig {
+        ApiConfig {
+            host: String::from(""),
+            user: String::from(""),
+            pass: String::from(""),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 /// Service specific config
 pub struct ServiceConfig {
     /// Client rpc host
@@ -96,6 +117,8 @@ pub struct Config {
     pub verify_duration: u64,
     /// Listener host address
     pub listener_host: String,
+    /// Api configuration
+    pub api: ApiConfig,
     /// Service configuration
     pub service: ServiceConfig,
     /// Clientchain configuration
@@ -112,6 +135,7 @@ impl Default for Config {
             challenge_frequency: 1,
             verify_duration: 150,
             listener_host: String::from("localhost:80"),
+            api: ApiConfig::default(),
             service: ServiceConfig::default(),
             clientchain: ClientChainConfig::default(),
             storage: StorageConfig::default(),
@@ -146,6 +170,16 @@ impl Config {
         // CO_CLIENTCHAIN__ASSET=CHALLENGE
         // CO_CLIENTCHAIN__HOST=http://127.0.0.1:5555
         // CO_CLIENTCHAIN__GENESIS_HASH=706f6...
+        if let Ok(v) = env::var("CO_API_HOST") {
+            let _ = conf_rs.set("api.host", v)?;
+        }
+        if let Ok(v) = env::var("CO_API_USER") {
+            let _ = conf_rs.set("api.user", v)?;
+        }
+        if let Ok(v) = env::var("CO_API_PASS") {
+            let _ = conf_rs.set("api.pass", v)?;
+        }
+
         if let Ok(v) = env::var("CO_SERVICE_HOST") {
             let _ = conf_rs.set("service.host", v)?;
         }

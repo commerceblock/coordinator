@@ -87,7 +87,7 @@ pub fn run_challenge_request<K: ClientChain, D: Storage>(
     clientchain: &K,
     challenge_state: Arc<Mutex<ChallengeState>>,
     verify_rx: &Receiver<ChallengeResponse>,
-    storage: &D,
+    storage: Arc<D>,
     verify_duration: time::Duration,
     challenge_duration: time::Duration,
     challenge_frequency: u64,
