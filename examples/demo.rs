@@ -24,7 +24,7 @@ use secp256k1::{Message, Secp256k1, SecretKey};
 
 use coordinator::clientchain::RpcClientChain;
 use coordinator::coordinator as coordinator_main;
-use coordinator::ocean::RpcClient;
+use coordinator::ocean::OceanClient;
 use coordinator::service::RpcService;
 use coordinator::storage::MongoStorage;
 
@@ -42,7 +42,7 @@ fn main() {
     env_logger::init();
 
     let client_rpc = Arc::new(
-        RpcClient::new(
+        OceanClient::new(
             config.clientchain.host.clone(),
             Some(config.clientchain.user.clone()),
             Some(config.clientchain.pass.clone()),
@@ -98,7 +98,7 @@ fn main() {
 /// The hash of the tx found is signed and send to the coordinator
 /// Bid info (key/txid) are based on MockService data for demo purpose
 fn guardnode(
-    client_rpc: &RpcClient,
+    client_rpc: &OceanClient,
     asset_hash: sha256d::Hash,
     listener_host: String,
     guard_txid: sha256d::Hash,
