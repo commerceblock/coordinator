@@ -82,10 +82,11 @@ fn main() {
     // run coordinator
     let service = RpcService::new(&config.service).unwrap();
     let clientchain = RpcClientChain::new(&config.clientchain).unwrap();
-    let storage = MongoStorage::new(&config.storage).unwrap();
+    let storage = Arc::new(MongoStorage::new(&config.storage).unwrap());
     // do multiple requests
     loop {
-        if let Some(_) = coordinator_main::run_request(&config, &service, &clientchain, &storage, genesis_hash).unwrap()
+        if let Some(_) =
+            coordinator_main::run_request(&config, &service, &clientchain, storage.clone(), genesis_hash).unwrap()
         {
             break;
         }
