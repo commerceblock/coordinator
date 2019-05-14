@@ -141,4 +141,30 @@ mod tests {
             resp.wait().unwrap()
         );
     }
+
+    #[test]
+    fn authorize_test() {
+        let our_auth = "user:pass";
+
+        // missing header
+        let request: Request<Body> = Request::builder().body(Body::from("")).unwrap();
+        assert_eq!(false, authorize(our_auth, &request));
+
+        // incorrect username/password
+        let request: Request<Body> = Request::builder()
+            .header(
+                header::AUTHORIZATION,
+                format!("Basic {}", base64::encode("user2:pass1")),
+            )
+            .body(Body::from(""))
+            .unwrap();
+        assert_eq!(false, authorize(our_auth, &request));
+
+        // correct username/password
+        let request: Request<Body> = Request::builder()
+            .header(header::AUTHORIZATION, format!("Basic {}", base64::encode("user:pass")))
+            .body(Body::from(""))
+            .unwrap();
+        assert_eq!(true, authorize(our_auth, &request));
+    }
 }
