@@ -90,3 +90,55 @@ pub fn run_api_server<D: Storage + Send + Sync + 'static>(
 
     thread::spawn(move || server.wait())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use bitcoin_hashes::Hash;
+    use futures::Future;
+
+    use crate::storage::MockStorage;
+
+    /// Generate dummy hash for tests
+    fn gen_dummy_hash(i: u8) -> sha256d::Hash {
+        sha256d::Hash::from_slice(&[i as u8; 32]).unwrap()
+    }
+
+    #[test]
+    fn get_challenge_responses_test() {
+        let storage = Arc::new(MockStorage::new());
+        let dummy_hash = gen_dummy_hash(1);
+        let dummy_hash_bid = gen_dummy_hash(2);
+        let mut dummy_response_set = ChallengeResponseIds::new();
+        let _ = dummy_response_set.insert(dummy_hash_bid.to_string());
+        let _ = storage.save_challenge_responses(dummy_hash, &dummy_response_set);
+
+        // invalid key
+        let s = format!(r#"{{"hash": "{}"}}"#, dummy_hash.to_string());
+        let params: Params = serde_json::from_str(&s).unwrap();
+        let resp = get_challenge_responses(params, storage.clone());
+        assert_eq!(
+            "Invalid params: missing field `txid`.",
+            resp.wait().unwrap_err().message
+        );
+
+        // invalid value
+        let s = format!(r#"{{"txid": "{}a"}}"#, dummy_hash.to_string());
+        let params: Params = serde_json::from_str(&s).unwrap();
+        let resp = get_challenge_responses(params, storage.clone());
+        assert_eq!(
+            "Invalid params: bad hex string length 65 (expected 64).",
+            resp.wait().unwrap_err().message
+        );
+
+        // valid key and value
+        let s = format!(r#"{{"txid": "{}"}}"#, dummy_hash.to_string());
+        let params: Params = serde_json::from_str(&s).unwrap();
+        let resp = get_challenge_responses(params, storage.clone());
+        assert_eq!(
+            format!("{{\"responses\":[[\"{}\"]]}}", dummy_hash_bid.to_string()),
+            resp.wait().unwrap()
+        );
+    }
+}
