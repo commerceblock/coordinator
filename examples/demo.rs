@@ -22,11 +22,8 @@ use hyper::{
 use ocean_rpc::RpcApi;
 use secp256k1::{Message, Secp256k1, SecretKey};
 
-use coordinator::clientchain::RpcClientChain;
 use coordinator::coordinator as coordinator_main;
 use coordinator::ocean::OceanClient;
-use coordinator::service::RpcService;
-use coordinator::storage::MongoStorage;
 
 /// Demo coordinator with listener and challenge service running
 /// mock implementation for service chain interface and ocean
@@ -79,19 +76,7 @@ fn main() {
         );
     });
 
-    // run coordinator
-    let service = RpcService::new(&config.service).unwrap();
-    let clientchain = RpcClientChain::new(&config.clientchain).unwrap();
-    let storage = Arc::new(MongoStorage::new(&config.storage).unwrap());
-    // do multiple requests
-    loop {
-        if let Some(_) =
-            coordinator_main::run_request(&config, &service, &clientchain, storage.clone(), genesis_hash).unwrap()
-        {
-            break;
-        }
-        thread::sleep(time::Duration::from_secs(1))
-    }
+    coordinator_main::run(config).unwrap()
 }
 
 /// Mock guardnode implementation parsing each new block and
