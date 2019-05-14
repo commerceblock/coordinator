@@ -29,15 +29,15 @@ struct GetChallengeResponsesResponse {
 
 /// Get challenge responses RPC call returning all responses for a specific
 /// request transaction id hash
-fn get_challenge_responses(params: Params, storage: Arc<Storage>) -> Result<Value, Error> {
+fn get_challenge_responses(params: Params, storage: Arc<Storage>) -> futures::Finished<Value, Error> {
     let try_parse = params.parse::<GetChallengeResponsesParams>();
     match try_parse {
         Ok(parse) => {
             let responses = storage.get_all_challenge_responses(parse.txid).unwrap();
             let res_serialized = serde_json::to_string(&GetChallengeResponsesResponse { responses }).unwrap();
-            return Ok(Value::String(res_serialized));
+            return futures::finished(Value::String(res_serialized));
         }
-        Err(e) => return Err(e),
+        Err(e) => return futures::failed(e),
     }
 }
 
