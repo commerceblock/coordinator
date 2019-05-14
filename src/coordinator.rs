@@ -22,7 +22,7 @@ pub fn run(config: Config) -> Result<()> {
 
     let service = RpcService::new(&config.service)?;
     let clientchain = RpcClientChain::new(&config.clientchain)?;
-    let storage = Arc::new(MongoStorage::new(&config.storage)?);
+    let storage = Arc::new(MongoStorage::new(config.storage.clone())?);
     let genesis_hash = sha256d::Hash::from_hex(&config.clientchain.genesis_hash)?;
 
     let _ = ::api::run_api_server(&config.api, storage.clone());

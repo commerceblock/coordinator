@@ -80,7 +80,7 @@ impl Default for ClientChainConfig {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 /// Storage specific config
 pub struct StorageConfig {
     /// Storage host

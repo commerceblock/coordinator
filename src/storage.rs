@@ -27,29 +27,40 @@ pub trait Storage {
 /// Database implementation of Storage trait
 pub struct MongoStorage {
     db: Database,
+    config: StorageConfig,
 }
 
 impl MongoStorage {
     /// Create DbStorage instance
-    pub fn new(storage_config: &StorageConfig) -> Result<Self> {
+    pub fn new(storage_config: StorageConfig) -> Result<Self> {
         let uri = &format!("mongodb://{}/{}", storage_config.host, storage_config.name);
         let client = Client::with_uri(&uri)?;
         let db = client.db("coordinator");
 
-        if let Some(ref user) = storage_config.user {
-            if let Some(ref pass) = storage_config.pass {
-                db.auth(user, pass)?;
+        let mongo_storage = MongoStorage {
+            db: db,
+            config: storage_config,
+        };
+        mongo_storage.auth()?;
+        let _ = mongo_storage.db.list_collections(None)?; // check connectivity
+        Ok(mongo_storage)
+    }
+
+    /// Do db authentication using user/pass from config
+    fn auth(&self) -> Result<()> {
+        if let Some(ref user) = self.config.user {
+            if let Some(ref pass) = self.config.pass {
+                self.db.auth(user, pass)?;
             }
         }
-        let _ = db.list_collections(None)?; // check connectivity
-
-        Ok(MongoStorage { db })
+        Ok(())
     }
 }
 
 impl Storage for MongoStorage {
     /// Store the state of a challenge request
     fn save_challenge_state(&self, challenge: &ChallengeState) -> Result<()> {
+        self.auth()?;
         let request_id;
         let coll = self.db.collection("Request");
         let doc = doc! {
@@ -81,6 +92,7 @@ impl Storage for MongoStorage {
 
     /// Store responses for a specific challenge request
     fn save_challenge_responses(&self, request_hash: sha256d::Hash, responses: &ChallengeResponseIds) -> Result<()> {
+        self.auth()?;
         if responses.len() == 0 {
             return Ok(());
         }
@@ -105,6 +117,7 @@ impl Storage for MongoStorage {
 
     /// Get all challenge responses for a specific request
     fn get_all_challenge_responses(&self, request_hash: sha256d::Hash) -> Result<Vec<ChallengeResponseIds>> {
+        self.auth()?;
         let mut resp_aggr = self.db.collection("Request").aggregate(
             [
                 doc! {
