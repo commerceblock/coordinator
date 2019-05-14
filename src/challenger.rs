@@ -364,7 +364,7 @@ mod tests {
     #[test]
     fn run_challenge_request_test() {
         let mut clientchain = MockClientChain::new();
-        let mut storage = MockStorage::new();
+        let mut storage = Arc::new(MockStorage::new());
         let service = MockService::new();
 
         let dummy_hash = gen_dummy_hash(0);
@@ -390,7 +390,7 @@ mod tests {
             &clientchain,
             Arc::new(Mutex::new(challenge_state.clone())),
             &vrx,
-            &storage,
+            storage.clone(),
             time::Duration::from_millis(10),
             time::Duration::from_millis(10),
             3,
@@ -411,7 +411,7 @@ mod tests {
             &clientchain,
             Arc::new(Mutex::new(challenge_state)),
             &vrx,
-            &storage,
+            storage.clone(),
             time::Duration::from_millis(10),
             time::Duration::from_millis(10),
             1,
@@ -436,7 +436,7 @@ mod tests {
             &clientchain,
             Arc::new(Mutex::new(challenge_state)),
             &vrx,
-            &storage,
+            storage.clone(),
             time::Duration::from_millis(10),
             time::Duration::from_millis(10),
             1,
@@ -448,12 +448,13 @@ mod tests {
         let _ = clientchain.height.replace(dummy_request.start_blockheight as u64); // set height for fetch_next to succeed
         let challenge_state = fetch_next(&service, &clientchain, &dummy_hash).unwrap().unwrap();
 
-        storage.return_err = true;
+        let mut storage_err = MockStorage::new();
+        storage_err.return_err = true;
         assert!(run_challenge_request(
             &clientchain,
             Arc::new(Mutex::new(challenge_state)),
             &vrx,
-            &storage,
+            Arc::new(storage_err),
             time::Duration::from_millis(10),
             time::Duration::from_millis(10),
             1,
@@ -461,7 +462,7 @@ mod tests {
         .is_err());
 
         // test client chain returning false
-        storage = MockStorage::new(); // reset storage;
+        storage = Arc::new(MockStorage::new()); // reset storage;
         let _ = clientchain.height.replace(dummy_request.start_blockheight as u64); // set height for fetch_next to succeed
         let challenge_state = fetch_next(&service, &clientchain, &dummy_hash).unwrap().unwrap();
 
@@ -473,7 +474,7 @@ mod tests {
             &clientchain,
             Arc::new(Mutex::new(challenge_state)),
             &vrx,
-            &storage,
+            storage.clone(),
             time::Duration::from_millis(10),
             time::Duration::from_millis(10),
             1,
@@ -487,7 +488,7 @@ mod tests {
         clientchain.return_false = false;
 
         // test run when height is already passed
-        storage = MockStorage::new(); // reset storage;
+        storage = Arc::new(MockStorage::new()); // reset storage;
         let _ = clientchain.height.replace(dummy_request.end_blockheight as u64 + 1); // set height for fetch_next to succeed
         let challenge_state = fetch_next(&service, &clientchain, &dummy_hash).unwrap().unwrap();
 
@@ -497,7 +498,7 @@ mod tests {
             &clientchain,
             Arc::new(Mutex::new(challenge_state)),
             &vrx,
-            &storage,
+            storage.clone(),
             time::Duration::from_millis(10),
             time::Duration::from_millis(10),
             1,
