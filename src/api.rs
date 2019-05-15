@@ -18,23 +18,23 @@ use crate::config::ApiConfig;
 use crate::storage::Storage;
 
 #[derive(Deserialize, Debug)]
-struct GetChallengeResponsesParams {
+struct GetRequestResponsesParams {
     txid: sha256d::Hash,
 }
 
 #[derive(Serialize, Debug)]
-struct GetChallengeResponsesResponse {
+struct GetRequestResponsesResponse {
     responses: Vec<ChallengeResponseIds>,
 }
 
-/// Get challenge responses RPC call returning all responses for a specific
+/// Get requests responses RPC call returning all responses for a specific
 /// request transaction id hash
-fn get_challenge_responses(params: Params, storage: Arc<Storage>) -> futures::Finished<Value, Error> {
-    let try_parse = params.parse::<GetChallengeResponsesParams>();
+fn get_request_responses(params: Params, storage: Arc<Storage>) -> futures::Finished<Value, Error> {
+    let try_parse = params.parse::<GetRequestResponsesParams>();
     match try_parse {
         Ok(parse) => {
             let responses = storage.get_responses(parse.txid).unwrap();
-            let res_serialized = serde_json::to_string(&GetChallengeResponsesResponse { responses }).unwrap();
+            let res_serialized = serde_json::to_string(&GetRequestResponsesResponse { responses }).unwrap();
             return futures::finished(Value::String(res_serialized));
         }
         Err(e) => return futures::failed(e),
@@ -67,8 +67,8 @@ pub fn run_api_server<D: Storage + Send + Sync + 'static>(
     storage: Arc<D>,
 ) -> thread::JoinHandle<()> {
     let mut io = IoHandler::default();
-    io.add_method("get_challenge_responses", move |params: Params| {
-        get_challenge_responses(params, storage.clone())
+    io.add_method("get_request_responses", move |params: Params| {
+        get_request_responses(params, storage.clone())
     });
 
     let our_auth = format! {"{}:{}", config.user, config.pass};
@@ -106,7 +106,7 @@ mod tests {
     }
 
     #[test]
-    fn get_challenge_responses_test() {
+    fn get_request_responses_test() {
         let storage = Arc::new(MockStorage::new());
         let dummy_hash = gen_dummy_hash(1);
         let dummy_hash_bid = gen_dummy_hash(2);
@@ -117,7 +117,7 @@ mod tests {
         // invalid key
         let s = format!(r#"{{"hash": "{}"}}"#, dummy_hash.to_string());
         let params: Params = serde_json::from_str(&s).unwrap();
-        let resp = get_challenge_responses(params, storage.clone());
+        let resp = get_request_responses(params, storage.clone());
         assert_eq!(
             "Invalid params: missing field `txid`.",
             resp.wait().unwrap_err().message
@@ -126,7 +126,7 @@ mod tests {
         // invalid value
         let s = format!(r#"{{"txid": "{}a"}}"#, dummy_hash.to_string());
         let params: Params = serde_json::from_str(&s).unwrap();
-        let resp = get_challenge_responses(params, storage.clone());
+        let resp = get_request_responses(params, storage.clone());
         assert_eq!(
             "Invalid params: bad hex string length 65 (expected 64).",
             resp.wait().unwrap_err().message
@@ -135,7 +135,7 @@ mod tests {
         // valid key and value
         let s = format!(r#"{{"txid": "{}"}}"#, dummy_hash.to_string());
         let params: Params = serde_json::from_str(&s).unwrap();
-        let resp = get_challenge_responses(params, storage.clone());
+        let resp = get_request_responses(params, storage.clone());
         assert_eq!(
             format!("{{\"responses\":[[\"{}\"]]}}", dummy_hash_bid.to_string()),
             resp.wait().unwrap()
