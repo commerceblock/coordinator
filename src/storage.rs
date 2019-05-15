@@ -3,15 +3,18 @@
 //! Storage interface and implementations
 
 use std::cell::RefCell;
+use std::str::FromStr;
 
 use bitcoin_hashes::{hex::FromHex, sha256d};
 use mongodb::db::{Database, ThreadedDatabase};
 use mongodb::ordered::OrderedDocument;
 use mongodb::{Bson, Client, ThreadedClient};
+use secp256k1::key::PublicKey;
 
 use crate::challenger::{ChallengeResponseIds, ChallengeState};
 use crate::config::StorageConfig;
 use crate::error::{CError, Error, Result};
+use crate::request::{Bid, BidSet};
 
 /// Storage trait defining required functionality for objects that store request
 /// and challenge information
@@ -22,6 +25,8 @@ pub trait Storage {
     fn save_response(&self, request_hash: sha256d::Hash, ids: &ChallengeResponseIds) -> Result<()>;
     /// Get all challenge responses for a specific request
     fn get_responses(&self, request_hash: sha256d::Hash) -> Result<Vec<ChallengeResponseIds>>;
+    /// Get all bids for a specific request
+    fn get_bids(&self, request_hash: sha256d::Hash) -> Result<BidSet>;
 }
 
 /// Database implementation of Storage trait
@@ -69,21 +74,17 @@ impl Storage for MongoStorage {
         match coll.find_one(Some(doc.clone()), None)? {
             Some(res) => request_id = res.get("_id").unwrap().clone(),
             None => {
-                request_id = coll.insert_one(doc.clone(), None)?.inserted_id.unwrap();
+                request_id = coll.insert_one(doc, None)?.inserted_id.unwrap();
             }
         }
 
         let coll = self.db.collection("Bid");
         for bid in challenge.bids.iter() {
-            let doc = doc! {
-                "request_id": request_id.clone(),
-                "txid": bid.txid.to_string(),
-                "pubkey": bid.pubkey.to_string()
-            };
+            let doc = bid_to_doc(&request_id, bid);
             match coll.find_one(Some(doc.clone()), None)? {
                 Some(_) => (),
                 None => {
-                    let _ = coll.insert_one(doc.clone(), None)?;
+                    let _ = coll.insert_one(doc, None)?;
                 }
             }
         }
@@ -145,6 +146,55 @@ impl Storage for MongoStorage {
             }
         }
         Ok(all_resps)
+    }
+
+    /// Get all bids for a specific request
+    fn get_bids(&self, request_hash: sha256d::Hash) -> Result<BidSet> {
+        self.auth()?;
+        let mut resp_aggr = self.db.collection("Request").aggregate(
+            [
+                doc! {
+                    "$lookup": {
+                        "from": "Bid",
+                        "localField": "_id",
+                        "foreignField": "request_id",
+                        "as": "bids"
+                    }
+                },
+                doc! {
+                    "$match": {
+                        "txid": request_hash.to_string()
+                    }
+                },
+            ]
+            .to_vec(),
+            None,
+        )?;
+
+        let mut all_bids = BidSet::new();
+        if let Some(resp) = resp_aggr.next() {
+            for bid in resp?.get_array("bids").unwrap().iter() {
+                let _ = all_bids.insert(doc_to_bid(bid.as_document().unwrap()));
+            }
+        }
+        Ok(all_bids)
+    }
+}
+
+/// Util method that generates a Bid document from a request bid
+fn bid_to_doc(request_id: &Bson, bid: &Bid) -> OrderedDocument {
+    doc! {
+        "request_id": request_id.clone(),
+        "txid": bid.txid.to_string(),
+        "pubkey": bid.pubkey.to_string()
+    }
+}
+
+/// Util method that generates a request bid from a Bid document
+fn doc_to_bid(doc: &OrderedDocument) -> Bid {
+    Bid {
+        txid: sha256d::Hash::from_hex(doc.get("txid").unwrap().as_str().unwrap()).unwrap(),
+        pubkey: PublicKey::from_str(doc.get("pubkey").unwrap().as_str().unwrap()).unwrap(),
     }
 }
 
@@ -226,6 +276,16 @@ impl Storage for MockStorage {
         }
         Ok(challenge_responses)
     }
+
+    /// Get all bids for a specific request
+    fn get_bids(&self, request_hash: sha256d::Hash) -> Result<BidSet> {
+        for state in self.challenge_states.borrow().to_vec().iter() {
+            if state.request.txid == request_hash {
+                return Ok(state.bids.clone());
+            }
+        }
+        Ok(BidSet::new())
+    }
 }
 
 #[cfg(test)]
@@ -238,6 +298,27 @@ mod tests {
     /// Generate dummy hash for tests
     fn gen_dummy_hash(i: u8) -> sha256d::Hash {
         sha256d::Hash::from_slice(&[i as u8; 32]).unwrap()
+    }
+
+    #[test]
+    fn bid_doc_test() {
+        let id = ObjectId::new().unwrap();
+        let pubkey_hex = "026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3";
+        let bid = Bid {
+            txid: gen_dummy_hash(1),
+            pubkey: PublicKey::from_str(pubkey_hex).unwrap(),
+        };
+
+        let doc = bid_to_doc(&Bson::ObjectId(id.clone()), &bid);
+        assert_eq!(
+            doc! {
+                "request_id": id.clone(),
+                "txid": gen_dummy_hash(1).to_string(),
+                "pubkey": pubkey_hex
+            },
+            doc
+        );
+        assert_eq!(bid, doc_to_bid(&doc));
     }
 
     #[test]

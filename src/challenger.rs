@@ -374,6 +374,7 @@ mod tests {
         // the first challenge
         let _ = clientchain.height.replace(dummy_request.start_blockheight as u64); // set height for fetch_next to succeed
         let challenge_state = fetch_next(&service, &clientchain, &dummy_hash).unwrap().unwrap();
+        storage.save_challenge_state(&challenge_state).unwrap();
 
         let (vtx, vrx): (Sender<ChallengeResponse>, Receiver<ChallengeResponse>) = channel();
 
@@ -399,6 +400,8 @@ mod tests {
             Ok(_) => {
                 let resps = storage.get_responses(dummy_request.txid).unwrap();
                 assert_eq!(0, resps.len());
+                let bids = storage.get_bids(dummy_request.txid).unwrap();
+                assert_eq!(challenge_state.bids, bids);
             }
             Err(_) => assert!(false, "should not return error"),
         }
@@ -409,7 +412,7 @@ mod tests {
         let _ = clientchain.height.replace(dummy_request.start_blockheight as u64); // set height back to starting height
         let res = run_challenge_request(
             &clientchain,
-            Arc::new(Mutex::new(challenge_state)),
+            Arc::new(Mutex::new(challenge_state.clone())),
             &vrx,
             storage.clone(),
             time::Duration::from_millis(10),
@@ -423,6 +426,8 @@ mod tests {
                 assert_eq!(1, resps[0].len());
                 assert_eq!(dummy_bid.txid, *resps[0].iter().next().unwrap());
                 assert_eq!(1, storage.challenge_responses.borrow().len());
+                let bids = storage.get_bids(dummy_request.txid).unwrap();
+                assert_eq!(challenge_state.bids, bids);
             }
             Err(_) => assert!(false, "should not return error"),
         }
