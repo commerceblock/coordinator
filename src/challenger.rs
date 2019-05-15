@@ -402,6 +402,8 @@ mod tests {
                 assert_eq!(0, resps.len());
                 let bids = storage.get_bids(dummy_request.txid).unwrap();
                 assert_eq!(challenge_state.bids, bids);
+                let requests = storage.get_requests().unwrap();
+                assert_eq!(vec![challenge_state.request.txid], requests);
             }
             Err(_) => assert!(false, "should not return error"),
         }
@@ -428,6 +430,8 @@ mod tests {
                 assert_eq!(1, storage.challenge_responses.borrow().len());
                 let bids = storage.get_bids(dummy_request.txid).unwrap();
                 assert_eq!(challenge_state.bids, bids);
+                let requests = storage.get_requests().unwrap();
+                assert_eq!(vec![challenge_state.request.txid], requests);
             }
             Err(_) => assert!(false, "should not return error"),
         }
