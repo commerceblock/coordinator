@@ -242,8 +242,10 @@ pub struct MockStorage {
     /// Flag that when set returns error on all inherited methods that return
     /// Result
     pub return_err: bool,
-    /// Store challenge states in memory
-    pub challenge_states: RefCell<Vec<ChallengeState>>,
+    /// Store requests in memory
+    pub requests: RefCell<Vec<OrderedDocument>>,
+    /// Store bids in memory
+    pub bids: RefCell<Vec<OrderedDocument>>,
     /// Store challenge responses in memory
     pub challenge_responses: RefCell<Vec<OrderedDocument>>,
 }
@@ -253,7 +255,8 @@ impl MockStorage {
     pub fn new() -> Self {
         MockStorage {
             return_err: false,
-            challenge_states: RefCell::new(vec![]),
+            requests: RefCell::new(vec![]),
+            bids: RefCell::new(vec![]),
             challenge_responses: RefCell::new(vec![]),
         }
     }
@@ -265,7 +268,12 @@ impl Storage for MockStorage {
         if self.return_err {
             return Err(Error::from(CError::Generic("save_challenge_state failed".to_owned())));
         }
-        self.challenge_states.borrow_mut().push(challenge.clone());
+        self.requests.borrow_mut().push(request_to_doc(&challenge.request.txid));
+        for bid in challenge.bids.iter() {
+            self.bids
+                .borrow_mut()
+                .push(bid_to_doc(&Bson::String(challenge.request.txid.to_string()), bid))
+        }
         Ok(())
     }
 
@@ -296,19 +304,20 @@ impl Storage for MockStorage {
 
     /// Get all bids for a specific request
     fn get_bids(&self, request_hash: sha256d::Hash) -> Result<BidSet> {
-        for state in self.challenge_states.borrow().to_vec().iter() {
-            if state.request.txid == request_hash {
-                return Ok(state.bids.clone());
+        let mut bids = BidSet::new();
+        for doc in self.bids.borrow().to_vec().iter() {
+            if doc.get("request_id").unwrap().as_str().unwrap() == request_hash.to_string() {
+                let _ = bids.insert(doc_to_bid(doc));
             }
         }
-        Ok(BidSet::new())
+        Ok(bids)
     }
 
     /// Get all the requests
     fn get_requests(&self) -> Result<Vec<sha256d::Hash>> {
         let mut requests = vec![];
-        for state in self.challenge_states.borrow().to_vec().iter() {
-            requests.push(state.request.txid)
+        for doc in self.requests.borrow().to_vec().iter() {
+            requests.push(doc_to_request(doc))
         }
         Ok(requests)
     }
