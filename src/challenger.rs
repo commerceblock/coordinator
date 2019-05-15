@@ -62,7 +62,7 @@ fn get_challenge_response(
                 Ok(resp) => {
                     if resp.0 == *challenge_hash {
                         // filter old invalid/responses
-                        let _ = responses.insert(resp.1.txid.to_string());
+                        let _ = responses.insert(resp.1.txid);
                     }
                 }
                 Err(RecvTimeoutError::Timeout) => {} // ignore timeout - it's allowed
@@ -138,7 +138,7 @@ impl PartialEq for ChallengeResponse {
 impl Eq for ChallengeResponse {}
 
 /// Type defining a set of Challenge Responses Ids
-pub type ChallengeResponseIds = HashSet<String>;
+pub type ChallengeResponseIds = HashSet<sha256d::Hash>;
 
 /// Mainstains challenge state with information on
 /// challenge requests and bids as well as the
@@ -259,7 +259,7 @@ mod tests {
         // then test with a few dummy responses and old hashes that are ignored
         let old_dummy_hash = gen_dummy_hash(8);
         let mut dummy_response_set = ChallengeResponseIds::new();
-        let _ = dummy_response_set.insert(dummy_bid.txid.to_string());
+        let _ = dummy_response_set.insert(dummy_bid.txid);
         vtx.send(ChallengeResponse(dummy_hash, dummy_bid.clone())).unwrap();
         vtx.send(ChallengeResponse(dummy_hash, dummy_bid.clone())).unwrap();
         vtx.send(ChallengeResponse(old_dummy_hash, dummy_bid.clone())).unwrap();
@@ -421,7 +421,7 @@ mod tests {
                 let resps = storage.get_responses(dummy_request.txid).unwrap();
                 assert_eq!(1, resps.len());
                 assert_eq!(1, resps[0].len());
-                assert_eq!(dummy_bid.txid.to_string(), *resps[0].iter().next().unwrap());
+                assert_eq!(dummy_bid.txid, *resps[0].iter().next().unwrap());
                 assert_eq!(1, storage.challenge_responses.borrow().len());
             }
             Err(_) => assert!(false, "should not return error"),

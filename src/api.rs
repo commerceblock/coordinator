@@ -111,7 +111,7 @@ mod tests {
         let dummy_hash = gen_dummy_hash(1);
         let dummy_hash_bid = gen_dummy_hash(2);
         let mut dummy_response_set = ChallengeResponseIds::new();
-        let _ = dummy_response_set.insert(dummy_hash_bid.to_string());
+        let _ = dummy_response_set.insert(dummy_hash_bid);
         let _ = storage.save_response(dummy_hash, &dummy_response_set);
 
         // invalid key

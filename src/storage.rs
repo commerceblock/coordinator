@@ -4,7 +4,7 @@
 
 use std::cell::RefCell;
 
-use bitcoin_hashes::sha256d;
+use bitcoin_hashes::{hex::FromHex, sha256d};
 use mongodb::db::{Database, ThreadedDatabase};
 use mongodb::ordered::OrderedDocument;
 use mongodb::{Bson, Client, ThreadedClient};
@@ -150,7 +150,10 @@ impl Storage for MongoStorage {
 
 /// Util method that generates a Response document from challenge responses
 fn challenge_responses_to_doc(request_id: &Bson, responses: &ChallengeResponseIds) -> OrderedDocument {
-    let bids = responses.iter().map(|x| Bson::String(x.clone())).collect::<Vec<_>>();
+    let bids = responses
+        .iter()
+        .map(|x| Bson::String(x.to_string()))
+        .collect::<Vec<_>>();
     doc! {
         "request_id": request_id.clone(),
         "bid_txids": bids
@@ -162,7 +165,7 @@ fn doc_to_challenge_responses(doc: &OrderedDocument) -> ChallengeResponseIds {
     doc.get_array("bid_txids")
         .unwrap()
         .iter()
-        .map(|x| x.as_str().unwrap().to_owned())
+        .map(|x| sha256d::Hash::from_hex(x.as_str().unwrap()).unwrap())
         .collect()
 }
 
@@ -229,7 +232,13 @@ impl Storage for MockStorage {
 mod tests {
     use super::*;
 
+    use bitcoin_hashes::Hash;
     use mongodb::oid::ObjectId;
+
+    /// Generate dummy hash for tests
+    fn gen_dummy_hash(i: u8) -> sha256d::Hash {
+        sha256d::Hash::from_slice(&[i as u8; 32]).unwrap()
+    }
 
     #[test]
     fn challenge_responses_doc_test() {
@@ -246,24 +255,24 @@ mod tests {
         );
         assert_eq!(ids, doc_to_challenge_responses(&doc));
 
-        let _ = ids.insert("test".to_owned());
+        let _ = ids.insert(gen_dummy_hash(0));
         let doc = challenge_responses_to_doc(&Bson::ObjectId(id.clone()), &ids);
         assert_eq!(
             doc! {
                 "request_id": id.clone(),
-                "bid_txids": ["test"]
+                "bid_txids": [gen_dummy_hash(0).to_string()]
             },
             doc
         );
         assert_eq!(ids, doc_to_challenge_responses(&doc));
 
-        let _ = ids.insert("test2".to_owned());
-        let _ = ids.insert("test3".to_owned());
-        let _ = ids.insert("test4".to_owned());
+        let _ = ids.insert(gen_dummy_hash(1));
+        let _ = ids.insert(gen_dummy_hash(2));
+        let _ = ids.insert(gen_dummy_hash(3));
         let doc = challenge_responses_to_doc(&Bson::ObjectId(id.clone()), &ids);
         assert_eq!(&id, doc.get("request_id").unwrap().as_object_id().unwrap());
         for id in doc.get_array("bid_txids").unwrap().iter() {
-            assert!(ids.contains(id.as_str().unwrap()));
+            assert!(ids.contains(&sha256d::Hash::from_hex(id.as_str().unwrap()).unwrap()));
         }
         assert_eq!(4, doc.get_array("bid_txids").unwrap().len());
         assert_eq!(ids, doc_to_challenge_responses(&doc));
