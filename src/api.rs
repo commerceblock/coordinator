@@ -33,7 +33,7 @@ fn get_challenge_responses(params: Params, storage: Arc<Storage>) -> futures::Fi
     let try_parse = params.parse::<GetChallengeResponsesParams>();
     match try_parse {
         Ok(parse) => {
-            let responses = storage.get_all_challenge_responses(parse.txid).unwrap();
+            let responses = storage.get_responses(parse.txid).unwrap();
             let res_serialized = serde_json::to_string(&GetChallengeResponsesResponse { responses }).unwrap();
             return futures::finished(Value::String(res_serialized));
         }
@@ -112,7 +112,7 @@ mod tests {
         let dummy_hash_bid = gen_dummy_hash(2);
         let mut dummy_response_set = ChallengeResponseIds::new();
         let _ = dummy_response_set.insert(dummy_hash_bid.to_string());
-        let _ = storage.save_challenge_responses(dummy_hash, &dummy_response_set);
+        let _ = storage.save_response(dummy_hash, &dummy_response_set);
 
         // invalid key
         let s = format!(r#"{{"hash": "{}"}}"#, dummy_hash.to_string());

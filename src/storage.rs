@@ -19,9 +19,9 @@ pub trait Storage {
     /// Store the state of a challenge request
     fn save_challenge_state(&self, challenge: &ChallengeState) -> Result<()>;
     /// Store responses for a specific challenge request
-    fn save_challenge_responses(&self, request_hash: sha256d::Hash, responses: &ChallengeResponseIds) -> Result<()>;
+    fn save_response(&self, request_hash: sha256d::Hash, ids: &ChallengeResponseIds) -> Result<()>;
     /// Get all challenge responses for a specific request
-    fn get_all_challenge_responses(&self, request_hash: sha256d::Hash) -> Result<Vec<ChallengeResponseIds>>;
+    fn get_responses(&self, request_hash: sha256d::Hash) -> Result<Vec<ChallengeResponseIds>>;
 }
 
 /// Database implementation of Storage trait
@@ -91,9 +91,9 @@ impl Storage for MongoStorage {
     }
 
     /// Store responses for a specific challenge request
-    fn save_challenge_responses(&self, request_hash: sha256d::Hash, responses: &ChallengeResponseIds) -> Result<()> {
+    fn save_response(&self, request_hash: sha256d::Hash, ids: &ChallengeResponseIds) -> Result<()> {
         self.auth()?;
-        if responses.len() == 0 {
+        if ids.len() == 0 {
             return Ok(());
         }
 
@@ -111,12 +111,12 @@ impl Storage for MongoStorage {
         let _ = self
             .db
             .collection("Response")
-            .insert_one(challenge_responses_to_doc(request.get("_id").unwrap(), responses), None)?;
+            .insert_one(challenge_responses_to_doc(request.get("_id").unwrap(), ids), None)?;
         Ok(())
     }
 
     /// Get all challenge responses for a specific request
-    fn get_all_challenge_responses(&self, request_hash: sha256d::Hash) -> Result<Vec<ChallengeResponseIds>> {
+    fn get_responses(&self, request_hash: sha256d::Hash) -> Result<Vec<ChallengeResponseIds>> {
         self.auth()?;
         let mut resp_aggr = self.db.collection("Request").aggregate(
             [
@@ -200,24 +200,21 @@ impl Storage for MockStorage {
     }
 
     /// Store responses for a specific challenge request
-    fn save_challenge_responses(&self, request_hash: sha256d::Hash, responses: &ChallengeResponseIds) -> Result<()> {
+    fn save_response(&self, request_hash: sha256d::Hash, ids: &ChallengeResponseIds) -> Result<()> {
         if self.return_err {
-            return Err(Error::from(CError::Generic(
-                "save_challenge_responses failed".to_owned(),
-            )));
+            return Err(Error::from(CError::Generic("save_response failed".to_owned())));
         }
-        if responses.len() == 0 {
+        if ids.len() == 0 {
             return Ok(());
         }
-        self.challenge_responses.borrow_mut().push(challenge_responses_to_doc(
-            &Bson::String(request_hash.to_string()),
-            responses,
-        ));
+        self.challenge_responses
+            .borrow_mut()
+            .push(challenge_responses_to_doc(&Bson::String(request_hash.to_string()), ids));
         Ok(())
     }
 
     /// Get all challenge responses for a specific request
-    fn get_all_challenge_responses(&self, request_hash: sha256d::Hash) -> Result<Vec<ChallengeResponseIds>> {
+    fn get_responses(&self, request_hash: sha256d::Hash) -> Result<Vec<ChallengeResponseIds>> {
         let mut challenge_responses = vec![];
         for doc in self.challenge_responses.borrow().to_vec().iter() {
             if doc.get("request_id").unwrap().as_str().unwrap() == request_hash.to_string() {

@@ -114,7 +114,7 @@ pub fn run_challenge_request<K: ClientChain, D: Storage>(
         }
 
         info! {"fetching responses..."}
-        storage.save_challenge_responses(
+        storage.save_response(
             request.txid,
             &get_challenge_response(&challenge_hash, &verify_rx, challenge_duration)?,
         )?;
@@ -397,7 +397,7 @@ mod tests {
         );
         match res {
             Ok(_) => {
-                let resps = storage.get_all_challenge_responses(dummy_request.txid).unwrap();
+                let resps = storage.get_responses(dummy_request.txid).unwrap();
                 assert_eq!(0, resps.len());
             }
             Err(_) => assert!(false, "should not return error"),
@@ -418,7 +418,7 @@ mod tests {
         );
         match res {
             Ok(_) => {
-                let resps = storage.get_all_challenge_responses(dummy_request.txid).unwrap();
+                let resps = storage.get_responses(dummy_request.txid).unwrap();
                 assert_eq!(1, resps.len());
                 assert_eq!(1, resps[0].len());
                 assert_eq!(dummy_bid.txid.to_string(), *resps[0].iter().next().unwrap());

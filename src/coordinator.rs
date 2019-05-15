@@ -33,7 +33,7 @@ pub fn run(config: Config) -> Result<()> {
         if let Some(request_id) = run_request(&config, &service, &clientchain, storage.clone(), genesis_hash)? {
             // if challenge request succeeds print responses
             println! {"***** Responses *****"}
-            let resp = storage.get_all_challenge_responses(request_id).unwrap();
+            let resp = storage.get_responses(request_id).unwrap();
             println! {"{}", serde_json::to_string_pretty(&resp).unwrap()};
         }
         info! {"Sleeping for 5 sec..."}
