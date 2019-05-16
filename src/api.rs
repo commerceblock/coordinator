@@ -2,6 +2,7 @@
 //!
 //! Api interface for external requests to the coordinator
 
+use std::net::ToSocketAddrs;
 use std::str;
 use std::sync::Arc;
 use std::thread;
@@ -127,6 +128,12 @@ pub fn run_api_server<D: Storage + Send + Sync + 'static>(
     });
     io.add_method("getrequests", move |_params| get_requests(storage.clone()));
 
+    let addr: Vec<_> = config
+        .host
+        .to_socket_addrs()
+        .expect("Unable to resolve domain")
+        .collect();
+
     let our_auth = format! {"{}:{}", config.user, config.pass};
     let server = ServerBuilder::new(io)
         .cors(DomainsValidation::AllowOnly(vec![AccessControlAllowOrigin::Null]))
@@ -141,7 +148,7 @@ pub fn run_api_server<D: Storage + Send + Sync + 'static>(
             }
             request.into()
         })
-        .start_http(&config.host.parse().unwrap())
+        .start_http(&addr[0])
         .expect("api error");
 
     thread::spawn(move || server.wait())

@@ -13,6 +13,7 @@ mkdir ~/co-client-dir
 printf '%s\n' '#!/bin/sh' 'rpcuser=user1' \
     'rpcpassword=password1' \
     'rpcport=5555' \
+    'rpcallowip=0.0.0.0/0'\
     'port=6666' \
     'initialfreecoins=2100000000000000' \
     'daemon=1' \

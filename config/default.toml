@@ -14,17 +14,17 @@ verify_duration = 150
 listener_host = "127.0.0.1:9999"
 
 [api]
-host = "127.0.0.1:3333"
+host = "localhost:3333"
 user = "userApi"
 pass = "passwordApi"
 
 [service]
-host = "http://127.0.0.1:5555"
+host = "localhost:5555"
 user = "user1"
 pass = "password1"
 
 [clientchain]
-host = "http://127.0.0.1:5555"
+host = "127.0.0.1:5555"
 user = "user1"
 pass = "password1"
 asset_hash = "73be00507b15f79efccd0184b7ca8367372dfd5334ae8991a492f5f354073c88"
