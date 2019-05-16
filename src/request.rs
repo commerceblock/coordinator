@@ -4,10 +4,10 @@
 
 use std::collections::HashSet;
 
-use ocean_rpc::json::{GetRequestBidsResultBid, GetRequestsResult};
-
 use bitcoin_hashes::sha256d;
+use ocean_rpc::json::{GetRequestBidsResultBid, GetRequestsResult};
 use secp256k1::key::PublicKey;
+use serde::{Serialize, Serializer};
 
 /// Request struct storing info on client request and modelling data that need
 /// to be stored
@@ -42,11 +42,12 @@ impl Request {
 }
 
 /// Bid struct storing successful bids and modelling data that need to be stored
-#[derive(Clone, Debug, PartialEq, Hash, Eq)]
+#[derive(Clone, Debug, PartialEq, Hash, Eq, Serialize)]
 pub struct Bid {
     /// Ocean transaction ID of the bid transaction
     pub txid: sha256d::Hash,
     /// Bid owner verification public key
+    #[serde(serialize_with = "serialize_pubkey")]
     pub pubkey: PublicKey,
 }
 
@@ -59,5 +60,40 @@ impl Bid {
         }
     }
 }
+
 /// Type defining a set of Bids
 pub type BidSet = HashSet<Bid>;
+
+/// Custom serializer for type PublicKey in order to serialize
+/// the key into a string and not the default u8 vector
+fn serialize_pubkey<S>(x: &PublicKey, s: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    s.serialize_str(&x.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use std::str::FromStr;
+
+    use bitcoin_hashes::hex::FromHex;
+
+    #[test]
+    fn serialize_pubkey_test() {
+        let txid_hex = "1234567890000000000000000000000000000000000000000000000000000000";
+        let pubkey_hex = "026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3";
+        let bid = Bid {
+            txid: sha256d::Hash::from_hex(txid_hex).unwrap(),
+            pubkey: PublicKey::from_str(pubkey_hex).unwrap(),
+        };
+
+        let serialized = serde_json::to_string(&bid);
+        assert_eq!(
+            format!(r#"{{"txid":"{}","pubkey":"{}"}}"#, txid_hex, pubkey_hex),
+            serialized.unwrap()
+        );
+    }
+}
