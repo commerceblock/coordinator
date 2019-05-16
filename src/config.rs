@@ -168,7 +168,7 @@ impl Config {
         // setting envs as below but is less readable and confusing
         // CO_CLIENTCHAIN__ASSET_HASH=73be005...
         // CO_CLIENTCHAIN__ASSET=CHALLENGE
-        // CO_CLIENTCHAIN__HOST=http://127.0.0.1:5555
+        // CO_CLIENTCHAIN__HOST=127.0.0.1:5555
         // CO_CLIENTCHAIN__GENESIS_HASH=706f6...
         if let Ok(v) = env::var("CO_API_HOST") {
             let _ = conf_rs.set("api.host", v)?;

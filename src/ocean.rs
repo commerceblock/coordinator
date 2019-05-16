@@ -16,7 +16,7 @@ impl OceanClient {
     /// Create an OceanClient with underlying rpc client connectivity
     pub fn new(url: String, user: Option<String>, pass: Option<String>) -> Result<Self> {
         Ok(OceanClient {
-            client: Client::new(url, user, pass),
+            client: Client::new(format!("http://{}", url), user, pass),
         })
     }
 }
