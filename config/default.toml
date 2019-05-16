@@ -5,7 +5,7 @@ log_level = "coordinator,demo"
 challenge_duration = 60
 
 # Frequency of creating new challenges, in number of blocks
-challenge_frequency = 1
+challenge_frequency = 2
 
 # Duration that we attempt to verify a challenge transaction before skipping, in seconds
 verify_duration = 150

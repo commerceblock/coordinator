@@ -36,8 +36,8 @@ pub fn run(config: Config) -> Result<()> {
             let resp = storage.get_responses(request_id).unwrap();
             println! {"{}", serde_json::to_string_pretty(&resp).unwrap()};
         }
-        info! {"Sleeping for 5 sec..."}
-        thread::sleep(time::Duration::from_secs(5))
+        info! {"Sleeping for 10 sec..."}
+        thread::sleep(time::Duration::from_secs(10))
     }
 }
 

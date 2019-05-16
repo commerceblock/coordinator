@@ -50,7 +50,7 @@ fn main() {
     // auto client chain block generation
     let client_rpc_clone = client_rpc.clone();
     thread::spawn(move || loop {
-        thread::sleep(time::Duration::from_secs(5));
+        thread::sleep(time::Duration::from_secs(10));
         if let Err(e) = client_rpc_clone.clone().client.generate(1) {
             error!("{}", e);
         }

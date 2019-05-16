@@ -101,6 +101,8 @@ pub fn run_challenge_request<K: ClientChain, D: Storage>(
         if (request.end_blockheight as u64) < challenge_height {
             break;
         } else if (challenge_height - prev_challenge_height) < challenge_frequency {
+            info! {"Sleeping for 10 sec..."}
+            thread::sleep(time::Duration::from_secs(10));
             continue;
         }
 
