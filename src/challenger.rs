@@ -368,6 +368,7 @@ mod tests {
         let service = MockService::new();
 
         let dummy_hash = gen_dummy_hash(0);
+        let dummy_other_hash = gen_dummy_hash(9);
         let dummy_request = service.get_request(&dummy_hash).unwrap().unwrap();
 
         // test normal operation of run_challenge_request by adding some responses for
@@ -405,6 +406,11 @@ mod tests {
                 let requests = storage.get_requests().unwrap();
                 assert_eq!(1, requests.len());
                 assert_eq!(&challenge_state.request, &requests[0]);
+                assert_eq!(
+                    challenge_state.request,
+                    storage.get_request(dummy_request.txid).unwrap().unwrap()
+                );
+                assert_eq!(None, storage.get_request(dummy_other_hash).unwrap());
             }
             Err(_) => assert!(false, "should not return error"),
         }
@@ -434,6 +440,11 @@ mod tests {
                 let requests = storage.get_requests().unwrap();
                 assert_eq!(1, requests.len());
                 assert_eq!(&challenge_state.request, &requests[0]);
+                assert_eq!(
+                    challenge_state.request,
+                    storage.get_request(dummy_request.txid).unwrap().unwrap()
+                );
+                assert_eq!(None, storage.get_request(dummy_other_hash).unwrap());
             }
             Err(_) => assert!(false, "should not return error"),
         }

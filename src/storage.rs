@@ -29,6 +29,8 @@ pub trait Storage {
     fn get_bids(&self, request_hash: sha256d::Hash) -> Result<BidSet>;
     /// Get all the requests
     fn get_requests(&self) -> Result<Vec<Request>>;
+    /// Get request for a specific request txid
+    fn get_request(&self, request_hash: sha256d::Hash) -> Result<Option<Request>>;
 }
 
 /// Database implementation of Storage trait
@@ -193,6 +195,22 @@ impl Storage for MongoStorage {
         }
         Ok(requests)
     }
+
+    /// Get request for a specific request txid
+    fn get_request(&self, request_hash: sha256d::Hash) -> Result<Option<Request>> {
+        self.auth()?;
+        let request = self.db.collection("Request").find_one(
+            Some(doc! {
+                "txid": request_hash.to_string(),
+            }),
+            None,
+        )?;
+
+        match request {
+            Some(doc) => Ok(Some(doc_to_request(&doc))),
+            None => Ok(None),
+        }
+    }
 }
 
 /// Util method that generates a Request document from a request
@@ -341,6 +359,16 @@ impl Storage for MockStorage {
             requests.push(doc_to_request(doc))
         }
         Ok(requests)
+    }
+
+    /// Get request for a specific request txid
+    fn get_request(&self, request_hash: sha256d::Hash) -> Result<Option<Request>> {
+        for doc in self.requests.borrow().to_vec().iter() {
+            if doc.get("txid").unwrap().as_str().unwrap() == request_hash.to_string() {
+                return Ok(Some(doc_to_request(doc)));
+            }
+        }
+        Ok(None)
     }
 }
 
