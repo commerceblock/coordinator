@@ -98,7 +98,7 @@ pub fn run_challenge_request<K: ClientChain, D: Storage>(
     loop {
         let challenge_height = clientchain.get_blockheight()?;
         info! {"client chain height: {}", challenge_height}
-        if request.end_blockheight < challenge_height as usize {
+        if (request.end_blockheight as u64) < challenge_height {
             break;
         } else if (challenge_height - prev_challenge_height) < challenge_frequency {
             continue;
@@ -156,7 +156,7 @@ pub struct ChallengeState {
 /// Check if request start height has been reached in order to initiate
 /// challenging.
 fn check_request(request: &Request, height: u64) -> bool {
-    return if request.start_blockheight <= height as usize {
+    return if request.start_blockheight as u64 <= height {
         true
     } else {
         false
@@ -403,7 +403,8 @@ mod tests {
                 let bids = storage.get_bids(dummy_request.txid).unwrap();
                 assert_eq!(challenge_state.bids, bids);
                 let requests = storage.get_requests().unwrap();
-                assert_eq!(vec![challenge_state.request.txid], requests);
+                assert_eq!(1, requests.len());
+                assert_eq!(&challenge_state.request, &requests[0]);
             }
             Err(_) => assert!(false, "should not return error"),
         }
@@ -431,7 +432,8 @@ mod tests {
                 let bids = storage.get_bids(dummy_request.txid).unwrap();
                 assert_eq!(challenge_state.bids, bids);
                 let requests = storage.get_requests().unwrap();
-                assert_eq!(vec![challenge_state.request.txid], requests);
+                assert_eq!(1, requests.len());
+                assert_eq!(&challenge_state.request, &requests[0]);
             }
             Err(_) => assert!(false, "should not return error"),
         }

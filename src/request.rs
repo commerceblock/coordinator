@@ -11,14 +11,14 @@ use serde::{Serialize, Serializer};
 
 /// Request struct storing info on client request and modelling data that need
 /// to be stored
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct Request {
     /// Ocean transaction ID of the request transaction
     pub txid: sha256d::Hash,
     /// Request start block height
-    pub start_blockheight: usize,
+    pub start_blockheight: u32,
     /// Request end block height
-    pub end_blockheight: usize,
+    pub end_blockheight: u32,
     /// Genesis blockhash of client issuing request
     pub genesis_blockhash: sha256d::Hash,
     /// Fee percentage for Guardnodes set by client
@@ -32,8 +32,8 @@ impl Request {
     pub fn from_json(res: &GetRequestsResult) -> Self {
         Request {
             txid: res.txid,
-            start_blockheight: res.start_block_height as usize,
-            end_blockheight: res.end_block_height as usize,
+            start_blockheight: res.start_block_height,
+            end_blockheight: res.end_block_height,
             genesis_blockhash: res.genesis_block,
             fee_percentage: res.fee_percentage,
             num_tickets: res.num_tickets,

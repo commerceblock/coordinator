@@ -14,7 +14,7 @@ use secp256k1::key::PublicKey;
 use crate::challenger::{ChallengeResponseIds, ChallengeState};
 use crate::config::StorageConfig;
 use crate::error::{CError, Error, Result};
-use crate::request::{Bid, BidSet};
+use crate::request::{Bid, BidSet, Request};
 
 /// Storage trait defining required functionality for objects that store request
 /// and challenge information
@@ -28,7 +28,7 @@ pub trait Storage {
     /// Get all bids for a specific request
     fn get_bids(&self, request_hash: sha256d::Hash) -> Result<BidSet>;
     /// Get all the requests
-    fn get_requests(&self) -> Result<Vec<sha256d::Hash>>;
+    fn get_requests(&self) -> Result<Vec<Request>>;
 }
 
 /// Database implementation of Storage trait
@@ -70,7 +70,7 @@ impl Storage for MongoStorage {
         self.auth()?;
         let request_id;
         let coll = self.db.collection("Request");
-        let doc = request_to_doc(&challenge.request.txid);
+        let doc = request_to_doc(&challenge.request);
         match coll.find_one(Some(doc.clone()), None)? {
             Some(res) => request_id = res.get("_id").unwrap().clone(),
             None => {
@@ -101,7 +101,12 @@ impl Storage for MongoStorage {
         let request = self
             .db
             .collection("Request")
-            .find_one(Some(request_to_doc(&request_hash)), None)?
+            .find_one(
+                Some(doc! {
+                    "txid": request_hash.to_string(),
+                }),
+                None,
+            )?
             .unwrap();
 
         let _ = self
@@ -125,7 +130,9 @@ impl Storage for MongoStorage {
                     }
                 },
                 doc! {
-                    "$match": request_to_doc(&request_hash)
+                    "$match": {
+                        "txid": request_hash.to_string()
+                    },
                 },
             ]
             .to_vec(),
@@ -155,7 +162,9 @@ impl Storage for MongoStorage {
                     }
                 },
                 doc! {
-                    "$match": request_to_doc(&request_hash)
+                    "$match": {
+                        "txid": request_hash.to_string()
+                    },
                 },
             ]
             .to_vec(),
@@ -172,7 +181,7 @@ impl Storage for MongoStorage {
     }
 
     /// Get all the requests
-    fn get_requests(&self) -> Result<Vec<sha256d::Hash>> {
+    fn get_requests(&self) -> Result<Vec<Request>> {
         self.auth()?;
         let mut options = FindOptions::new();
         options.sort = Some(doc! { "_id" : 1 }); // sort ascending, latest request is last
@@ -187,15 +196,27 @@ impl Storage for MongoStorage {
 }
 
 /// Util method that generates a Request document from a request
-fn request_to_doc(request: &sha256d::Hash) -> OrderedDocument {
+fn request_to_doc(request: &Request) -> OrderedDocument {
     doc! {
-        "txid": request.to_string()
+        "txid": request.txid.to_string(),
+        "start_blockheight": request.start_blockheight,
+        "end_blockheight": request.end_blockheight,
+        "genesis_blockhash": request.genesis_blockhash.to_string(),
+        "fee_percentage": request.fee_percentage,
+        "num_tickets": request.num_tickets
     }
 }
 
 /// Util method that generates a request from a Request document
-fn doc_to_request(doc: &OrderedDocument) -> sha256d::Hash {
-    sha256d::Hash::from_hex(doc.get("txid").unwrap().as_str().unwrap()).unwrap()
+fn doc_to_request(doc: &OrderedDocument) -> Request {
+    Request {
+        txid: sha256d::Hash::from_hex(doc.get("txid").unwrap().as_str().unwrap()).unwrap(),
+        start_blockheight: doc.get("start_blockheight").unwrap().as_i32().unwrap() as u32,
+        end_blockheight: doc.get("end_blockheight").unwrap().as_i32().unwrap() as u32,
+        genesis_blockhash: sha256d::Hash::from_hex(doc.get("genesis_blockhash").unwrap().as_str().unwrap()).unwrap(),
+        fee_percentage: doc.get("fee_percentage").unwrap().as_i32().unwrap() as u32,
+        num_tickets: doc.get("num_tickets").unwrap().as_i32().unwrap() as u32,
+    }
 }
 
 /// Util method that generates a Bid document from a request bid
@@ -268,7 +289,7 @@ impl Storage for MockStorage {
         if self.return_err {
             return Err(Error::from(CError::Generic("save_challenge_state failed".to_owned())));
         }
-        self.requests.borrow_mut().push(request_to_doc(&challenge.request.txid));
+        self.requests.borrow_mut().push(request_to_doc(&challenge.request));
         for bid in challenge.bids.iter() {
             self.bids
                 .borrow_mut()
@@ -314,7 +335,7 @@ impl Storage for MockStorage {
     }
 
     /// Get all the requests
-    fn get_requests(&self) -> Result<Vec<sha256d::Hash>> {
+    fn get_requests(&self) -> Result<Vec<Request>> {
         let mut requests = vec![];
         for doc in self.requests.borrow().to_vec().iter() {
             requests.push(doc_to_request(doc))
@@ -337,12 +358,26 @@ mod tests {
 
     #[test]
     fn request_doc_test() {
-        let request = gen_dummy_hash(9);
+        let request_hash = gen_dummy_hash(9);
+        let genesis_hash = "1100000000000000000000000000000000000000000000000000000000000022";
+        let request = Request {
+            txid: request_hash,
+            start_blockheight: 2,
+            end_blockheight: 5,
+            genesis_blockhash: sha256d::Hash::from_hex(genesis_hash).unwrap(),
+            fee_percentage: 5,
+            num_tickets: 10,
+        };
 
         let doc = request_to_doc(&request);
         assert_eq!(
             doc! {
-                "txid": request.to_string(),
+                "txid": request_hash.to_string(),
+                "start_blockheight": 2,
+                "end_blockheight": 5,
+                "genesis_blockhash": genesis_hash,
+                "fee_percentage": 5,
+                "num_tickets": 10
             },
             doc
         );
