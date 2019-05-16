@@ -9,13 +9,63 @@ use std::thread;
 use base64::decode;
 use bitcoin_hashes::sha256d;
 use hyper::{Body, Request, StatusCode};
-use jsonrpc_http_server::jsonrpc_core::{Error, IoHandler, Params, Value};
+use jsonrpc_http_server::jsonrpc_core::{Error, ErrorCode, IoHandler, Params, Value};
 use jsonrpc_http_server::{hyper::header, AccessControlAllowOrigin, DomainsValidation, Response, ServerBuilder};
 use serde::{Deserialize, Serialize};
 
 use crate::challenger::ChallengeResponseIds;
 use crate::config::ApiConfig;
+use crate::request::{BidSet, Request as ServiceRequest};
 use crate::storage::Storage;
+
+#[derive(Deserialize, Debug)]
+struct GetRequestParams {
+    txid: sha256d::Hash,
+}
+
+#[derive(Serialize, Debug)]
+struct GetRequestResponse {
+    request: ServiceRequest,
+    bids: BidSet,
+}
+
+/// Get request RPC call returning corresponding request if it exists
+fn get_request(params: Params, storage: Arc<Storage>) -> futures::Finished<Value, Error> {
+    let try_parse = params.parse::<GetRequestResponsesParams>();
+    match try_parse {
+        Ok(parse) => {
+            let request_get = storage.get_request(parse.txid).unwrap();
+            if let Some(request) = request_get {
+                let bids = storage.get_bids(request.txid).unwrap();
+                let res_serialized = serde_json::to_string(&GetRequestResponse { request, bids }).unwrap();
+                return futures::finished(Value::String(res_serialized));
+            } else {
+                return futures::failed(Error {
+                    code: ErrorCode::InvalidParams,
+                    message: "Invalid params: `txid` does not exist.".to_string(),
+                    data: None,
+                });
+            }
+        }
+        Err(e) => return futures::failed(e),
+    }
+}
+
+#[derive(Serialize, Debug)]
+struct GetRequestsResponse {
+    requests: Vec<GetRequestResponse>,
+}
+
+/// Get requests RPC call returning all stored requests
+fn get_requests(storage: Arc<Storage>) -> futures::Finished<Value, Error> {
+    let requests = storage.get_requests().unwrap();
+    let mut response = GetRequestsResponse { requests: vec![] };
+    for request in requests {
+        let bids = storage.get_bids(request.txid).unwrap();
+        response.requests.push(GetRequestResponse { request, bids })
+    }
+    return futures::finished(Value::String(serde_json::to_string(&response).unwrap()));
+}
 
 #[derive(Deserialize, Debug)]
 struct GetRequestResponsesParams {
@@ -67,9 +117,15 @@ pub fn run_api_server<D: Storage + Send + Sync + 'static>(
     storage: Arc<D>,
 ) -> thread::JoinHandle<()> {
     let mut io = IoHandler::default();
-    io.add_method("get_request_responses", move |params: Params| {
-        get_request_responses(params, storage.clone())
+    let storage_ref = storage.clone();
+    io.add_method("getrequestresponses", move |params: Params| {
+        get_request_responses(params, storage_ref.clone())
     });
+    let storage_ref = storage.clone();
+    io.add_method("getrequest", move |params: Params| {
+        get_request(params, storage_ref.clone())
+    });
+    io.add_method("getrequests", move |_params| get_requests(storage.clone()));
 
     let our_auth = format! {"{}:{}", config.user, config.pass};
     let server = ServerBuilder::new(io)
@@ -95,14 +151,99 @@ pub fn run_api_server<D: Storage + Send + Sync + 'static>(
 mod tests {
     use super::*;
 
-    use bitcoin_hashes::Hash;
-    use futures::Future;
+    use std::str::FromStr;
 
+    use bitcoin_hashes::{hex::FromHex, Hash};
+    use futures::Future;
+    use secp256k1::PublicKey;
+
+    use crate::challenger::ChallengeState;
+    use crate::request::Bid;
     use crate::storage::MockStorage;
 
     /// Generate dummy hash for tests
     fn gen_dummy_hash(i: u8) -> sha256d::Hash {
         sha256d::Hash::from_slice(&[i as u8; 32]).unwrap()
+    }
+
+    /// Geberate dummy challenge state
+    fn gen_challenge_state(request_hash: &sha256d::Hash) -> ChallengeState {
+        let request = ServiceRequest {
+            txid: *request_hash,
+            start_blockheight: 2,
+            end_blockheight: 5,
+            genesis_blockhash: gen_dummy_hash(0),
+            fee_percentage: 5,
+            num_tickets: 10,
+        };
+        let mut bids = BidSet::new();
+        let _ = bids.insert(Bid {
+            txid: sha256d::Hash::from_hex("1234567890000000000000000000000000000000000000000000000000000000").unwrap(),
+            pubkey: PublicKey::from_str("026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3").unwrap(),
+        });
+        ChallengeState {
+            request,
+            bids,
+            latest_challenge: Some(gen_dummy_hash(0)),
+        }
+    }
+
+    #[test]
+    fn get_request_test() {
+        let storage = Arc::new(MockStorage::new());
+        let dummy_hash = gen_dummy_hash(1);
+
+        // no such request
+        let s = format!(r#"{{"txid": "{}"}}"#, dummy_hash.to_string());
+        let params: Params = serde_json::from_str(&s).unwrap();
+        let resp = get_request(params, storage.clone());
+        assert_eq!(
+            "Invalid params: `txid` does not exist.",
+            resp.wait().unwrap_err().message
+        );
+
+        // save actual state
+        let state = gen_challenge_state(&dummy_hash);
+        storage.save_challenge_state(&state).unwrap();
+        let s = format!(r#"{{"txid": "{}"}}"#, dummy_hash.to_string());
+        let params: Params = serde_json::from_str(&s).unwrap();
+        let resp = get_request(params, storage.clone());
+        assert_eq!(
+            format!(r#"{{"request":{{"txid":"{}","start_blockheight":2,"end_blockheight":5,"genesis_blockhash":"0000000000000000000000000000000000000000000000000000000000000000","fee_percentage":5,"num_tickets":10}},"bids":[{{"txid":"1234567890000000000000000000000000000000000000000000000000000000","pubkey":"026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3"}}]}}"#,
+                dummy_hash.to_string()),
+            resp.wait().unwrap()
+        );
+    }
+
+    #[test]
+    fn get_requests_test() {
+        let storage = Arc::new(MockStorage::new());
+        let dummy_hash = gen_dummy_hash(1);
+
+        // no requests
+        let resp = get_requests(storage.clone());
+        assert_eq!(r#"{"requests":[]}"#, resp.wait().unwrap());
+
+        // save actual state
+        let state = gen_challenge_state(&dummy_hash);
+        storage.save_challenge_state(&state).unwrap();
+        let resp = get_requests(storage.clone());
+        assert_eq!(
+            format!(r#"{{"requests":[{{"request":{{"txid":"{}","start_blockheight":2,"end_blockheight":5,"genesis_blockhash":"0000000000000000000000000000000000000000000000000000000000000000","fee_percentage":5,"num_tickets":10}},"bids":[{{"txid":"1234567890000000000000000000000000000000000000000000000000000000","pubkey":"026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3"}}]}}]}}"#,
+                dummy_hash.to_string()),
+            resp.wait().unwrap()
+        );
+
+        let dummy_hash2 = gen_dummy_hash(2);
+        let state2 = gen_challenge_state(&dummy_hash2);
+        storage.save_challenge_state(&state2).unwrap();
+        let resp = get_requests(storage.clone());
+        assert_eq!(
+            format!(r#"{{"requests":[{{"request":{{"txid":"{}","start_blockheight":2,"end_blockheight":5,"genesis_blockhash":"0000000000000000000000000000000000000000000000000000000000000000","fee_percentage":5,"num_tickets":10}},"bids":[{{"txid":"1234567890000000000000000000000000000000000000000000000000000000","pubkey":"026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3"}}]}},{{"request":{{"txid":"{}","start_blockheight":2,"end_blockheight":5,"genesis_blockhash":"0000000000000000000000000000000000000000000000000000000000000000","fee_percentage":5,"num_tickets":10}},"bids":[{{"txid":"1234567890000000000000000000000000000000000000000000000000000000","pubkey":"026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3"}}]}}]}}"#,
+                dummy_hash.to_string(),
+                dummy_hash2.to_string()),
+            resp.wait().unwrap()
+        );
     }
 
     #[test]

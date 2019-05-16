@@ -187,11 +187,13 @@ impl Storage for MongoStorage {
         self.auth()?;
         let mut options = FindOptions::new();
         options.sort = Some(doc! { "_id" : 1 }); // sort ascending, latest request is last
-        let mut resps = self.db.collection("Request").find(None, Some(options))?;
+        let resps = self.db.collection("Request").find(None, Some(options))?;
 
         let mut requests = vec![];
-        if let Some(resp) = resps.next() {
-            requests.push(doc_to_request(&resp?))
+        for resp in resps {
+            if let Ok(req) = resp {
+                requests.push(doc_to_request(&req))
+            }
         }
         Ok(requests)
     }
