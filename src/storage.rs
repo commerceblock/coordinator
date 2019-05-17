@@ -3,7 +3,9 @@
 //! Storage interface and implementations
 
 use std::cell::RefCell;
+use std::mem::drop;
 use std::str::FromStr;
+use std::sync::{Mutex, MutexGuard};
 
 use bitcoin_hashes::{hex::FromHex, sha256d};
 use mongodb::db::{Database, ThreadedDatabase};
@@ -35,7 +37,7 @@ pub trait Storage {
 
 /// Database implementation of Storage trait
 pub struct MongoStorage {
-    db: Database,
+    db: Mutex<Database>,
     config: StorageConfig,
 }
 
@@ -44,23 +46,32 @@ impl MongoStorage {
     pub fn new(storage_config: StorageConfig) -> Result<Self> {
         let uri = &format!("mongodb://{}/{}", storage_config.host, storage_config.name);
         let client = Client::with_uri(&uri)?;
-        let db = client.db("coordinator");
 
-        let mongo_storage = MongoStorage {
-            db: db,
+        let db = client.db("coordinator");
+        if let Some(ref user) = storage_config.user {
+            if let Some(ref pass) = storage_config.pass {
+                db.auth(user, pass)?;
+            }
+        }
+
+        Ok(MongoStorage {
+            db: Mutex::new(db),
             config: storage_config,
-        };
-        mongo_storage.auth()?;
-        let _ = mongo_storage.db.list_collections(None)?; // check connectivity
-        Ok(mongo_storage)
+        })
     }
 
     /// Do db authentication using user/pass from config
-    fn auth(&self) -> Result<()> {
-        if let Some(ref user) = self.config.user {
-            if let Some(ref pass) = self.config.pass {
-                self.db.auth(user, pass)?;
+    fn auth(&self, db_locked: &MutexGuard<Database>) -> Result<()> {
+        match db_locked.list_collections(None) {
+            // only do authentication if connectivity check fails
+            Err(_) => {
+                if let Some(ref user) = self.config.user {
+                    if let Some(ref pass) = self.config.pass {
+                        db_locked.auth(user, pass)?;
+                    }
+                }
             }
+            _ => (),
         }
         Ok(())
     }
@@ -69,9 +80,11 @@ impl MongoStorage {
 impl Storage for MongoStorage {
     /// Store the state of a challenge request
     fn save_challenge_state(&self, challenge: &ChallengeState) -> Result<()> {
-        self.auth()?;
+        let db_locked = self.db.lock().unwrap();
+        self.auth(&db_locked)?;
+
         let request_id;
-        let coll = self.db.collection("Request");
+        let coll = db_locked.collection("Request");
         let doc = request_to_doc(&challenge.request);
         match coll.find_one(Some(doc.clone()), None)? {
             Some(res) => request_id = res.get("_id").unwrap().clone(),
@@ -80,7 +93,7 @@ impl Storage for MongoStorage {
             }
         }
 
-        let coll = self.db.collection("Bid");
+        let coll = db_locked.collection("Bid");
         for bid in challenge.bids.iter() {
             let doc = bid_to_doc(&request_id, bid);
             match coll.find_one(Some(doc.clone()), None)? {
@@ -95,13 +108,14 @@ impl Storage for MongoStorage {
 
     /// Store responses for a specific challenge request
     fn save_response(&self, request_hash: sha256d::Hash, ids: &ChallengeResponseIds) -> Result<()> {
-        self.auth()?;
+        let db_locked = self.db.lock().unwrap();
+        self.auth(&db_locked)?;
+
         if ids.len() == 0 {
             return Ok(());
         }
 
-        let request = self
-            .db
+        let request = db_locked
             .collection("Request")
             .find_one(
                 Some(doc! {
@@ -111,8 +125,7 @@ impl Storage for MongoStorage {
             )?
             .unwrap();
 
-        let _ = self
-            .db
+        let _ = db_locked
             .collection("Response")
             .insert_one(challenge_responses_to_doc(request.get("_id").unwrap(), ids), None)?;
         Ok(())
@@ -120,8 +133,10 @@ impl Storage for MongoStorage {
 
     /// Get all challenge responses for a specific request
     fn get_responses(&self, request_hash: sha256d::Hash) -> Result<Vec<ChallengeResponseIds>> {
-        self.auth()?;
-        let mut resp_aggr = self.db.collection("Request").aggregate(
+        let db_locked = self.db.lock().unwrap();
+        self.auth(&db_locked)?;
+
+        let mut resp_aggr = db_locked.collection("Request").aggregate(
             [
                 doc! {
                     "$lookup": {
@@ -140,6 +155,7 @@ impl Storage for MongoStorage {
             .to_vec(),
             None,
         )?;
+        drop(db_locked); // drop immediately on get requests
 
         let mut all_resps: Vec<ChallengeResponseIds> = Vec::new();
         if let Some(resp) = resp_aggr.next() {
@@ -152,8 +168,10 @@ impl Storage for MongoStorage {
 
     /// Get all bids for a specific request
     fn get_bids(&self, request_hash: sha256d::Hash) -> Result<BidSet> {
-        self.auth()?;
-        let mut resp_aggr = self.db.collection("Request").aggregate(
+        let db_locked = self.db.lock().unwrap();
+        self.auth(&db_locked)?;
+
+        let mut resp_aggr = db_locked.collection("Request").aggregate(
             [
                 doc! {
                     "$lookup": {
@@ -172,6 +190,7 @@ impl Storage for MongoStorage {
             .to_vec(),
             None,
         )?;
+        drop(db_locked); // drop immediately on get requests
 
         let mut all_bids = BidSet::new();
         if let Some(resp) = resp_aggr.next() {
@@ -184,10 +203,13 @@ impl Storage for MongoStorage {
 
     /// Get all the requests
     fn get_requests(&self) -> Result<Vec<Request>> {
-        self.auth()?;
+        let db_locked = self.db.lock().unwrap();
+        self.auth(&db_locked)?;
+
         let mut options = FindOptions::new();
         options.sort = Some(doc! { "_id" : 1 }); // sort ascending, latest request is last
-        let resps = self.db.collection("Request").find(None, Some(options))?;
+        let resps = db_locked.collection("Request").find(None, Some(options))?;
+        drop(db_locked); // drop immediately on get requests
 
         let mut requests = vec![];
         for resp in resps {
@@ -200,13 +222,16 @@ impl Storage for MongoStorage {
 
     /// Get request for a specific request txid
     fn get_request(&self, request_hash: sha256d::Hash) -> Result<Option<Request>> {
-        self.auth()?;
-        let request = self.db.collection("Request").find_one(
+        let db_locked = self.db.lock().unwrap();
+        self.auth(&db_locked)?;
+
+        let request = db_locked.collection("Request").find_one(
             Some(doc! {
                 "txid": request_hash.to_string(),
             }),
             None,
         )?;
+        drop(db_locked); // drop immediately on get requests
 
         match request {
             Some(doc) => Ok(Some(doc_to_request(&doc))),

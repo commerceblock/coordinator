@@ -148,6 +148,7 @@ pub fn run_api_server<D: Storage + Send + Sync + 'static>(
             }
             request.into()
         })
+        .threads(2)
         .start_http(&addr[0])
         .expect("api error");
 
