@@ -11,3 +11,7 @@ Implementation of the Coordinator daemon, responsible for verifying the operatio
 ### Run Demo
 
 `./scripts/demo.sh && cargo run --example demo`
+
+### Docs
+
+For more details check [readthedocs](https://commerceblock.readthedocs.io/en/latest/coordinator/index.html).
