@@ -8,6 +8,7 @@ repository = "https://github.com/commerceblock/coordinator"
 
 [dependencies]
 log = "0.4"
+base64 = "0.10.1"
 env_logger = "0.6"
 hyper = "0.12"
 futures = "0.1"
@@ -15,6 +16,7 @@ config = "0.9"
 serde = { version = "1.0", features = ["derive"] }
 serde_json="1.0"
 mongodb = "0.3.11"
+jsonrpc-http-server = "11.0"
 rust-ocean = { git = "https://github.com/commerceblock/rust-ocean"}
 ocean-rpc = { git = "https://github.com/commerceblock/rust-ocean-rpc"}
 bitcoin = { version = "0.17", features = [ "serde-decimal" ] }

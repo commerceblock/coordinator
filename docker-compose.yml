@@ -1,0 +1,61 @@
+---
+version: '3.6'
+services:
+  mongo:
+    image: commerceblock/mongo:4.0.0
+    ports:
+      - "27017:27017"
+    networks:
+      - default
+    volumes:
+      - /Users/nikolaos/db_dir:/data/db
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: adminpass
+      MONGO_INITDB_DATABASE: coordinator
+      MONGO_USERNAME: user
+      MONGO_PASSWORD: pass
+  coordinator:
+    image: commerceblock/coordinator:latest
+    ports:
+      - "8080:8080"
+      - "3333:3333"
+    networks:
+      - default
+    environment:
+      # host for listening to incoming guardnode responses
+      CO_LISTENER_HOST: coordinator:8080
+
+      # frequency of challenge creation (in number of blocks)
+      CO_CHALLENGE_FREQUENCY: 60
+
+      # coordinator rpc api connectivity details
+      CO_API_HOST: coordinator:3333
+      CO_API_USER: userApi
+      CO_API_PASS: passwordApi
+
+      # mongo db connectivity details
+      CO_STORAGE_HOST: mongo:27017
+      CO_STORAGE_USER: user
+      CO_STORAGE_PASS: pass
+      CO_STORAGE_NAME: coordinator
+
+      # client chain node connectivity
+      CO_CLIENTCHAIN_HOST: client_chain:5555
+      CO_CLIENTCHAIN_USER: user1
+      CO_CLIENTCHAIN_PASS: password1
+      CO_CLIENTCHAIN_ASSET_HASH: 73be00507b15f79efccd0184b7ca8367372dfd5334ae8991a492f5f354073c88
+      CO_CLIENTCHAIN_GENESIS_HASH: 706f645393a41142e5fc1e1bf6c496bddb26bcada8b9429d4f33a2552eb6e66c
+
+      # cb service chain node connectivity
+      CO_SERVICE_HOST: service_chain:5555
+      CO_SERVICE_USER: user1
+      CO_SERVICE_PASS: password1
+
+    command: cargo run
+networks:
+ default:
+   driver: bridge
+   ipam:
+     config:
+     - subnet: 192.168.12.0/24

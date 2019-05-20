@@ -10,7 +10,7 @@ use secp256k1::key::PublicKey;
 
 use crate::config::ServiceConfig;
 use crate::error::{CError, Error, Result};
-use crate::ocean::RpcClient;
+use crate::ocean::OceanClient;
 use crate::request::{Bid, BidSet, Request};
 
 /// Service trait defining functionality for interfacing with service chain
@@ -28,13 +28,13 @@ pub trait Service {
 /// Rpc implementation of Service using an underlying ocean rpc connection
 pub struct RpcService {
     /// Rpc client instance
-    client: RpcClient,
+    client: OceanClient,
 }
 
 impl RpcService {
     /// Create an RpcService with underlying rpc client connectivity
     pub fn new(service_config: &ServiceConfig) -> Result<Self> {
-        let client = RpcClient::new(
+        let client = OceanClient::new(
             service_config.host.clone(),
             Some(service_config.user.clone()),
             Some(service_config.pass.clone()),

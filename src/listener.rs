@@ -164,7 +164,7 @@ pub fn run_listener(
     let server = Server::bind(&addr[0])
         .serve(listener_service)
         .with_graceful_shutdown(ch_recv)
-        .map_err(|e| error!("server error: {}", e));
+        .map_err(|e| error!("listener error: {}", e));
 
     thread::spawn(move || {
         rt::run(server);

@@ -22,21 +22,22 @@ pub fn run(config: Config) -> Result<()> {
 
     let service = RpcService::new(&config.service)?;
     let clientchain = RpcClientChain::new(&config.clientchain)?;
-    let storage = MongoStorage::new(&config.storage)?;
+    let storage = Arc::new(MongoStorage::new(config.storage.clone())?);
     let genesis_hash = sha256d::Hash::from_hex(&config.clientchain.genesis_hash)?;
+
+    let _ = ::api::run_api_server(&config.api, storage.clone());
 
     // This loop runs continuously fetching and running challenge requests,
     // generating challenge responses and fails on any errors that occur
     loop {
-        if let Some(request_id) = run_request(&config, &service, &clientchain, &storage, genesis_hash)? {
+        if let Some(request_id) = run_request(&config, &service, &clientchain, storage.clone(), genesis_hash)? {
             // if challenge request succeeds print responses
-            // TODO: how to propagate responses to fee payer
             println! {"***** Responses *****"}
-            let resp = storage.get_all_challenge_responses(request_id).unwrap();
+            let resp = storage.get_responses(request_id).unwrap();
             println! {"{}", serde_json::to_string_pretty(&resp).unwrap()};
         }
-        info! {"Sleeping for 1 sec..."}
-        thread::sleep(time::Duration::from_secs(1))
+        info! {"Sleeping for 10 sec..."}
+        thread::sleep(time::Duration::from_secs(10))
     }
 }
 
@@ -47,7 +48,7 @@ pub fn run_request<T: Service, K: ClientChain, D: Storage>(
     config: &Config,
     service: &T,
     clientchain: &K,
-    storage: &D,
+    storage: Arc<D>,
     genesis_hash: sha256d::Hash,
 ) -> Result<Option<sha256d::Hash>> {
     match ::challenger::fetch_next(service, clientchain, &genesis_hash)? {
@@ -71,7 +72,7 @@ pub fn run_request<T: Service, K: ClientChain, D: Storage>(
                 clientchain,
                 shared_challenge.clone(),
                 &verify_rx,
-                storage,
+                storage.clone(),
                 time::Duration::from_secs(config.verify_duration),
                 time::Duration::from_secs(config.challenge_duration),
                 config.challenge_frequency,

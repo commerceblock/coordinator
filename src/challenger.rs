@@ -62,7 +62,7 @@ fn get_challenge_response(
                 Ok(resp) => {
                     if resp.0 == *challenge_hash {
                         // filter old invalid/responses
-                        let _ = responses.insert(resp.1.txid.to_string());
+                        let _ = responses.insert(resp.1.txid);
                     }
                 }
                 Err(RecvTimeoutError::Timeout) => {} // ignore timeout - it's allowed
@@ -87,7 +87,7 @@ pub fn run_challenge_request<K: ClientChain, D: Storage>(
     clientchain: &K,
     challenge_state: Arc<Mutex<ChallengeState>>,
     verify_rx: &Receiver<ChallengeResponse>,
-    storage: &D,
+    storage: Arc<D>,
     verify_duration: time::Duration,
     challenge_duration: time::Duration,
     challenge_frequency: u64,
@@ -98,9 +98,11 @@ pub fn run_challenge_request<K: ClientChain, D: Storage>(
     loop {
         let challenge_height = clientchain.get_blockheight()?;
         info! {"client chain height: {}", challenge_height}
-        if request.end_blockheight < challenge_height as usize {
+        if (request.end_blockheight as u64) < challenge_height {
             break;
         } else if (challenge_height - prev_challenge_height) < challenge_frequency {
+            info! {"Sleeping for 10 sec..."}
+            thread::sleep(time::Duration::from_secs(10));
             continue;
         }
 
@@ -114,7 +116,7 @@ pub fn run_challenge_request<K: ClientChain, D: Storage>(
         }
 
         info! {"fetching responses..."}
-        storage.save_challenge_responses(
+        storage.save_response(
             request.txid,
             &get_challenge_response(&challenge_hash, &verify_rx, challenge_duration)?,
         )?;
@@ -138,7 +140,7 @@ impl PartialEq for ChallengeResponse {
 impl Eq for ChallengeResponse {}
 
 /// Type defining a set of Challenge Responses Ids
-pub type ChallengeResponseIds = HashSet<String>;
+pub type ChallengeResponseIds = HashSet<sha256d::Hash>;
 
 /// Mainstains challenge state with information on
 /// challenge requests and bids as well as the
@@ -156,7 +158,7 @@ pub struct ChallengeState {
 /// Check if request start height has been reached in order to initiate
 /// challenging.
 fn check_request(request: &Request, height: u64) -> bool {
-    return if request.start_blockheight <= height as usize {
+    return if request.start_blockheight as u64 <= height {
         true
     } else {
         false
@@ -259,7 +261,7 @@ mod tests {
         // then test with a few dummy responses and old hashes that are ignored
         let old_dummy_hash = gen_dummy_hash(8);
         let mut dummy_response_set = ChallengeResponseIds::new();
-        let _ = dummy_response_set.insert(dummy_bid.txid.to_string());
+        let _ = dummy_response_set.insert(dummy_bid.txid);
         vtx.send(ChallengeResponse(dummy_hash, dummy_bid.clone())).unwrap();
         vtx.send(ChallengeResponse(dummy_hash, dummy_bid.clone())).unwrap();
         vtx.send(ChallengeResponse(old_dummy_hash, dummy_bid.clone())).unwrap();
@@ -364,16 +366,18 @@ mod tests {
     #[test]
     fn run_challenge_request_test() {
         let mut clientchain = MockClientChain::new();
-        let mut storage = MockStorage::new();
+        let mut storage = Arc::new(MockStorage::new());
         let service = MockService::new();
 
         let dummy_hash = gen_dummy_hash(0);
+        let dummy_other_hash = gen_dummy_hash(9);
         let dummy_request = service.get_request(&dummy_hash).unwrap().unwrap();
 
         // test normal operation of run_challenge_request by adding some responses for
         // the first challenge
         let _ = clientchain.height.replace(dummy_request.start_blockheight as u64); // set height for fetch_next to succeed
         let challenge_state = fetch_next(&service, &clientchain, &dummy_hash).unwrap().unwrap();
+        storage.save_challenge_state(&challenge_state).unwrap();
 
         let (vtx, vrx): (Sender<ChallengeResponse>, Receiver<ChallengeResponse>) = channel();
 
@@ -390,15 +394,25 @@ mod tests {
             &clientchain,
             Arc::new(Mutex::new(challenge_state.clone())),
             &vrx,
-            &storage,
+            storage.clone(),
             time::Duration::from_millis(10),
             time::Duration::from_millis(10),
             3,
         );
         match res {
             Ok(_) => {
-                let resps = storage.get_all_challenge_responses(dummy_request.txid).unwrap();
+                let resps = storage.get_responses(dummy_request.txid).unwrap();
                 assert_eq!(0, resps.len());
+                let bids = storage.get_bids(dummy_request.txid).unwrap();
+                assert_eq!(challenge_state.bids, bids);
+                let requests = storage.get_requests().unwrap();
+                assert_eq!(1, requests.len());
+                assert_eq!(&challenge_state.request, &requests[0]);
+                assert_eq!(
+                    challenge_state.request,
+                    storage.get_request(dummy_request.txid).unwrap().unwrap()
+                );
+                assert_eq!(None, storage.get_request(dummy_other_hash).unwrap());
             }
             Err(_) => assert!(false, "should not return error"),
         }
@@ -409,20 +423,30 @@ mod tests {
         let _ = clientchain.height.replace(dummy_request.start_blockheight as u64); // set height back to starting height
         let res = run_challenge_request(
             &clientchain,
-            Arc::new(Mutex::new(challenge_state)),
+            Arc::new(Mutex::new(challenge_state.clone())),
             &vrx,
-            &storage,
+            storage.clone(),
             time::Duration::from_millis(10),
             time::Duration::from_millis(10),
             1,
         );
         match res {
             Ok(_) => {
-                let resps = storage.get_all_challenge_responses(dummy_request.txid).unwrap();
+                let resps = storage.get_responses(dummy_request.txid).unwrap();
                 assert_eq!(1, resps.len());
                 assert_eq!(1, resps[0].len());
-                assert_eq!(dummy_bid.txid.to_string(), *resps[0].iter().next().unwrap());
+                assert_eq!(dummy_bid.txid, *resps[0].iter().next().unwrap());
                 assert_eq!(1, storage.challenge_responses.borrow().len());
+                let bids = storage.get_bids(dummy_request.txid).unwrap();
+                assert_eq!(challenge_state.bids, bids);
+                let requests = storage.get_requests().unwrap();
+                assert_eq!(1, requests.len());
+                assert_eq!(&challenge_state.request, &requests[0]);
+                assert_eq!(
+                    challenge_state.request,
+                    storage.get_request(dummy_request.txid).unwrap().unwrap()
+                );
+                assert_eq!(None, storage.get_request(dummy_other_hash).unwrap());
             }
             Err(_) => assert!(false, "should not return error"),
         }
@@ -436,7 +460,7 @@ mod tests {
             &clientchain,
             Arc::new(Mutex::new(challenge_state)),
             &vrx,
-            &storage,
+            storage.clone(),
             time::Duration::from_millis(10),
             time::Duration::from_millis(10),
             1,
@@ -448,12 +472,13 @@ mod tests {
         let _ = clientchain.height.replace(dummy_request.start_blockheight as u64); // set height for fetch_next to succeed
         let challenge_state = fetch_next(&service, &clientchain, &dummy_hash).unwrap().unwrap();
 
-        storage.return_err = true;
+        let mut storage_err = MockStorage::new();
+        storage_err.return_err = true;
         assert!(run_challenge_request(
             &clientchain,
             Arc::new(Mutex::new(challenge_state)),
             &vrx,
-            &storage,
+            Arc::new(storage_err),
             time::Duration::from_millis(10),
             time::Duration::from_millis(10),
             1,
@@ -461,7 +486,7 @@ mod tests {
         .is_err());
 
         // test client chain returning false
-        storage = MockStorage::new(); // reset storage;
+        storage = Arc::new(MockStorage::new()); // reset storage;
         let _ = clientchain.height.replace(dummy_request.start_blockheight as u64); // set height for fetch_next to succeed
         let challenge_state = fetch_next(&service, &clientchain, &dummy_hash).unwrap().unwrap();
 
@@ -473,7 +498,7 @@ mod tests {
             &clientchain,
             Arc::new(Mutex::new(challenge_state)),
             &vrx,
-            &storage,
+            storage.clone(),
             time::Duration::from_millis(10),
             time::Duration::from_millis(10),
             1,
@@ -487,7 +512,7 @@ mod tests {
         clientchain.return_false = false;
 
         // test run when height is already passed
-        storage = MockStorage::new(); // reset storage;
+        storage = Arc::new(MockStorage::new()); // reset storage;
         let _ = clientchain.height.replace(dummy_request.end_blockheight as u64 + 1); // set height for fetch_next to succeed
         let challenge_state = fetch_next(&service, &clientchain, &dummy_hash).unwrap().unwrap();
 
@@ -497,7 +522,7 @@ mod tests {
             &clientchain,
             Arc::new(Mutex::new(challenge_state)),
             &vrx,
-            &storage,
+            storage.clone(),
             time::Duration::from_millis(10),
             time::Duration::from_millis(10),
             1,

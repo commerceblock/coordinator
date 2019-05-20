@@ -10,11 +10,11 @@ use ocean_rpc::{json, RpcApi};
 
 use crate::config::ClientChainConfig;
 use crate::error::{CError, Error, Result};
-use crate::ocean::RpcClient;
+use crate::ocean::OceanClient;
 
 /// Method that returns the first unspent for a specified asset label
 /// or an error if the client wallet does not have any unspent/funds
-fn get_first_unspent(client: &RpcClient, asset: &str, asset_hash: &sha256d::Hash) -> Result<json::ListUnspentResult> {
+fn get_first_unspent(client: &OceanClient, asset: &str, asset_hash: &sha256d::Hash) -> Result<json::ListUnspentResult> {
     // Check challenge asset hash is in the wallet
     let unspent = client.list_unspent(None, None, None, None, None)?;
     for tx in unspent.iter() {
@@ -41,7 +41,7 @@ pub trait ClientChain {
 /// Rpc implementation of Service using an underlying ocean rpc connection
 pub struct RpcClientChain<'a> {
     /// Rpc client instance
-    client: RpcClient,
+    client: OceanClient,
     /// Challenge asset id
     asset: &'a str,
     /// Challenge asset hash
@@ -51,7 +51,7 @@ pub struct RpcClientChain<'a> {
 impl<'a> RpcClientChain<'a> {
     /// Create an RpcClientChain with underlying rpc client connectivity
     pub fn new(clientchain_config: &'a ClientChainConfig) -> Result<Self> {
-        let client = RpcClient::new(
+        let client = OceanClient::new(
             clientchain_config.host.clone(),
             Some(clientchain_config.user.clone()),
             Some(clientchain_config.pass.clone()),

@@ -7,16 +7,16 @@ use ocean_rpc::{Client, RpcApi};
 use crate::error::Result;
 
 /// Extension of ocean_rpc::Client that retries rpc calls
-pub struct RpcClient {
+pub struct OceanClient {
     /// Ocean rpc client instance
     pub client: Client,
 }
 
-impl RpcClient {
-    /// Create an RpcClient with underlying rpc client connectivity
+impl OceanClient {
+    /// Create an OceanClient with underlying rpc client connectivity
     pub fn new(url: String, user: Option<String>, pass: Option<String>) -> Result<Self> {
-        Ok(RpcClient {
-            client: Client::new(url, user, pass),
+        Ok(OceanClient {
+            client: Client::new(format!("http://{}", url), user, pass),
         })
     }
 }
@@ -27,7 +27,7 @@ pub const CLIENT_INTERVAL: u64 = 10;
 /// Number of retry attemps for rpc client calls
 pub const CLIENT_RETRY_ATTEMPTS: u8 = 5;
 
-impl RpcApi for RpcClient {
+impl RpcApi for OceanClient {
     fn call<T: for<'b> serde::de::Deserialize<'b>>(
         &self,
         cmd: &str,
