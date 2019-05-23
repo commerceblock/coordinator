@@ -58,7 +58,14 @@ fn main() {
 
     let genesis_hash = sha256d::Hash::from_hex(&config.clientchain.genesis_hash).unwrap();
     let request_txid = &client_rpc.get_requests(Some(&genesis_hash)).unwrap()[0].txid;
-    let guardnode_txid = client_rpc.get_request_bids(request_txid).unwrap().unwrap().bids[0].txid;
+    let guardnode_pubkey = "026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3";
+    let mut guardnode_txid = genesis_hash; // dummy init
+    for bid in client_rpc.get_request_bids(request_txid).unwrap().unwrap().bids {
+        if bid.fee_pub_key.to_string() == guardnode_pubkey {
+            guardnode_txid = bid.txid;
+            break;
+        }
+    }
 
     // add two guardnodes with valid keys and one without
     // keys based on mockservice request bids
