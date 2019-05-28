@@ -16,13 +16,11 @@ printf '%s\n' '#!/bin/sh' 'rpcuser=user1' \
     'rpcallowip=0.0.0.0/0'\
     'port=6666' \
     'initialfreecoins=2100000000000000' \
+    'policycoins=2100000000000000' \
     'daemon=1' \
     'listen=1' \
     'txindex=1' \
     'initialfreecoinsdestination=76a914be70510653867b1c648b43cfb3b0edf8420f08d788ac' \
-    'freezelistcoinsdestination=76a914be70510653867b1c648b43cfb3b0edf8420f08d788ac' \
-    'burnlistcoinsdestination=76a914be70510653867b1c648b43cfb3b0edf8420f08d788ac' \
-    'whitelistcoinsdestination=76a914be70510653867b1c648b43cfb3b0edf8420f08d788ac' \
     'permissioncoinsdestination=76a914be70510653867b1c648b43cfb3b0edf8420f08d788ac' \
     'challengecoinsdestination=76a914be70510653867b1c648b43cfb3b0edf8420f08d788ac' > ~/co-client-dir/ocean.conf
 

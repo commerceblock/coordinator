@@ -27,8 +27,8 @@ pass = "password1"
 host = "127.0.0.1:5555"
 user = "user1"
 pass = "password1"
-asset_hash = "73be00507b15f79efccd0184b7ca8367372dfd5334ae8991a492f5f354073c88"
-genesis_hash = "706f645393a41142e5fc1e1bf6c496bddb26bcada8b9429d4f33a2552eb6e66c"
+asset_hash = "fae9f771019d45e31b8f78da99a15b094b17b2ba76b0940c3ac53d5e9afd8e8e"
+genesis_hash = "d1fbd07bd9a7a80a85445b8e28246f0b644c01ac7412e81ce3ffc0815386ad77"
 asset = "CHALLENGE"
 
 [storage]

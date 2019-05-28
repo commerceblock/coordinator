@@ -32,7 +32,7 @@ use coordinator::ocean::OceanClient;
 fn main() {
     let mut config = coordinator::config::Config::new().unwrap();
     config.challenge_duration = 5;
-    config.verify_duration = 10;
+    config.verify_duration = 30;
 
     env::set_var("RUST_LOG", &config.log_level);
     env::set_var("RUST_BACKTRACE", "1");
