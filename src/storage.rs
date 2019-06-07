@@ -111,10 +111,6 @@ impl Storage for MongoStorage {
         let db_locked = self.db.lock().unwrap();
         self.auth(&db_locked)?;
 
-        if ids.len() == 0 {
-            return Ok(());
-        }
-
         let request = db_locked
             .collection("Request")
             .find_one(
@@ -347,9 +343,6 @@ impl Storage for MockStorage {
     fn save_response(&self, request_hash: sha256d::Hash, ids: &ChallengeResponseIds) -> Result<()> {
         if self.return_err {
             return Err(Error::from(CError::Generic("save_response failed".to_owned())));
-        }
-        if ids.len() == 0 {
-            return Ok(());
         }
         self.challenge_responses
             .borrow_mut()

@@ -2,7 +2,7 @@
 import requests
 import json
 
-txid = "3992775dc59575ad10e2e2ee840db5b5214fff0adcd321b6a060addf0494039c"
+txid = "e5990b1d3bde028f40281df5f84d50272e74ca8f13d810d317b2022940423d15"
 url = 'https://userApi:passwordApi@coordinator-api.testnet.commerceblock.com:10006'
 
 payload = '{{"jsonrpc": "2.0", "method": "getrequest", "params": {{"txid": "{}"}}, "id": 1}}'.format(txid)
