@@ -2,8 +2,8 @@
 import requests
 import json
 
-txid = "f78038d112a567f0a2efc4a4d6ecafb9c815227846b97c014bfaa172dd944506"
-url = 'http://userApi:passwordApi@localhost:3333'
+txid = "e5990b1d3bde028f40281df5f84d50272e74ca8f13d810d317b2022940423d15"
+url = 'https://userApi:passwordApi@coordinator-api.testnet.commerceblock.com:10006'
 
 payload = '{{"jsonrpc": "2.0", "method": "getrequest", "params": {{"txid": "{}"}}, "id": 1}}'.format(txid)
 headers = {'content-type': 'application/json', 'Accept-Charset': 'UTF-8'}
