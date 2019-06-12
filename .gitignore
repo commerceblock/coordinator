@@ -1,2 +1,5 @@
 /target
 **/*.rs.bk
+
+# for python scripts
+scripts/__pycache__/
