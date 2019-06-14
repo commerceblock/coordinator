@@ -2,6 +2,7 @@
 //!
 //! Service chain interface and implementations
 
+use std::cell::RefCell;
 use std::str::FromStr;
 
 use bitcoin_hashes::{hex::FromHex, sha256d, Hash};
@@ -17,12 +18,12 @@ use crate::request::{Bid, BidSet, Request};
 pub trait Service {
     /// Get all active requests, if any, from service chain
     fn get_requests(&self) -> Result<Option<Vec<Request>>>;
-
     /// Try get active request, by genesis hash, from service chain
     fn get_request(&self, hash: &sha256d::Hash) -> Result<Option<Request>>;
-
     /// Try get active request bids, by transaction hash, from service chain
     fn get_request_bids(&self, hash: &sha256d::Hash) -> Result<Option<BidSet>>;
+    /// Get service chain blockheight
+    fn get_blockheight(&self) -> Result<u64>;
 }
 
 /// Rpc implementation of Service using an underlying ocean rpc connection
@@ -80,6 +81,11 @@ impl Service for RpcService {
             None => Ok(None),
         }
     }
+
+    /// Get service chain blockheight
+    fn get_blockheight(&self) -> Result<u64> {
+        Ok(self.client.get_block_count()?)
+    }
 }
 
 /// Mock implementation of Service using some mock logic for testing
@@ -92,6 +98,9 @@ pub struct MockService {
     pub return_none: bool,
     /// Current active request
     pub request: Request,
+    /// Mock service chain blockheight - incremented by default on
+    /// get_blockheight
+    pub height: RefCell<u64>,
 }
 
 impl MockService {
@@ -113,6 +122,7 @@ impl MockService {
             return_err: false,
             return_none: false,
             request,
+            height: RefCell::new(0),
         }
     }
 }
@@ -162,5 +172,16 @@ impl Service for MockService {
             pubkey: PublicKey::from_str("02b95c249d84f417e3e395a127425428b540671cc15881eb828c17b722a53fc599").unwrap(),
         });
         Ok(Some(bid_set))
+    }
+
+    /// Get service chain blockheight
+    fn get_blockheight(&self) -> Result<u64> {
+        if self.return_err {
+            return Err(Error::from(CError::Generic("get_blockheight failed".to_owned())));
+        }
+
+        let mut height = self.height.borrow_mut();
+        *height += 1; // increment height for integration testing
+        Ok(*height - 1) // return previous height
     }
 }
