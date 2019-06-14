@@ -51,7 +51,7 @@ pub fn run_request<T: Service, K: ClientChain, D: Storage>(
     storage: Arc<D>,
     genesis_hash: sha256d::Hash,
 ) -> Result<Option<sha256d::Hash>> {
-    match ::challenger::fetch_next(service, clientchain, &genesis_hash)? {
+    match ::challenger::fetch_next(service, &genesis_hash)? {
         Some(challenge) => {
             // first attempt to store the challenge state information
             // on requests and winning bids and exit if that fails
@@ -69,6 +69,7 @@ pub fn run_request<T: Service, K: ClientChain, D: Storage>(
 
             // run challenge request storing expected responses
             ::challenger::run_challenge_request(
+                service,
                 clientchain,
                 shared_challenge.clone(),
                 &verify_rx,

@@ -30,8 +30,6 @@ fn get_first_unspent(client: &OceanClient, asset: &str, asset_hash: &sha256d::Ha
 /// ClientChain trait defining desired functionality for interfacing
 /// with the client chain when coordinating the guardnode service
 pub trait ClientChain {
-    /// Get client chain blockheight
-    fn get_blockheight(&self) -> Result<u64>;
     /// Send challenge transaction to client chain
     fn send_challenge(&self) -> Result<sha256d::Hash>;
     /// Verify challenge transaction has been included in the chain
@@ -71,11 +69,6 @@ impl<'a> RpcClientChain<'a> {
 }
 
 impl<'a> ClientChain for RpcClientChain<'a> {
-    /// Get client chain blockheight
-    fn get_blockheight(&self) -> Result<u64> {
-        Ok(self.client.get_block_count()?)
-    }
-
     /// Send challenge transaction to client chain
     fn send_challenge(&self) -> Result<sha256d::Hash> {
         // get any unspent for the challenge asset
@@ -139,8 +132,7 @@ pub struct MockClientChain {
     /// Flag that when set returns false on all inherited methods that return
     /// bool
     pub return_false: bool,
-    /// Mock client chain blockheight - incremented by default on
-    /// get_blockheight
+    /// Mock client chain blockheight
     pub height: RefCell<u64>,
 }
 
@@ -156,23 +148,11 @@ impl MockClientChain {
 }
 
 impl ClientChain for MockClientChain {
-    /// Get client chain blockheight
-    fn get_blockheight(&self) -> Result<u64> {
-        if self.return_err {
-            return Err(Error::from(CError::Generic("get_blockheight failed".to_owned())));
-        }
-
-        let mut height = self.height.borrow_mut();
-        *height += 1; // increment height for integration testing
-        Ok(*height - 1) // return previous height
-    }
-
     /// Send challenge transaction to client chain
     fn send_challenge(&self) -> Result<sha256d::Hash> {
         if self.return_err {
             return Err(Error::from(CError::Generic("send_challenge failed".to_owned())));
         }
-
         // Use height to generate mock challenge hash
         Ok(sha256d::Hash::from_slice(&[(*self.height.borrow() % 16) as u8; 32])?)
     }
