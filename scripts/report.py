@@ -74,7 +74,7 @@ def calculate_fees(rpc, start_height, end_height):
     return fee
 
 addr_prefix = 235
-txid = "e5990b1d3bde028f40281df5f84d50272e74ca8f13d810d317b2022940423d15"
+txid = "78f954d07de5badbc1526a60fe0ea639216f17f490a3bf41e48840453eca243f"
 url = 'https://userApi:passwordApi@coordinator-api.testnet.commerceblock.com:10006'
 rpc = connect("ocean", "oceanpass", "localhost", "7043")
 
@@ -90,7 +90,12 @@ print("Request details:\n{}".format(request))
 print("")
 
 print("Calculating total fees...")
-fee = calculate_fees(rpc, request['start_blockheight'], request['end_blockheight'])
+# For requests that are serving the service chain the fee start/end heights
+# can be picked up from the request information. For requests in client chains
+# these heights need to be found manually and inserted below to calculate fees
+fee_start_height = request['start_blockheight']
+fee_end_height = request['end_blockheight']
+fee = calculate_fees(rpc, fee_start_height, fee_end_height)
 fee_percentage = request['fee_percentage']
 fee_out = fee*fee_percentage/100
 print("Fee: {0}".format(fee))
