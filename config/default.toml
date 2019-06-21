@@ -30,6 +30,7 @@ pass = "password1"
 asset_hash = "fae9f771019d45e31b8f78da99a15b094b17b2ba76b0940c3ac53d5e9afd8e8e"
 genesis_hash = "d1fbd07bd9a7a80a85445b8e28246f0b644c01ac7412e81ce3ffc0815386ad77"
 asset = "CHALLENGE"
+asset_key = "cScSHCQp9AEwzZoucRpX9bMRkLCJ4LoQWBNFTZuD6tPX9qwNMWfQ"
 
 [storage]
 host = "localhost:27017"

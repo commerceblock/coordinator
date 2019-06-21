@@ -22,9 +22,9 @@ pub struct ApiConfig {
 impl Default for ApiConfig {
     fn default() -> ApiConfig {
         ApiConfig {
-            host: String::from(""),
-            user: String::from(""),
-            pass: String::from(""),
+            host: String::new(),
+            user: String::new(),
+            pass: String::new(),
         }
     }
 }
@@ -43,9 +43,9 @@ pub struct ServiceConfig {
 impl Default for ServiceConfig {
     fn default() -> ServiceConfig {
         ServiceConfig {
-            host: String::from(""),
-            user: String::from(""),
-            pass: String::from(""),
+            host: String::new(),
+            user: String::new(),
+            pass: String::new(),
         }
     }
 }
@@ -65,17 +65,20 @@ pub struct ClientChainConfig {
     pub genesis_hash: String,
     /// Client asset label
     pub asset: String,
+    /// Client asset key
+    pub asset_key: String,
 }
 
 impl Default for ClientChainConfig {
     fn default() -> ClientChainConfig {
         ClientChainConfig {
-            host: String::from(""),
-            user: String::from(""),
-            pass: String::from(""),
-            asset_hash: String::from(""),
-            genesis_hash: String::from(""),
+            host: String::new(),
+            user: String::new(),
+            pass: String::new(),
+            asset_hash: String::new(),
+            genesis_hash: String::new(),
             asset: String::from("CHALLENGE"),
+            asset_key: String::new(),
         }
     }
 }
@@ -201,6 +204,9 @@ impl Config {
         }
         if let Ok(v) = env::var("CO_CLIENTCHAIN_ASSET") {
             let _ = conf_rs.set("clientchain.asset", v)?;
+        }
+        if let Ok(v) = env::var("CO_CLIENTCHAIN_ASSET_KEY") {
+            let _ = conf_rs.set("clientchain.asset_key", v)?;
         }
         if let Ok(v) = env::var("CO_CLIENTCHAIN_ASSET_HASH") {
             let _ = conf_rs.set("clientchain.asset_hash", v)?;
