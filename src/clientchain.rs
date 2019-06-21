@@ -58,7 +58,14 @@ impl<'a> RpcClientChain<'a> {
         let asset_hash = sha256d::Hash::from_hex(&clientchain_config.asset_hash)?;
 
         // check we have funds for challenge asset
-        let _ = get_first_unspent(&client, &clientchain_config.asset, &asset_hash)?;
+        match get_first_unspent(&client, &clientchain_config.asset, &asset_hash) {
+            // If this fails attempt to import the private key and then fetch the unspent again
+            Err(_) => {
+                client.import_priv_key(&clientchain_config.asset_key, None, None)?;
+                let _ = get_first_unspent(&client, &clientchain_config.asset, &asset_hash)?;
+            }
+            _ => (),
+        }
 
         Ok(RpcClientChain {
             client,
