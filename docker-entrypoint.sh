@@ -21,11 +21,7 @@ case "$1" in
             echo "Running coordinator"
             cargo run
             ;;
-        shell)
-            bash
-            ;;
         *)
-            echo $"Usage: $0 {coordinator|shell}"
-            exit 1
+            "$@"
 
 esac
