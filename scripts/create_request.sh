@@ -1,7 +1,8 @@
 #!/bin/bash
 shopt -s expand_aliases
 
-alias ocl="ocean-cli -rpcport=7043 -rpcuser=ocean -rpcpassword=oceanpass"
+# alias ocl="ocean-cli -rpcport=7043 -rpcuser=ocean -rpcpassword=oceanpass"
+alias ocl="/$HOME/ocean/src/ocean-cli -datadir=$HOME/nodes/node1"
 
 # parameters:
 # $1 Genesis hash
@@ -42,7 +43,7 @@ fi
 # Client chain genesis block hash
 genesis=$1
 # check for currently active request for given genesis hash
-if [ `ocl getrequests | jq "if .[].genesisBlock == \"$genesis\" then 1 else empty end" ` ]
+if [ `ocl getrequests | jq "if .[].genesisBlock == \"$genesis\" then 1 else empty end"` ]
 then
     echo "Input parameter error: Genesis hash already in active request list."
     exit
@@ -104,6 +105,14 @@ inputs="{\"txid\":\"$txid\",\"vout\":$vout}"
 outputs="{\"decayConst\":$decay,\"endBlockHeight\":$end,\"fee\":$fee,\"genesisBlockHash\":\"$genesis\",\
 \"startBlockHeight\":$start,\"tickets\":$tickets,\"startPrice\":$price,\"value\":$value,\"pubkey\":\"$pub\"}"
 
+
 signedtx=`ocl signrawtransaction $(ocl createrawrequesttx $inputs $outputs)`
+echo $signedtx
+# Catch signign error
+if [ `echo $signedtx | jq ".complete"` = "false" ]
+then
+    echo "Signing error: Script cannot be signed. Is the input transaction information correct and is it unlockable now?"
+fi
+
 txid=`ocl sendrawtransaction $(echo $signedtx | jq -r ".hex")`
 echo "txid: $txid"
