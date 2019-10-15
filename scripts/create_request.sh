@@ -1,8 +1,8 @@
 #!/bin/bash
 shopt -s expand_aliases
 
-# alias ocl="ocean-cli -rpcport=7043 -rpcuser=ocean -rpcpassword=oceanpass"
-alias ocl="/$HOME/ocean/src/ocean-cli -datadir=$HOME/nodes/node1"
+alias ocl="ocean-cli -rpcport=7043 -rpcuser=ocean -rpcpassword=oceanpass"
+
 # parameters:
 # $1 Genesis hash
 # $2 start price
@@ -20,7 +20,7 @@ if [ -z $1 ] || [ -z $2 ] || [ -z $3 ] || [ -z $4 ] || [ -z $5 ] || [ -z $6 ] ||
 then
     printf "%s\n" "createRequest genesisHash startPrice endPrice, auctionDuration, requestDuration, numTickets feePercentage ( txid ) ( vout )"
     \ \
-    "Script builds, signs and sends a request transaction to service chain. By deflault a previously TX_LOCKED_MULTISIG transaction is spent to fund the request. If you wish to specify which transaction is used set parameters 8 and 9." \
+    "Script builds, signs and sends a request transaction to service chain. By deflault a previously TX_LOCKED_MULTISIG transaction is spent to fund the request. If a specific permission asset transaction should be used then set parameters 8 and 9 accordingly." \
     ""
     \ \
     "Arguments:" \
