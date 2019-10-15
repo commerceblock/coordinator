@@ -77,6 +77,14 @@ then
     txid=$8
     vout=$9
     tx=`ocl decoderawtransaction $(ocl getrawtransaction $txid)`
+    # Check lock time
+    if [[ `echo $tx | jq -r '.locktime'` -lt $currentblockheight ]]
+    then
+        value=`echo $tx | jq -r '.vout[0].value'`
+    else
+        printf "Input parameter error: Previous request transaction nlocktime not met.\n"
+        exit
+    fi
 else
     # Get previously locked TX_LOCKED_MULTISIG unspent output
     unspent=`ocl listunspent 1 9999999 [] true "PERMISSION" | jq -c '.[]'`
@@ -86,6 +94,11 @@ else
         then
             txid=`echo $i | jq -r ".txid"`
             tx=`ocl decoderawtransaction $(ocl getrawtransaction $txid)`
+            # Check lock time
+            if [[ `echo $tx | jq -r '.locktime'` -lt $currentblockheight ]]
+            then
+                continue # continue checking unspent list
+            fi
             value=`echo $tx | jq -r '.vout[0].value'`
             vout=0
             break
@@ -96,14 +109,6 @@ else
         printf "Error: No available TX_LOCKED_MULTISIG unspent transaction outputs.\n"
         exit
     fi
-fi
-# Check lock time
-if [[ `echo $tx | jq -r '.locktime'` -lt $currentblockheight ]]
-then
-    value=`echo $tx | jq -r '.vout[0].value'`
-else
-    printf "Input parameter error: Previous request transaction nlocktime not met.\n"
-    exit
 fi
 
 # Address permission tokens will be locked in
