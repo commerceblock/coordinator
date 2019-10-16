@@ -1,7 +1,8 @@
 #!/bin/bash
 shopt -s expand_aliases
 
-alias ocl="ocean-cli -rpcport=7043 -rpcuser=ocean -rpcpassword=oceanpass"
+# alias ocl="ocean-cli -rpcport=7043 -rpcuser=ocean -rpcpassword=oceanpass"
+alias ocl="$HOME/ocean/src/ocean-cli -datadir=$HOME/nodes/node1"
 
 # parameters:
 # $1 Genesis hash
@@ -66,6 +67,14 @@ tickets=$6
 # Fee percentage paid
 fee=$7
 
+checkLockTime () {
+    if [[ `echo $1 | jq -r '.locktime'` -lt $currentblockheight ]]
+    then
+        return 0
+    fi
+    return 1
+}
+
 # Check for specified previous request transaction info and set txid, vout variables accordingly
 if [ -n "$8" ] || [ -n "$9" ]
 then
@@ -77,8 +86,7 @@ then
     txid=$8
     vout=$9
     tx=`ocl decoderawtransaction $(ocl getrawtransaction $txid)`
-    # Check lock time
-    if [[ `echo $tx | jq -r '.locktime'` -lt $currentblockheight ]]
+    if checkLockTime "$tx";
     then
         value=`echo $tx | jq -r '.vout[0].value'`
     else
@@ -94,23 +102,35 @@ else
         then
             txid=`echo $i | jq -r ".txid"`
             tx=`ocl decoderawtransaction $(ocl getrawtransaction $txid)`
-            # Check lock time
-            if [[ `echo $tx | jq -r '.locktime'` -lt $currentblockheight ]]
+            if checkLockTime "$tx";
             then
-                continue # continue checking unspent list
+                value=`echo $tx | jq -r '.vout[0].value'` # TX_LOCKED_MULTISIG permission
+                vout=0                                    # asset always vout=0
+                break
             fi
-            value=`echo $tx | jq -r '.vout[0].value'`
-            vout=0
-            break
         fi
     done
-    if [ -z $txid ] # unspent is null
+    # If txid not set yet then get standard permission asset unspent output
+    if [ -z $txid ]
     then
-        printf "Error: No available TX_LOCKED_MULTISIG unspent transaction outputs.\n"
+        for i in $unspent;
+        do
+            txid=`echo $i | jq -r ".txid"`
+            tx=`ocl decoderawtransaction $(ocl getrawtransaction $txid)`
+            if checkLockTime "$tx";
+            then
+                value=`echo $i | jq -r ".amount"`
+                vout=`echo $i | jq ".vout"`
+                break
+            fi
+        done
+    fi
+    if [[ ${#unspent[0]} = 4 || -z $txid ]] # unspent or txid is null
+    then
+        printf "Error: No unspent TX_LOCKED_MULTISIG or permission asset transaction outputs available in wallet.\n"
         exit
     fi
 fi
-
 # Address permission tokens will be locked in
 pub=`ocl validateaddress $(ocl getnewaddress) | jq -r ".pubkey"`
 
