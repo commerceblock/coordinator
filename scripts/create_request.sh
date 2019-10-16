@@ -1,8 +1,8 @@
-#!/bin/bash
-shopt -s expand_aliases
+#!/usr/local/bin/bash
+source bitcoin-bash-tools.sh
 
-# alias ocl="ocean-cli -rpcport=7043 -rpcuser=ocean -rpcpassword=oceanpass"
-alias ocl="$HOME/ocean/src/ocean-cli -datadir=$HOME/nodes/node1"
+shopt -s expand_aliases
+alias ocl="ocean-cli -rpcport=7043 -rpcuser=ocean -rpcpassword=oceanpass"
 
 # parameters:
 # $1 Genesis hash
@@ -12,16 +12,17 @@ alias ocl="$HOME/ocean/src/ocean-cli -datadir=$HOME/nodes/node1"
 # $5 request duration
 # $6 number of tickets
 # $7 fee percentage
+# $8 Permission asset private key
 # OPTIONAL
-# $8 prevtxid
-# $9 prevvout
+# $9 prevtxid
+# $10 prevvout
 
 # Check parameters are set
 if [ -z $1 ] || [ -z $2 ] || [ -z $3 ] || [ -z $4 ] || [ -z $5 ] || [ -z $6 ] || [ -z $7 ]
 then
     printf "%s\n" "createRequest genesisHash startPrice endPrice, auctionDuration, requestDuration, numTickets feePercentage ( txid ) ( vout )"
     \ \
-    "Script builds, signs and sends a request transaction to service chain. By deflault a previously TX_LOCKED_MULTISIG transaction is spent to fund the request. If a specific permission asset transaction should be used then set parameters 8 and 9 accordingly." \
+    "Script builds, signs and sends a request transaction to service chain. By deflault a previously TX_LOCKED_MULTISIG transaction is spent to fund the request. If a specific permission asset transaction should be used then set parameters 9 and 10 accordingly." \
     ""
     \ \
     "Arguments:" \
@@ -32,8 +33,9 @@ then
     "5. \"requestDuration\"     (Integer, Required) Number of blocks service period to last for" \
     "6. \"numTickets\"          (Integer, Required) Number of tickets to be sold" \
     "7. \"feePercentage\"       (Integer, Required) Percentage of fee to go towards rewarding guardnodes" \
-    "8. \"txid\"                (Hex string, Optional) Specified previous request transaction ID to fund new request" \
-    "9. \"vout\"                (Integer, Optional) Specified previous request vout to fund new request"
+    "8. \"privKey\"             (String (hex), Optional) Hex encoded private key of address with permission asset" \
+    "9. \"txid\"                (String (hex), Optional) Specified previous request transaction ID to fund new request" \
+    "10. \"vout\"                (Integer, Optional) Specified previous request vout to fund new request"
     \ \
     "Result: " \
     "\"txid\"                    (hex string) Transaction ID of request transaction"
@@ -66,6 +68,12 @@ decay=$(echo "$4^3/((1+$4)*(($2/$3)-1))" | bc)
 tickets=$6
 # Fee percentage paid
 fee=$7
+# Import private key. Check if already imported to avoid re-scanning every time script runs
+if [ ! -z $8 ] && [ `ocl validateaddress $(newBitcoinKey $8) | jq '.ismine'` = "false" ]
+then
+        ocl importprivkey $8 "" true
+        echo "Imported private key successfully."
+fi
 
 checkLockTime () {
     if [[ `echo $1 | jq -r '.locktime'` -lt $currentblockheight ]]
@@ -74,17 +82,16 @@ checkLockTime () {
     fi
     return 1
 }
-
 # Check for specified previous request transaction info and set txid, vout variables accordingly
-if [ -n "$8" ] || [ -n "$9" ]
+if [ -n "$9" ] || [ -n "${10}" ]
 then
-    if [ -z $8 ] || [ -z $9 ]
+    if [ -z $9 ] || [ -z ${10} ]
     then
         printf "Input parameter error: txid and vout must be provided for previous request transaction.\n"
         exit
     fi
-    txid=$8
-    vout=$9
+    txid=$9
+    vout=$10
     tx=`ocl decoderawtransaction $(ocl getrawtransaction $txid)`
     if checkLockTime "$tx";
     then
@@ -147,7 +154,7 @@ then
 fi
 
 txid=`ocl sendrawtransaction $(echo $signedtx | jq -r ".hex")`
-echo "txid: $txid"
+echo "Request txid: $txid"
 
 # import spending address to allow script to automatically update request
 address=`ocl decoderawtransaction $(echo $signedtx | jq -r '.hex') | jq -r '.vout[0].scriptPubKey.hex'`
