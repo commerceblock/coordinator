@@ -1,6 +1,4 @@
-#!/usr/local/bin/bash
-source bitcoin-bash-tools.sh
-
+#!/bin/bash
 shopt -s expand_aliases
 alias ocl="$HOME/jsonrpc-cli/jsonrpc-cli --user=$RPC_USER --pass=$RPC_PASS --format=jsonpretty --resultonly=on --highlight=off  http://$RPC_CONNECT:$RPC_PORT/"
 # parameters:
@@ -66,11 +64,14 @@ decay=$(echo "$4^3/((1+$4)*(($2/$3)-1))" | bc)
 tickets=$6
 # Fee percentage paid
 fee=$7
-# Import private key. Check if already imported to avoid re-scanning every time script runs
-if [ ! -z $8 ] && [ `ocl validateaddress $(newBitcoinKey $8) | jq '.ismine'` = "false" ]
+
+unspent=`ocl listunspent '[1, 9999999, [], true, "PERMISSION"]' | jq -c '.[]'`
+# Import private key. Check if list unspent is empty first to avoid unnessesary re-scanning every time script runs
+if [ ! -z $8 ] && [[ -z $unspent ]]
 then
-        ocl importprivkey $8 "" true
-        echo "Imported private key successfully."
+        echo "Importing private key..."
+        ocl importprivkey $8 > /dev/null
+        unspent=`ocl listunspent '[1, 9999999, [], true, "PERMISSION"]' | jq -c '.[]'`
 fi
 
 checkLockTime () {
@@ -100,7 +101,6 @@ then
     fi
 else
     # Get previously locked TX_LOCKED_MULTISIG unspent output
-    unspent=`ocl listunspent '[1, 9999999, [], true, "PERMISSION"]' | jq -c '.[]'`
     for i in $unspent;
     do
         if [ `echo $i | jq ".solvable"` = "false" ]
@@ -152,7 +152,6 @@ if [ `echo $signedrawtx | jq ".complete"` = "false" ]
 then
     echo "Signing error: Script cannot be signed. Is the input transaction information correct and is it unlockable now?"
 fi
-
 
 txid=`ocl sendrawtransaction $(echo $signedrawtx | jq -r ".hex") | jq -r '.'`
 echo "Request txid: $txid"
