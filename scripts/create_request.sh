@@ -2,8 +2,7 @@
 source bitcoin-bash-tools.sh
 
 shopt -s expand_aliases
-alias ocl="ocean-cli -rpcport=7043 -rpcuser=ocean -rpcpassword=oceanpass"
-
+alias ocl="$HOME/jsonrpc-cli/jsonrpc-cli --user=$RPC_USER --pass=$RPC_PASS --format=jsonpretty --resultonly=on --highlight=off  http://$RPC_CONNECT:$RPC_PORT/"
 # parameters:
 # $1 Genesis hash
 # $2 start price
@@ -20,10 +19,10 @@ alias ocl="ocean-cli -rpcport=7043 -rpcuser=ocean -rpcpassword=oceanpass"
 # Check parameters are set
 if [ -z $1 ] || [ -z $2 ] || [ -z $3 ] || [ -z $4 ] || [ -z $5 ] || [ -z $6 ] || [ -z $7 ]
 then
-    printf "%s\n" "createRequest genesisHash startPrice endPrice, auctionDuration, requestDuration, numTickets feePercentage privKey ( txid ) ( vout )"
-    \ \
-    "Script builds, signs and sends a request transaction to service chain. By deflault a previously TX_LOCKED_MULTISIG transaction is spent to fund the request. If a specific permission asset transaction should be used then set parameters 9 and 10 accordingly." \
-    ""
+    printf "%s\n" "createRequest genesisHash startPrice endPrice, auctionDuration, requestDuration, numTickets feePercentage privKey ( txid ) ( vout )" \ \
+    "Script builds, signs and sends a request transaction to service chain." \
+    "Set shell enviroment variables RPC_CONNECT, RPC_PORT, RPC_USER, RPC_PASS with network connection information." \
+    "By deflault a TX_LOCKED_MULTISIG transaction or standard permission asset unspent output is spent to fund the request. If a specific permission asset transaction should be used then set parameters 9 and 10 accordingly." \
     \ \
     "Arguments:" \
     "1. \"Genesis hash\"        (Hex string, Required) Hash of client chain genesis block" \
@@ -39,7 +38,6 @@ then
     \ \
     "Result: " \
     "\"txid\"                    (hex string) Transaction ID of request transaction"
-
     exit
 fi
 
@@ -102,13 +100,13 @@ then
     fi
 else
     # Get previously locked TX_LOCKED_MULTISIG unspent output
-    unspent=`ocl listunspent 1 9999999 [] true "PERMISSION" | jq -c '.[]'`
+    unspent=`ocl listunspent '[1, 9999999, [], true, "PERMISSION"]' | jq -c '.[]'`
     for i in $unspent;
     do
         if [ `echo $i | jq ".solvable"` = "false" ]
         then
             txid=`echo $i | jq -r ".txid"`
-            tx=`ocl decoderawtransaction $(ocl getrawtransaction $txid)`
+            tx=`ocl decoderawtransaction $(ocl getrawtransaction $txid | jq -r '.')`
             if checkLockTime "$tx";
             then
                 value=`echo $tx | jq -r '.vout[0].value'` # TX_LOCKED_MULTISIG permission
@@ -123,7 +121,7 @@ else
         for i in $unspent;
         do
             txid=`echo $i | jq -r ".txid"`
-            tx=`ocl decoderawtransaction $(ocl getrawtransaction $txid)`
+            tx=`ocl decoderawtransaction $(ocl getrawtransaction $txid | jq -r '.')`
             if checkLockTime "$tx";
             then
                 value=`echo $i | jq -r ".amount"`
@@ -139,23 +137,26 @@ else
     fi
 fi
 # Address permission tokens will be locked in
-pub=`ocl validateaddress $(ocl getnewaddress) | jq -r ".pubkey"`
+pub=`ocl validateaddress $(ocl getnewaddress | jq -r '.') | jq -r ".pubkey"`
 
 # Generate and sign request transaction
 inputs="{\"txid\":\"$txid\",\"vout\":$vout}"
 outputs="{\"decayConst\":$decay,\"endBlockHeight\":$end,\"fee\":$fee,\"genesisBlockHash\":\"$genesis\",\
 \"startBlockHeight\":$start,\"tickets\":$tickets,\"startPrice\":$price,\"value\":$value,\"pubkey\":\"$pub\"}"
 
-signedtx=`ocl signrawtransaction $(ocl createrawrequesttx $inputs $outputs)`
+rawtx=`ocl createrawrequesttx '['$(echo $inputs)','$(echo $outputs)']' | jq -r '.'`
+signedrawtx=`ocl signrawtransaction $rawtx`
+
 # Catch signing error
-if [ `echo $signedtx | jq ".complete"` = "false" ]
+if [ `echo $signedrawtx | jq ".complete"` = "false" ]
 then
     echo "Signing error: Script cannot be signed. Is the input transaction information correct and is it unlockable now?"
 fi
 
-txid=`ocl sendrawtransaction $(echo $signedtx | jq -r ".hex")`
+
+txid=`ocl sendrawtransaction $(echo $signedrawtx | jq -r ".hex") | jq -r '.'`
 echo "Request txid: $txid"
 
-# import spending address to allow script to automatically update request
-address=`ocl decoderawtransaction $(echo $signedtx | jq -r '.hex') | jq -r '.vout[0].scriptPubKey.hex'`
-ocl importaddress $address
+# Import spending address to allow script to automatically update request
+address=`ocl decoderawtransaction $(echo $signedrawtx | jq -r '.hex') | jq -r '.vout[0].scriptPubKey.hex'`
+ocl importaddress $address > /dev/null
