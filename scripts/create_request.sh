@@ -17,7 +17,7 @@ alias ocl="$HOME/jsonrpc-cli/jsonrpc-cli --user=$RPC_USER --pass=$RPC_PASS --for
 # Check parameters are set
 if [ -z $1 ] || [ -z $2 ] || [ -z $3 ] || [ -z $4 ] || [ -z $5 ] || [ -z $6 ] || [ -z $7 ]
 then
-    printf "%s\n" "createRequest genesisHash startPrice endPrice, auctionDuration, requestDuration, numTickets feePercentage privKey ( txid ) ( vout )" \ \
+    printf "%s\n" "createRequest genesisHash startPrice endPrice auctionDuration requestDuration numTickets feePercentage privKey ( txid ) ( vout )" \ \
     "Script builds, signs and sends a request transaction to service chain." \
     "Set shell enviroment variables RPC_CONNECT, RPC_PORT, RPC_USER, RPC_PASS with network connection information." \
     "By deflault a TX_LOCKED_MULTISIG transaction or standard permission asset unspent output is spent to fund the request. If a specific permission asset transaction should be used then set parameters 9 and 10 accordingly." \
@@ -42,7 +42,7 @@ fi
 # Client chain genesis block hash
 genesis=$1
 # check for currently active request for given genesis hash
-if [ `ocl getrequests | jq "if .[].genesisBlock == \"$genesis\" then 1 else empty end"` ]
+if [[ `ocl getrequests | jq "if .[].genesisBlock == \"$genesis\" then 1 else 0 end"` == *"1"* ]]
 then
     printf "Input parameter error: Genesis hash already in active request list. Relevant request info below.\n\n"
     echo "Current block height: " `ocl getblockcount`
@@ -75,7 +75,7 @@ then
 fi
 
 checkLockTime () {
-    if [[ `echo $1 | jq -r '.locktime'` -lt $currentblockheight ]]
+    if [[ $currentblockheight -gt `echo $1 | jq -r '.locktime'` ]]
     then
         return 0
     fi
