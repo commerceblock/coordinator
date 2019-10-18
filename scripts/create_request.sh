@@ -115,8 +115,8 @@ else
             fi
         fi
     done
-    # If txid not set yet then get standard permission asset unspent output
-    if [ -z $txid ]
+    # If value not set yet then get standard permission asset unspent output
+    if [ -z $value ]
     then
         for i in $unspent;
         do
