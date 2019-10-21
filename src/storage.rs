@@ -396,13 +396,9 @@ impl Storage for MockStorage {
 mod tests {
     use super::*;
 
-    use bitcoin_hashes::Hash;
     use mongodb::oid::ObjectId;
 
-    /// Generate dummy hash for tests
-    fn gen_dummy_hash(i: u8) -> sha256d::Hash {
-        sha256d::Hash::from_slice(&[i as u8; 32]).unwrap()
-    }
+    use crate::testing_utils::gen_dummy_hash;
 
     #[test]
     fn request_doc_test() {

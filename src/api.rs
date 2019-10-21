@@ -159,42 +159,10 @@ pub fn run_api_server<D: Storage + Send + Sync + 'static>(
 mod tests {
     use super::*;
 
-    use std::str::FromStr;
-
-    use bitcoin_hashes::{hex::FromHex, Hash};
     use futures::Future;
-    use secp256k1::PublicKey;
 
-    use crate::challenger::ChallengeState;
-    use crate::request::Bid;
     use crate::storage::MockStorage;
-
-    /// Generate dummy hash for tests
-    fn gen_dummy_hash(i: u8) -> sha256d::Hash {
-        sha256d::Hash::from_slice(&[i as u8; 32]).unwrap()
-    }
-
-    /// Geberate dummy challenge state
-    fn gen_challenge_state(request_hash: &sha256d::Hash) -> ChallengeState {
-        let request = ServiceRequest {
-            txid: *request_hash,
-            start_blockheight: 2,
-            end_blockheight: 5,
-            genesis_blockhash: gen_dummy_hash(0),
-            fee_percentage: 5,
-            num_tickets: 10,
-        };
-        let mut bids = BidSet::new();
-        let _ = bids.insert(Bid {
-            txid: sha256d::Hash::from_hex("1234567890000000000000000000000000000000000000000000000000000000").unwrap(),
-            pubkey: PublicKey::from_str("026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3").unwrap(),
-        });
-        ChallengeState {
-            request,
-            bids,
-            latest_challenge: Some(gen_dummy_hash(0)),
-        }
-    }
+    use crate::testing_utils::{gen_dummy_hash,gen_challenge_state};
 
     #[test]
     fn get_request_test() {
