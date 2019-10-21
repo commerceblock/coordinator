@@ -180,7 +180,7 @@ mod tests {
     use bitcoin_hashes::hex::ToHex;
     use secp256k1::SecretKey;
 
-    use crate::testing_utils::tests::{gen_dummy_hash,gen_challenge_state_with_challenge};
+    use crate::testing_utils::{gen_dummy_hash,gen_challenge_state_with_challenge};
 
     #[test]
     fn challengeproof_from_json_test() {

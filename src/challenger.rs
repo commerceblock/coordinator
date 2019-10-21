@@ -211,7 +211,7 @@ mod tests {
     use crate::error::Error;
     use crate::service::MockService;
     use crate::storage::MockStorage;
-    use crate::testing_utils::tests::gen_dummy_hash;
+    use crate::testing_utils::gen_dummy_hash;
 
     #[test]
     fn verify_challenge_test() {

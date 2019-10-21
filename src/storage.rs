@@ -398,7 +398,7 @@ mod tests {
 
     use mongodb::oid::ObjectId;
 
-    use crate::testing_utils::tests::gen_dummy_hash;
+    use crate::testing_utils::gen_dummy_hash;
 
     #[test]
     fn request_doc_test() {
