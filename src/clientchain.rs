@@ -6,24 +6,22 @@ use std::collections::HashMap;
 
 use bitcoin_hashes::{hex::FromHex, sha256d};
 use ocean_rpc::{json, RpcApi};
+use std::str;
 
 use crate::config::ClientChainConfig;
 use crate::error::{CError, Error, Result};
 use crate::ocean::OceanClient;
 
-/// Method that returns the first unspent for a specified asset label
+/// Method that returns the first unspent output for given asset
 /// or an error if the client wallet does not have any unspent/funds
-fn get_first_unspent(client: &OceanClient, asset: &str, asset_hash: &sha256d::Hash) -> Result<json::ListUnspentResult> {
-    // Check challenge asset hash is in the wallet
-    let unspent = client.list_unspent(None, None, None, None, None)?;
-    for tx in unspent.iter() {
-        if tx.assetlabel == Some(asset.into()) && tx.asset == *asset_hash {
-            return Ok(tx.clone());
-        }
+fn get_first_unspent(client: &OceanClient, asset: &str) -> Result<json::ListUnspentResult> {
+    // Check asset is held by the wallet and return unspent tx
+    let unspent = client.list_unspent(None, None, None, None, Some(asset))?;
+    if unspent.is_empty() {
+        // TODO: custom error for clientchain
+        return Err(Error::from(CError::MissingUnspent))
     }
-
-    // TODO: custom error for clientchain
-    Err(Error::from(CError::MissingUnspent))
+    Ok(unspent[0].clone())
 }
 
 /// ClientChain trait defining desired functionality for interfacing
@@ -41,8 +39,6 @@ pub struct RpcClientChain<'a> {
     client: OceanClient,
     /// Challenge asset id
     asset: &'a str,
-    /// Challenge asset hash
-    asset_hash: sha256d::Hash,
 }
 
 impl<'a> RpcClientChain<'a> {
@@ -54,14 +50,12 @@ impl<'a> RpcClientChain<'a> {
             Some(clientchain_config.pass.clone()),
         )?;
 
-        let asset_hash = sha256d::Hash::from_hex(&clientchain_config.asset_hash)?;
-
         // check we have funds for challenge asset
-        match get_first_unspent(&client, &clientchain_config.asset, &asset_hash) {
+        match get_first_unspent(&client, &clientchain_config.asset) {
             // If this fails attempt to import the private key and then fetch the unspent again
             Err(_) => {
                 client.import_priv_key(&clientchain_config.asset_key, None, None)?;
-                let _ = get_first_unspent(&client, &clientchain_config.asset, &asset_hash)?;
+                let _ = get_first_unspent(&client, &clientchain_config.asset)?;
             }
             _ => (),
         }
@@ -69,7 +63,6 @@ impl<'a> RpcClientChain<'a> {
         Ok(RpcClientChain {
             client,
             asset: &clientchain_config.asset,
-            asset_hash,
         })
     }
 }
@@ -78,7 +71,7 @@ impl<'a> ClientChain for RpcClientChain<'a> {
     /// Send challenge transaction to client chain
     fn send_challenge(&self) -> Result<sha256d::Hash> {
         // get any unspent for the challenge asset
-        let unspent = get_first_unspent(&self.client, self.asset, &self.asset_hash)?;
+        let unspent = get_first_unspent(&self.client, self.asset)?;
 
         // construct the challenge transaction excluding fees
         // which are not required for policy transactions

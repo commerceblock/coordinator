@@ -59,8 +59,6 @@ pub struct ClientChainConfig {
     pub user: String,
     /// Client rpc pass
     pub pass: String,
-    /// Client asset hash
-    pub asset_hash: String,
     /// Client genesis hash
     pub genesis_hash: String,
     /// Client asset label
@@ -75,7 +73,6 @@ impl Default for ClientChainConfig {
             host: String::new(),
             user: String::new(),
             pass: String::new(),
-            asset_hash: String::new(),
             genesis_hash: String::new(),
             asset: String::from("CHALLENGE"),
             asset_key: String::new(),
@@ -207,9 +204,6 @@ impl Config {
         }
         if let Ok(v) = env::var("CO_CLIENTCHAIN_ASSET_KEY") {
             let _ = conf_rs.set("clientchain.asset_key", v)?;
-        }
-        if let Ok(v) = env::var("CO_CLIENTCHAIN_ASSET_HASH") {
-            let _ = conf_rs.set("clientchain.asset_hash", v)?;
         }
         if let Ok(v) = env::var("CO_CLIENTCHAIN_GENESIS_HASH") {
             let _ = conf_rs.set("clientchain.genesis_hash", v)?;

@@ -69,13 +69,11 @@ fn main() {
 
     // add two guardnodes with valid keys and one without
     // keys based on mockservice request bids
-    let asset_hash = config.clientchain.asset_hash.clone();
     let listener_host = config.listener_host.clone();
     let client_rpc_clone = client_rpc.clone();
     thread::spawn(move || {
         guardnode(
             &client_rpc_clone,
-            sha256d::Hash::from_hex(&asset_hash).unwrap(),
             listener_host.clone(),
             guardnode_txid,
             SecretKey::from_slice(&[0xaa; 32]).unwrap(),
@@ -92,7 +90,6 @@ fn main() {
 /// Bid info (key/txid) are based on MockService data for demo purpose
 fn guardnode(
     client_rpc: &OceanClient,
-    asset_hash: sha256d::Hash,
     listener_host: String,
     guard_txid: sha256d::Hash,
     guard_key: SecretKey,
@@ -100,6 +97,11 @@ fn guardnode(
 ) {
     let secp = Secp256k1::new();
     let mut prev_block_count = 0;
+    let unspent = client_rpc.list_unspent(None, None, None, None, Some(&String::from("CHALLENGE"))).unwrap();
+    if unspent.is_empty() {
+        panic!("No challenge issued in client blockchain!")
+    }
+    let asset_hash = unspent[0].asset;
     loop {
         if let Ok(block_count) = client_rpc.get_block_count() {
             if block_count > prev_block_count {

@@ -101,7 +101,6 @@ pub fn run_challenge_request<T: Service, K: ClientChain, D: Storage>(
     loop {
         let challenge_height = service.get_blockheight()?;
         info! {"service chain height: {}", challenge_height}
-        println!("prev: {} challfreq: {}", prev_challenge_height, challenge_frequency);
         if (request.end_blockheight as u64) < challenge_height {
             break;
         } else if (challenge_height - prev_challenge_height) < challenge_frequency {
