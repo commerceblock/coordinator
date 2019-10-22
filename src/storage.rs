@@ -2,7 +2,6 @@
 //!
 //! Storage interface and implementations
 
-use std::cell::RefCell;
 use std::mem::drop;
 use std::str::FromStr;
 use std::sync::{Mutex, MutexGuard};
@@ -15,7 +14,7 @@ use secp256k1::key::PublicKey;
 
 use crate::challenger::{ChallengeResponseIds, ChallengeState};
 use crate::config::StorageConfig;
-use crate::error::{CError, Error, Result};
+use crate::error::Result;
 use crate::request::{Bid, BidSet, Request};
 
 /// Storage trait defining required functionality for objects that store request
@@ -48,11 +47,11 @@ impl MongoStorage {
         let client = Client::with_uri(&uri)?;
 
         let db = client.db("coordinator");
-        if let Some(ref user) = storage_config.user {
-            if let Some(ref pass) = storage_config.pass {
-                db.auth(user, pass)?;
-            }
-        }
+        // if let Some(ref user) = storage_config.user {
+        //     if let Some(ref pass) = storage_config.pass {
+        //         db.auth(user, pass)?;
+        //     }
+        // }
 
         Ok(MongoStorage {
             db: Mutex::new(db),
@@ -237,7 +236,7 @@ impl Storage for MongoStorage {
 }
 
 /// Util method that generates a Request document from a request
-fn request_to_doc(request: &Request) -> OrderedDocument {
+pub fn request_to_doc(request: &Request) -> OrderedDocument {
     doc! {
         "txid": request.txid.to_string(),
         "start_blockheight": request.start_blockheight,
@@ -249,7 +248,7 @@ fn request_to_doc(request: &Request) -> OrderedDocument {
 }
 
 /// Util method that generates a request from a Request document
-fn doc_to_request(doc: &OrderedDocument) -> Request {
+pub fn doc_to_request(doc: &OrderedDocument) -> Request {
     Request {
         txid: sha256d::Hash::from_hex(doc.get("txid").unwrap().as_str().unwrap()).unwrap(),
         start_blockheight: doc.get("start_blockheight").unwrap().as_i32().unwrap() as u32,
@@ -261,7 +260,7 @@ fn doc_to_request(doc: &OrderedDocument) -> Request {
 }
 
 /// Util method that generates a Bid document from a request bid
-fn bid_to_doc(request_id: &Bson, bid: &Bid) -> OrderedDocument {
+pub fn bid_to_doc(request_id: &Bson, bid: &Bid) -> OrderedDocument {
     doc! {
         "request_id": request_id.clone(),
         "txid": bid.txid.to_string(),
@@ -270,7 +269,7 @@ fn bid_to_doc(request_id: &Bson, bid: &Bid) -> OrderedDocument {
 }
 
 /// Util method that generates a request bid from a Bid document
-fn doc_to_bid(doc: &OrderedDocument) -> Bid {
+pub fn doc_to_bid(doc: &OrderedDocument) -> Bid {
     Bid {
         txid: sha256d::Hash::from_hex(doc.get("txid").unwrap().as_str().unwrap()).unwrap(),
         pubkey: PublicKey::from_str(doc.get("pubkey").unwrap().as_str().unwrap()).unwrap(),
@@ -278,7 +277,7 @@ fn doc_to_bid(doc: &OrderedDocument) -> Bid {
 }
 
 /// Util method that generates a Response document from challenge responses
-fn challenge_responses_to_doc(request_id: &Bson, responses: &ChallengeResponseIds) -> OrderedDocument {
+pub fn challenge_responses_to_doc(request_id: &Bson, responses: &ChallengeResponseIds) -> OrderedDocument {
     let bids = responses
         .iter()
         .map(|x| Bson::String(x.to_string()))
@@ -290,106 +289,12 @@ fn challenge_responses_to_doc(request_id: &Bson, responses: &ChallengeResponseId
 }
 
 /// Util method that generates challenge responses from a Response document
-fn doc_to_challenge_responses(doc: &OrderedDocument) -> ChallengeResponseIds {
+pub fn doc_to_challenge_responses(doc: &OrderedDocument) -> ChallengeResponseIds {
     doc.get_array("bid_txids")
         .unwrap()
         .iter()
         .map(|x| sha256d::Hash::from_hex(x.as_str().unwrap()).unwrap())
         .collect()
-}
-
-/// Mock implementation of Storage storing data in memory for testing
-#[derive(Debug)]
-pub struct MockStorage {
-    /// Flag that when set returns error on all inherited methods that return
-    /// Result
-    pub return_err: bool,
-    /// Store requests in memory
-    pub requests: RefCell<Vec<OrderedDocument>>,
-    /// Store bids in memory
-    pub bids: RefCell<Vec<OrderedDocument>>,
-    /// Store challenge responses in memory
-    pub challenge_responses: RefCell<Vec<OrderedDocument>>,
-}
-
-impl MockStorage {
-    /// Create a MockStorage with all flags turned off by default
-    pub fn new() -> Self {
-        MockStorage {
-            return_err: false,
-            requests: RefCell::new(vec![]),
-            bids: RefCell::new(vec![]),
-            challenge_responses: RefCell::new(vec![]),
-        }
-    }
-}
-
-impl Storage for MockStorage {
-    /// Store the state of a challenge request
-    fn save_challenge_state(&self, challenge: &ChallengeState) -> Result<()> {
-        if self.return_err {
-            return Err(Error::from(CError::Generic("save_challenge_state failed".to_owned())));
-        }
-        self.requests.borrow_mut().push(request_to_doc(&challenge.request));
-        for bid in challenge.bids.iter() {
-            self.bids
-                .borrow_mut()
-                .push(bid_to_doc(&Bson::String(challenge.request.txid.to_string()), bid))
-        }
-        Ok(())
-    }
-
-    /// Store responses for a specific challenge request
-    fn save_response(&self, request_hash: sha256d::Hash, ids: &ChallengeResponseIds) -> Result<()> {
-        if self.return_err {
-            return Err(Error::from(CError::Generic("save_response failed".to_owned())));
-        }
-        self.challenge_responses
-            .borrow_mut()
-            .push(challenge_responses_to_doc(&Bson::String(request_hash.to_string()), ids));
-        Ok(())
-    }
-
-    /// Get all challenge responses for a specific request
-    fn get_responses(&self, request_hash: sha256d::Hash) -> Result<Vec<ChallengeResponseIds>> {
-        let mut challenge_responses = vec![];
-        for doc in self.challenge_responses.borrow().to_vec().iter() {
-            if doc.get("request_id").unwrap().as_str().unwrap() == request_hash.to_string() {
-                challenge_responses.push(doc_to_challenge_responses(doc));
-            }
-        }
-        Ok(challenge_responses)
-    }
-
-    /// Get all bids for a specific request
-    fn get_bids(&self, request_hash: sha256d::Hash) -> Result<BidSet> {
-        let mut bids = BidSet::new();
-        for doc in self.bids.borrow().to_vec().iter() {
-            if doc.get("request_id").unwrap().as_str().unwrap() == request_hash.to_string() {
-                let _ = bids.insert(doc_to_bid(doc));
-            }
-        }
-        Ok(bids)
-    }
-
-    /// Get all the requests
-    fn get_requests(&self) -> Result<Vec<Request>> {
-        let mut requests = vec![];
-        for doc in self.requests.borrow().to_vec().iter() {
-            requests.push(doc_to_request(doc))
-        }
-        Ok(requests)
-    }
-
-    /// Get request for a specific request txid
-    fn get_request(&self, request_hash: sha256d::Hash) -> Result<Option<Request>> {
-        for doc in self.requests.borrow().to_vec().iter() {
-            if doc.get("txid").unwrap().as_str().unwrap() == request_hash.to_string() {
-                return Ok(Some(doc_to_request(doc)));
-            }
-        }
-        Ok(None)
-    }
 }
 
 #[cfg(test)]
