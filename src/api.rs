@@ -31,7 +31,7 @@ struct GetRequestResponse {
 }
 
 /// Get request RPC call returning corresponding request if it exists
-fn get_request(params: Params, storage: Arc<Storage>) -> futures::Finished<Value, Error> {
+fn get_request(params: Params, storage: Arc<dyn Storage>) -> futures::Finished<Value, Error> {
     let try_parse = params.parse::<GetRequestResponsesParams>();
     match try_parse {
         Ok(parse) => {
@@ -58,7 +58,7 @@ struct GetRequestsResponse {
 }
 
 /// Get requests RPC call returning all stored requests
-fn get_requests(storage: Arc<Storage>) -> futures::Finished<Value, Error> {
+fn get_requests(storage: Arc<dyn Storage>) -> futures::Finished<Value, Error> {
     let requests = storage.get_requests().unwrap();
     let mut response = GetRequestsResponse { requests: vec![] };
     for request in requests {
@@ -80,7 +80,7 @@ struct GetRequestResponsesResponse {
 
 /// Get requests responses RPC call returning all responses for a specific
 /// request transaction id hash
-fn get_request_responses(params: Params, storage: Arc<Storage>) -> futures::Finished<Value, Error> {
+fn get_request_responses(params: Params, storage: Arc<dyn Storage>) -> futures::Finished<Value, Error> {
     let try_parse = params.parse::<GetRequestResponsesParams>();
     match try_parse {
         Ok(parse) => {
