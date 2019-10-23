@@ -2,18 +2,17 @@
 //!
 //! Colleciton of helper functions used in tests module
 
-
-use bitcoin_hashes::{hex::FromHex, Hash, sha256d};
+use bitcoin_hashes::{hex::FromHex, sha256d, Hash};
+use mongodb::ordered::OrderedDocument;
+use mongodb::Bson;
 use secp256k1::PublicKey;
 use std::cell::RefCell;
 use std::str::FromStr;
-use mongodb::ordered::OrderedDocument;
-use mongodb::Bson;
 
-use crate::challenger::{ChallengeState,ChallengeResponseIds};
-use crate::request::{Bid,BidSet, Request as ServiceRequest};
-use crate::service::Service;
+use crate::challenger::{ChallengeResponseIds, ChallengeState};
 use crate::clientchain::ClientChain;
+use crate::request::{Bid, BidSet, Request as ServiceRequest};
+use crate::service::Service;
 use crate::storage::*;
 
 use crate::error::*;
@@ -46,7 +45,10 @@ pub fn gen_challenge_state(request_hash: &sha256d::Hash) -> ChallengeState {
 }
 
 /// Generate dummy challenge state with specific challenge
-pub fn gen_challenge_state_with_challenge(request_hash: &sha256d::Hash, challenge_hash: &sha256d::Hash) -> ChallengeState {
+pub fn gen_challenge_state_with_challenge(
+    request_hash: &sha256d::Hash,
+    challenge_hash: &sha256d::Hash,
+) -> ChallengeState {
     let request = ServiceRequest {
         txid: sha256d::Hash::from_slice(&[0xff as u8; 32]).unwrap(),
         start_blockheight: 2,

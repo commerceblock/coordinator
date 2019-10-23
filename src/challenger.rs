@@ -209,7 +209,7 @@ mod tests {
     use std::sync::mpsc::{channel, Receiver, Sender};
 
     use crate::error::Error;
-    use crate::testing_utils::{gen_dummy_hash,MockClientChain,MockService,MockStorage};
+    use crate::testing_utils::{gen_dummy_hash, MockClientChain, MockService, MockStorage};
 
     #[test]
     fn verify_challenge_test() {

@@ -14,12 +14,12 @@ use crate::ocean::OceanClient;
 
 /// Method that returns the first unspent output for given asset
 /// or an error if the client wallet does not have any unspent/funds
-fn get_first_unspent(client: &OceanClient, asset: &str) -> Result<json::ListUnspentResult> {
+pub fn get_first_unspent(client: &OceanClient, asset: &str) -> Result<json::ListUnspentResult> {
     // Check asset is held by the wallet and return unspent tx
     let unspent = client.list_unspent(None, None, None, None, Some(asset))?;
     if unspent.is_empty() {
         // TODO: custom error for clientchain
-        return Err(Error::from(CError::MissingUnspent))
+        return Err(Error::from(CError::MissingUnspent));
     }
     Ok(unspent[0].clone())
 }
