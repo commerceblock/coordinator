@@ -105,7 +105,7 @@ fn guardnode(
     // Get asset hash from unspent list
     let asset_hash;
     match get_first_unspent(&client_rpc, &String::from("CHALLENGE")) {
-        Err(_) => panic!("No challenge issued in client blockchain!"),
+        Err(_) => panic!("No challenge asset issued in client blockchain!"),
         Ok(res) => asset_hash = res.asset,
     }
 
