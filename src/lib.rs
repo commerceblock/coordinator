@@ -45,3 +45,4 @@ pub mod request;
 pub mod service;
 pub mod storage;
 pub mod testing_utils;
+pub mod checks;
