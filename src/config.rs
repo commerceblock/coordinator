@@ -2,11 +2,12 @@
 //!
 //! Config module handling config options from file/env
 
+use error::InputErrorType::{GenHash, Host, PrivKey};
 use config_rs::{Config as ConfigRs, Environment, File};
 use serde::{Deserialize, Serialize};
 use std::env;
 
-use crate::error::Result;
+use crate::error::{CError, Result, Error};
 
 #[derive(Debug, Serialize, Deserialize)]
 /// Api specific config
@@ -142,6 +143,34 @@ impl Default for Config {
         }
     }
 }
+/// Return true if char is in base58check character set, false otherwise
+fn is_base58_char(char: &char) -> bool {
+    match *char as u8 {
+        b'0'..=b'9' | b'A'..=b'H' | b'J'..=b'N' | b'P'..=b'Z'| b'a'..=b'k' | b'm'..=b'z'=> true,
+        _ => false
+    }
+}
+/// Check for correct priv key input string format
+fn check_privkey_string(str: &String) -> bool {
+    if str.len() == 52 && str.chars().all(|x| is_base58_char(&x)) {
+        return true
+    }
+    return false
+}
+/// Check for correct hash input string format
+fn check_hash_string(str: &String) -> bool {
+    if str.len() == 64 && str.chars().all(|x| x.is_ascii_hexdigit()) {
+        return true
+    }
+    return false
+}
+/// Check for correct host input string format
+fn check_host_string(str: &String) -> bool {
+    if str.contains(":") {
+        return true
+    }
+    return false
+}
 
 impl Config {
     /// New Config instance reading default values from value
@@ -171,7 +200,12 @@ impl Config {
         // CO_CLIENTCHAIN__HOST=127.0.0.1:5555
         // CO_CLIENTCHAIN__GENESIS_HASH=706f6...
         if let Ok(v) = env::var("CO_API_HOST") {
-            let _ = conf_rs.set("api.host", v)?;
+            if check_host_string(&v) {
+                let _ = conf_rs.set("api.host", v)?;
+            } else {
+                println!("{}",CError::InputError(Host));
+                return Err(Error::from(CError::InputError(Host)));
+            }
         }
         if let Ok(v) = env::var("CO_API_USER") {
             let _ = conf_rs.set("api.user", v)?;
@@ -181,7 +215,12 @@ impl Config {
         }
 
         if let Ok(v) = env::var("CO_SERVICE_HOST") {
-            let _ = conf_rs.set("service.host", v)?;
+            if check_host_string(&v) {
+                let _ = conf_rs.set("service.host", v)?;
+            } else {
+                println!("{}",CError::InputError(Host));
+                return Err(Error::from(CError::InputError(Host)));
+            }
         }
         if let Ok(v) = env::var("CO_SERVICE_USER") {
             let _ = conf_rs.set("service.user", v)?;
@@ -191,7 +230,12 @@ impl Config {
         }
 
         if let Ok(v) = env::var("CO_CLIENTCHAIN_HOST") {
-            let _ = conf_rs.set("clientchain.host", v)?;
+            if check_host_string(&v) {
+                let _ = conf_rs.set("clientchain.host", v)?;
+            } else {
+                println!("{}",CError::InputError(Host));
+                return Err(Error::from(CError::InputError(Host)));
+            }
         }
         if let Ok(v) = env::var("CO_CLIENTCHAIN_USER") {
             let _ = conf_rs.set("clientchain.user", v)?;
@@ -203,14 +247,29 @@ impl Config {
             let _ = conf_rs.set("clientchain.asset", v)?;
         }
         if let Ok(v) = env::var("CO_CLIENTCHAIN_ASSET_KEY") {
-            let _ = conf_rs.set("clientchain.asset_key", v)?;
+            if check_privkey_string(&v) {
+                let _ = conf_rs.set("clientchain.asset_key", v)?;
+            } else {
+                println!("{}",CError::InputError(PrivKey));
+                return Err(Error::from(CError::InputError(PrivKey)));
+            }
         }
         if let Ok(v) = env::var("CO_CLIENTCHAIN_GENESIS_HASH") {
-            let _ = conf_rs.set("clientchain.genesis_hash", v)?;
+            if check_hash_string(&v) {
+                let _ = conf_rs.set("clientchain.genesis_hash", v)?;
+            } else {
+                println!("{}",CError::InputError(GenHash));
+                return Err(Error::from(CError::InputError(GenHash)));
+            }
         }
 
         if let Ok(v) = env::var("CO_STORAGE_HOST") {
-            let _ = conf_rs.set("storage.host", v)?;
+            if check_host_string(&v) {
+                let _ = conf_rs.set("storage.host", v)?;
+            } else {
+                println!("{}",CError::InputError(Host));
+                return Err(Error::from(CError::InputError(Host)));
+            }
         }
         if let Ok(v) = env::var("CO_STORAGE_USER") {
             let _ = conf_rs.set("storage.user", v)?;

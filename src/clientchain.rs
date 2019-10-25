@@ -19,7 +19,7 @@ pub fn get_first_unspent(client: &OceanClient, asset: &str) -> Result<json::List
     let unspent = client.list_unspent(None, None, None, None, Some(asset))?;
     if unspent.is_empty() {
         // TODO: custom error for clientchain
-        return Err(Error::from(CError::MissingUnspent));
+        return Err(Error::from(CError::MissingUnspent(String::from(asset),String::from("Client"))));
     }
     Ok(unspent[0].clone())
 }
@@ -49,13 +49,14 @@ impl<'a> RpcClientChain<'a> {
             Some(clientchain_config.user.clone()),
             Some(clientchain_config.pass.clone()),
         )?;
-
         // check we have funds for challenge asset
         match get_first_unspent(&client, &clientchain_config.asset) {
             // If this fails attempt to import the private key and then fetch the unspent again
             Err(_) => {
                 client.import_priv_key(&clientchain_config.asset_key, None, None)?;
-                let _ = get_first_unspent(&client, &clientchain_config.asset)?;
+                if let Err(e) = get_first_unspent(&client, &clientchain_config.asset) {
+                    return Err(e)
+                }
             }
             _ => (),
         }
