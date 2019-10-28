@@ -2,13 +2,13 @@
 //!
 //! Config module handling config options from file/env
 
-use error::InputErrorType::{GenHash, Host, PrivKey};
+use checks::{check_hash_string, check_host_string, check_privkey_string};
 use config_rs::{Config as ConfigRs, Environment, File};
+use error::InputErrorType::{GenHash, Host, PrivKey};
 use serde::{Deserialize, Serialize};
 use std::env;
-use checks::{check_privkey_string,check_hash_string,check_host_string};
 
-use crate::error::{CError, Result, Error};
+use crate::error::{CError, Error, Result};
 
 #[derive(Debug, Serialize, Deserialize)]
 /// Api specific config
@@ -176,7 +176,7 @@ impl Config {
             if check_host_string(&v) {
                 let _ = conf_rs.set("api.host", v)?;
             } else {
-                println!("{}",CError::InputError(Host));
+                println!("{}", CError::InputError(Host));
                 return Err(Error::from(CError::InputError(Host)));
             }
         }
@@ -191,7 +191,7 @@ impl Config {
             if check_host_string(&v) {
                 let _ = conf_rs.set("service.host", v)?;
             } else {
-                println!("{}",CError::InputError(Host));
+                println!("{}", CError::InputError(Host));
                 return Err(Error::from(CError::InputError(Host)));
             }
         }
@@ -206,7 +206,7 @@ impl Config {
             if check_host_string(&v) {
                 let _ = conf_rs.set("clientchain.host", v)?;
             } else {
-                println!("{}",CError::InputError(Host));
+                println!("{}", CError::InputError(Host));
                 return Err(Error::from(CError::InputError(Host)));
             }
         }
@@ -223,7 +223,7 @@ impl Config {
             if check_privkey_string(&v) {
                 let _ = conf_rs.set("clientchain.asset_key", v)?;
             } else {
-                println!("{}",CError::InputError(PrivKey));
+                println!("{}", CError::InputError(PrivKey));
                 return Err(Error::from(CError::InputError(PrivKey)));
             }
         }
@@ -231,7 +231,7 @@ impl Config {
             if check_hash_string(&v) {
                 let _ = conf_rs.set("clientchain.genesis_hash", v)?;
             } else {
-                println!("{}",CError::InputError(GenHash));
+                println!("{}", CError::InputError(GenHash));
                 return Err(Error::from(CError::InputError(GenHash)));
             }
         }
@@ -240,7 +240,7 @@ impl Config {
             if check_host_string(&v) {
                 let _ = conf_rs.set("storage.host", v)?;
             } else {
-                println!("{}",CError::InputError(Host));
+                println!("{}", CError::InputError(Host));
                 return Err(Error::from(CError::InputError(Host)));
             }
         }

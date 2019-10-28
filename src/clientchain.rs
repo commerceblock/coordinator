@@ -19,7 +19,10 @@ pub fn get_first_unspent(client: &OceanClient, asset: &str) -> Result<json::List
     let unspent = client.list_unspent(None, None, None, None, Some(asset))?;
     if unspent.is_empty() {
         // TODO: custom error for clientchain
-        return Err(Error::from(CError::MissingUnspent(String::from(asset),String::from("Client"))));
+        return Err(Error::from(CError::MissingUnspent(
+            String::from(asset),
+            String::from("Client"),
+        )));
     }
     Ok(unspent[0].clone())
 }
@@ -55,7 +58,7 @@ impl<'a> RpcClientChain<'a> {
             Err(_) => {
                 client.import_priv_key(&clientchain_config.asset_key, None, None)?;
                 if let Err(e) = get_first_unspent(&client, &clientchain_config.asset) {
-                    return Err(e)
+                    return Err(e);
                 }
             }
             _ => (),

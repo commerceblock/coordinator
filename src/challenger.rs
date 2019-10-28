@@ -388,7 +388,7 @@ mod tests {
             time::Duration::from_millis(10),
             time::Duration::from_millis(10),
             3,
-            time::Duration::from_secs(1),
+            time::Duration::from_millis(10),
         );
         match res {
             Ok(_) => {
@@ -421,7 +421,7 @@ mod tests {
             time::Duration::from_millis(10),
             time::Duration::from_millis(10),
             1,
-            time::Duration::from_secs(1),
+            time::Duration::from_millis(10),
         );
         match res {
             Ok(_) => {
@@ -458,7 +458,7 @@ mod tests {
             time::Duration::from_millis(10),
             time::Duration::from_millis(10),
             1,
-            time::Duration::from_secs(1),
+            time::Duration::from_millis(10),
         )
         .is_err());
         clientchain.return_err = false;
@@ -477,7 +477,7 @@ mod tests {
             time::Duration::from_millis(10),
             time::Duration::from_millis(10),
             1,
-            time::Duration::from_secs(1),
+            time::Duration::from_millis(10),
         )
         .is_err());
         service.return_err = false;
@@ -497,7 +497,7 @@ mod tests {
             time::Duration::from_millis(10),
             time::Duration::from_millis(10),
             1,
-            time::Duration::from_secs(1),
+            time::Duration::from_millis(10),
         )
         .is_err());
 
@@ -519,7 +519,7 @@ mod tests {
             time::Duration::from_millis(10),
             time::Duration::from_millis(10),
             1,
-            time::Duration::from_secs(1),
+            time::Duration::from_millis(10),
         );
         match res {
             Ok(_) => {
@@ -545,7 +545,7 @@ mod tests {
             time::Duration::from_millis(10),
             time::Duration::from_millis(10),
             1,
-            time::Duration::from_secs(1),
+            time::Duration::from_millis(10),
         );
         match res {
             Ok(_) => {

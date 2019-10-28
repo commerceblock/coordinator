@@ -47,7 +47,6 @@ fn main() {
         )
         .unwrap(),
     );
-    println!("client chain: {}",config.clientchain.host);
 
     // auto client chain block generation
     let client_rpc_clone = client_rpc.clone();
@@ -69,6 +68,7 @@ fn main() {
     for bid in client_rpc.get_request_bids(&request_txid).unwrap().unwrap().bids {
         if bid.fee_pub_key.to_string() == guardnode_pubkey {
             guardnode_txid = bid.txid;
+            println!("guardnode bid txid: {}", guardnode_txid);
             break;
         }
     }

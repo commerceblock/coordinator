@@ -35,6 +35,7 @@ extern crate jsonrpc_http_server;
 
 pub mod api;
 pub mod challenger;
+pub mod checks;
 pub mod clientchain;
 pub mod config;
 pub mod coordinator;
@@ -45,4 +46,3 @@ pub mod request;
 pub mod service;
 pub mod storage;
 pub mod testing_utils;
-pub mod checks;
