@@ -2,11 +2,11 @@
 //!
 //! Config module handling config options from file/env
 
-use checks::{check_hash_string, check_host_string, check_privkey_string};
-use config_rs::{Config as ConfigRs, Environment, File};
-use error::InputErrorType::{GenHash, Host, PrivKey};
+use config_rs::{Config as ConfigRs, ConfigError, Environment, File, Source};
+use error::InputErrorType::{GenHash, PrivKey};
 use serde::{Deserialize, Serialize};
 use std::env;
+use util::checks::{check_hash_string, check_privkey_string};
 
 use crate::error::{CError, Error, Result};
 
@@ -145,6 +145,63 @@ impl Default for Config {
     }
 }
 
+trait Checks {
+    fn merge_with_checks<T>(&mut self, source: T) -> Result<&mut ConfigRs>
+    where
+        T: 'static,
+        T: Source + Send + Sync;
+}
+
+impl Checks for ConfigRs {
+    /// Merge in a configuration property source and perform type
+    /// checks on priv key and hash strings. Values are compared before
+    /// and after merge to find changes - if changed then checks are ran
+    fn merge_with_checks<T>(&mut self, source: T) -> Result<&mut ConfigRs>
+    where
+        T: 'static,
+        T: Source + Send + Sync,
+    {
+        let mut key_bef = String::from(""); //dummy init
+        if let Ok(v) = self.get_str("clientchain.asset_key") {
+            key_bef = v;
+        }
+        let mut hash_bef = String::from(""); //dummy init
+        if let Ok(v) = self.get_str("clientchain.genesis_hash") {
+            hash_bef = v;
+        }
+
+        let res = self.merge(source);
+
+        match res {
+            Ok(v) => {
+                let mut key_aft = String::from("");
+                if let Ok(key) = v.get_str("clientchain.asset_key") {
+                    key_aft = key;
+                }
+                if Some(key_bef) != Some(String::from(key_aft.clone())) {
+                    if !check_privkey_string(&key_aft) {
+                        println!("{}", CError::InputError(PrivKey));
+                        return Err(Error::from(CError::InputError(PrivKey)));
+                    }
+                }
+                let mut hash_aft = String::from("");
+                if let Ok(hash) = v.get_str("clientchain.genesis_hash") {
+                    hash_aft = hash;
+                }
+                if Some(hash_bef) != Some(String::from(hash_aft.clone())) {
+                    if !check_hash_string(&hash_aft) {
+                        println!("{}", CError::InputError(GenHash));
+                        return Err(Error::from(CError::InputError(GenHash)));
+                    }
+                }
+                return Ok(v); // both checks successful
+            }
+            // Pass through error from merge()
+            Err(_) => return Err(Error::from(ConfigError::Frozen)),
+        }
+    }
+}
+
 impl Config {
     /// New Config instance reading default values from value
     /// as well as overriden values by the environment
@@ -152,15 +209,15 @@ impl Config {
         let mut conf_rs = ConfigRs::new();
         let _ = conf_rs
             // First merge struct default config
-            .merge(ConfigRs::try_from(&Config::default())?)?
+            .merge_with_checks(ConfigRs::try_from(&Config::default())?)?
             // Add in defaults from file config/default.toml if exists
             // This is especially useful for local testing config as
             // the default file is not actually loaded in production
             // This could be done with include_str! if ever required
-            .merge(File::with_name("config/default").required(false))?
+            .merge_with_checks(File::with_name("config/default").required(false))?
             // Override any config from env using CO prefix and a
             // "_" separator for the nested config in Config
-            .merge(Environment::with_prefix("CO"))?;
+            .merge_with_checks(Environment::with_prefix("CO"))?;
 
         // Override service config from env variables
         // Currently doesn't seem to be supported by config_rs
@@ -173,12 +230,7 @@ impl Config {
         // CO_CLIENTCHAIN__HOST=127.0.0.1:5555
         // CO_CLIENTCHAIN__GENESIS_HASH=706f6...
         if let Ok(v) = env::var("CO_API_HOST") {
-            if check_host_string(&v) {
-                let _ = conf_rs.set("api.host", v)?;
-            } else {
-                println!("{}", CError::InputError(Host));
-                return Err(Error::from(CError::InputError(Host)));
-            }
+            let _ = conf_rs.set("api.host", v)?;
         }
         if let Ok(v) = env::var("CO_API_USER") {
             let _ = conf_rs.set("api.user", v)?;
@@ -188,12 +240,7 @@ impl Config {
         }
 
         if let Ok(v) = env::var("CO_SERVICE_HOST") {
-            if check_host_string(&v) {
-                let _ = conf_rs.set("service.host", v)?;
-            } else {
-                println!("{}", CError::InputError(Host));
-                return Err(Error::from(CError::InputError(Host)));
-            }
+            let _ = conf_rs.set("service.host", v)?;
         }
         if let Ok(v) = env::var("CO_SERVICE_USER") {
             let _ = conf_rs.set("service.user", v)?;
@@ -203,12 +250,7 @@ impl Config {
         }
 
         if let Ok(v) = env::var("CO_CLIENTCHAIN_HOST") {
-            if check_host_string(&v) {
-                let _ = conf_rs.set("clientchain.host", v)?;
-            } else {
-                println!("{}", CError::InputError(Host));
-                return Err(Error::from(CError::InputError(Host)));
-            }
+            let _ = conf_rs.set("clientchain.host", v)?;
         }
         if let Ok(v) = env::var("CO_CLIENTCHAIN_USER") {
             let _ = conf_rs.set("clientchain.user", v)?;
@@ -237,12 +279,7 @@ impl Config {
         }
 
         if let Ok(v) = env::var("CO_STORAGE_HOST") {
-            if check_host_string(&v) {
-                let _ = conf_rs.set("storage.host", v)?;
-            } else {
-                println!("{}", CError::InputError(Host));
-                return Err(Error::from(CError::InputError(Host)));
-            }
+            let _ = conf_rs.set("storage.host", v)?;
         }
         if let Ok(v) = env::var("CO_STORAGE_USER") {
             let _ = conf_rs.set("storage.user", v)?;

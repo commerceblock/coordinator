@@ -6,7 +6,6 @@ use std::collections::HashMap;
 
 use bitcoin_hashes::{hex::FromHex, sha256d};
 use ocean_rpc::{json, RpcApi};
-use std::str;
 
 use crate::config::ClientChainConfig;
 use crate::error::{CError, Error, Result};

@@ -23,10 +23,3 @@ pub fn check_hash_string(str: &String) -> bool {
     }
     return false;
 }
-/// Check for correct host input string format
-pub fn check_host_string(str: &String) -> bool {
-    if str.contains(":") {
-        return true;
-    }
-    return false;
-}

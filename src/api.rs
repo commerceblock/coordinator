@@ -161,7 +161,7 @@ mod tests {
 
     use futures::Future;
 
-    use crate::testing_utils::{gen_challenge_state, gen_dummy_hash, MockStorage};
+    use crate::util::testing::{gen_challenge_state, gen_dummy_hash, MockStorage};
 
     #[test]
     fn get_request_test() {

@@ -44,8 +44,6 @@ pub enum InputErrorType {
     PrivKey,
     /// Invalid genesis hash string
     GenHash,
-    /// Invalid host input string
-    Host,
 }
 
 impl InputErrorType {
@@ -55,7 +53,6 @@ impl InputErrorType {
             InputErrorType::GenHash => {
                 "Invalid client chain genesis hash input - must be hexadecimal string of length 64."
             }
-            InputErrorType::Host => "Invalid host value input - must be in format HOST:PORT.",
         }
     }
 }

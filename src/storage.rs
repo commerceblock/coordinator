@@ -47,11 +47,11 @@ impl MongoStorage {
         let client = Client::with_uri(&uri)?;
 
         let db = client.db("coordinator");
-        // if let Some(ref user) = storage_config.user {
-        //     if let Some(ref pass) = storage_config.pass {
-        //         db.auth(user, pass)?;
-        //     }
-        // }
+        if let Some(ref user) = storage_config.user {
+            if let Some(ref pass) = storage_config.pass {
+                db.auth(user, pass)?;
+            }
+        }
 
         Ok(MongoStorage {
             db: Mutex::new(db),
@@ -303,7 +303,7 @@ mod tests {
 
     use mongodb::oid::ObjectId;
 
-    use crate::testing_utils::gen_dummy_hash;
+    use crate::util::testing::gen_dummy_hash;
 
     #[test]
     fn request_doc_test() {
