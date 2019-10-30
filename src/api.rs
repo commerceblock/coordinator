@@ -31,7 +31,7 @@ struct GetRequestResponse {
 }
 
 /// Get request RPC call returning corresponding request if it exists
-fn get_request(params: Params, storage: Arc<Storage>) -> futures::Finished<Value, Error> {
+fn get_request(params: Params, storage: Arc<dyn Storage>) -> futures::Finished<Value, Error> {
     let try_parse = params.parse::<GetRequestResponsesParams>();
     match try_parse {
         Ok(parse) => {
@@ -58,7 +58,7 @@ struct GetRequestsResponse {
 }
 
 /// Get requests RPC call returning all stored requests
-fn get_requests(storage: Arc<Storage>) -> futures::Finished<Value, Error> {
+fn get_requests(storage: Arc<dyn Storage>) -> futures::Finished<Value, Error> {
     let requests = storage.get_requests().unwrap();
     let mut response = GetRequestsResponse { requests: vec![] };
     for request in requests {
@@ -80,7 +80,7 @@ struct GetRequestResponsesResponse {
 
 /// Get requests responses RPC call returning all responses for a specific
 /// request transaction id hash
-fn get_request_responses(params: Params, storage: Arc<Storage>) -> futures::Finished<Value, Error> {
+fn get_request_responses(params: Params, storage: Arc<dyn Storage>) -> futures::Finished<Value, Error> {
     let try_parse = params.parse::<GetRequestResponsesParams>();
     match try_parse {
         Ok(parse) => {
@@ -159,42 +159,9 @@ pub fn run_api_server<D: Storage + Send + Sync + 'static>(
 mod tests {
     use super::*;
 
-    use std::str::FromStr;
-
-    use bitcoin_hashes::{hex::FromHex, Hash};
     use futures::Future;
-    use secp256k1::PublicKey;
 
-    use crate::challenger::ChallengeState;
-    use crate::request::Bid;
-    use crate::storage::MockStorage;
-
-    /// Generate dummy hash for tests
-    fn gen_dummy_hash(i: u8) -> sha256d::Hash {
-        sha256d::Hash::from_slice(&[i as u8; 32]).unwrap()
-    }
-
-    /// Geberate dummy challenge state
-    fn gen_challenge_state(request_hash: &sha256d::Hash) -> ChallengeState {
-        let request = ServiceRequest {
-            txid: *request_hash,
-            start_blockheight: 2,
-            end_blockheight: 5,
-            genesis_blockhash: gen_dummy_hash(0),
-            fee_percentage: 5,
-            num_tickets: 10,
-        };
-        let mut bids = BidSet::new();
-        let _ = bids.insert(Bid {
-            txid: sha256d::Hash::from_hex("1234567890000000000000000000000000000000000000000000000000000000").unwrap(),
-            pubkey: PublicKey::from_str("026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3").unwrap(),
-        });
-        ChallengeState {
-            request,
-            bids,
-            latest_challenge: Some(gen_dummy_hash(0)),
-        }
-    }
+    use crate::util::testing::{gen_challenge_state, gen_dummy_hash, MockStorage};
 
     #[test]
     fn get_request_test() {
@@ -217,8 +184,10 @@ mod tests {
         let params: Params = serde_json::from_str(&s).unwrap();
         let resp = get_request(params, storage.clone());
         assert_eq!(
-            format!(r#"{{"request":{{"txid":"{}","start_blockheight":2,"end_blockheight":5,"genesis_blockhash":"0000000000000000000000000000000000000000000000000000000000000000","fee_percentage":5,"num_tickets":10}},"bids":[{{"txid":"1234567890000000000000000000000000000000000000000000000000000000","pubkey":"026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3"}}]}}"#,
-                dummy_hash.to_string()),
+            format!(
+                r#"{{"request":{{"txid":"{}","start_blockheight":2,"end_blockheight":5,"genesis_blockhash":"0000000000000000000000000000000000000000000000000000000000000000","fee_percentage":5,"num_tickets":10}},"bids":[{{"txid":"1234567890000000000000000000000000000000000000000000000000000000","pubkey":"026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3"}}]}}"#,
+                dummy_hash.to_string()
+            ),
             resp.wait().unwrap()
         );
     }
@@ -237,8 +206,10 @@ mod tests {
         storage.save_challenge_state(&state).unwrap();
         let resp = get_requests(storage.clone());
         assert_eq!(
-            format!(r#"{{"requests":[{{"request":{{"txid":"{}","start_blockheight":2,"end_blockheight":5,"genesis_blockhash":"0000000000000000000000000000000000000000000000000000000000000000","fee_percentage":5,"num_tickets":10}},"bids":[{{"txid":"1234567890000000000000000000000000000000000000000000000000000000","pubkey":"026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3"}}]}}]}}"#,
-                dummy_hash.to_string()),
+            format!(
+                r#"{{"requests":[{{"request":{{"txid":"{}","start_blockheight":2,"end_blockheight":5,"genesis_blockhash":"0000000000000000000000000000000000000000000000000000000000000000","fee_percentage":5,"num_tickets":10}},"bids":[{{"txid":"1234567890000000000000000000000000000000000000000000000000000000","pubkey":"026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3"}}]}}]}}"#,
+                dummy_hash.to_string()
+            ),
             resp.wait().unwrap()
         );
 
@@ -247,9 +218,11 @@ mod tests {
         storage.save_challenge_state(&state2).unwrap();
         let resp = get_requests(storage.clone());
         assert_eq!(
-            format!(r#"{{"requests":[{{"request":{{"txid":"{}","start_blockheight":2,"end_blockheight":5,"genesis_blockhash":"0000000000000000000000000000000000000000000000000000000000000000","fee_percentage":5,"num_tickets":10}},"bids":[{{"txid":"1234567890000000000000000000000000000000000000000000000000000000","pubkey":"026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3"}}]}},{{"request":{{"txid":"{}","start_blockheight":2,"end_blockheight":5,"genesis_blockhash":"0000000000000000000000000000000000000000000000000000000000000000","fee_percentage":5,"num_tickets":10}},"bids":[{{"txid":"1234567890000000000000000000000000000000000000000000000000000000","pubkey":"026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3"}}]}}]}}"#,
+            format!(
+                r#"{{"requests":[{{"request":{{"txid":"{}","start_blockheight":2,"end_blockheight":5,"genesis_blockhash":"0000000000000000000000000000000000000000000000000000000000000000","fee_percentage":5,"num_tickets":10}},"bids":[{{"txid":"1234567890000000000000000000000000000000000000000000000000000000","pubkey":"026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3"}}]}},{{"request":{{"txid":"{}","start_blockheight":2,"end_blockheight":5,"genesis_blockhash":"0000000000000000000000000000000000000000000000000000000000000000","fee_percentage":5,"num_tickets":10}},"bids":[{{"txid":"1234567890000000000000000000000000000000000000000000000000000000","pubkey":"026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3"}}]}}]}}"#,
                 dummy_hash.to_string(),
-                dummy_hash2.to_string()),
+                dummy_hash2.to_string()
+            ),
             resp.wait().unwrap()
         );
     }

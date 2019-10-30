@@ -178,38 +178,9 @@ mod tests {
     use std::sync::mpsc::{channel, Receiver, TryRecvError};
 
     use bitcoin_hashes::hex::ToHex;
-    use bitcoin_hashes::Hash;
     use secp256k1::SecretKey;
 
-    use crate::request::{BidSet, Request as ServiceRequest};
-
-    /// Generate dummy hash for tests
-    fn gen_dummy_hash(i: u8) -> sha256d::Hash {
-        sha256d::Hash::from_slice(&[i as u8; 32]).unwrap()
-    }
-
-    /// Geberate dummy challenge state
-    fn gen_challenge_state(request_hash: &sha256d::Hash, challenge_hash: &sha256d::Hash) -> ChallengeState {
-        let request = ServiceRequest {
-            txid: sha256d::Hash::from_slice(&[0xff as u8; 32]).unwrap(),
-            start_blockheight: 2,
-            end_blockheight: 5,
-            genesis_blockhash: *request_hash,
-            fee_percentage: 5,
-            num_tickets: 10,
-        };
-        let mut bids = BidSet::new();
-        let _ = bids.insert(Bid {
-            txid: sha256d::Hash::from_hex("1234567890000000000000000000000000000000000000000000000000000000").unwrap(),
-            // pubkey corresponding to SecretKey::from_slice(&[0xaa; 32])
-            pubkey: PublicKey::from_str("026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3").unwrap(),
-        });
-        ChallengeState {
-            request,
-            bids,
-            latest_challenge: Some(*challenge_hash),
-        }
-    }
+    use crate::util::testing::{gen_challenge_state_with_challenge, gen_dummy_hash};
 
     #[test]
     fn challengeproof_from_json_test() {
@@ -272,7 +243,7 @@ mod tests {
     #[test]
     fn challengeproof_verify_test() {
         let chl_hash = gen_dummy_hash(11);
-        let _challenge_state = gen_challenge_state(&gen_dummy_hash(3), &chl_hash);
+        let _challenge_state = gen_challenge_state_with_challenge(&gen_dummy_hash(3), &chl_hash);
         let bid_txid = _challenge_state.bids.iter().next().unwrap().txid;
         let bid_pubkey = _challenge_state.bids.iter().next().unwrap().pubkey;
 
@@ -315,7 +286,7 @@ mod tests {
         let (resp_tx, resp_rx): (Sender<ChallengeResponse>, Receiver<ChallengeResponse>) = channel();
 
         let chl_hash = gen_dummy_hash(11);
-        let _challenge_state = gen_challenge_state(&gen_dummy_hash(3), &chl_hash);
+        let _challenge_state = gen_challenge_state_with_challenge(&gen_dummy_hash(3), &chl_hash);
         let bid_txid = _challenge_state.bids.iter().next().unwrap().txid;
         let bid_pubkey = _challenge_state.bids.iter().next().unwrap().pubkey;
         let challenge_state = Arc::new(Mutex::new(_challenge_state));
@@ -453,7 +424,7 @@ mod tests {
         let (resp_tx, resp_rx): (Sender<ChallengeResponse>, Receiver<ChallengeResponse>) = channel();
 
         let chl_hash = gen_dummy_hash(8);
-        let _challenge_state = gen_challenge_state(&gen_dummy_hash(1), &chl_hash);
+        let _challenge_state = gen_challenge_state_with_challenge(&gen_dummy_hash(1), &chl_hash);
         let bid_txid = _challenge_state.bids.iter().next().unwrap().txid;
         let bid_pubkey = _challenge_state.bids.iter().next().unwrap().pubkey;
         let challenge_state = Arc::new(Mutex::new(_challenge_state));
@@ -581,13 +552,16 @@ mod tests {
         assert!(resp_rx.try_recv() == Err(TryRecvError::Empty)); // check receiver empty
 
         // Invalid bid on request body (pubkey does not exist)
-        let data = format!(r#"
+        let data = format!(
+            r#"
         {{
             "txid": "{}",
             "pubkey": "03356190524d52d7e94e1bd43e8f23778e585a4fe1f275e65a06fa5ceedb67d111",
             "hash": "0404040404040404040404040404040404040404040404040404040404040404",
             "sig": "304402201742daea5ec3b7306b9164be862fc1659cc830032180b8b17beffe02645860d602201039eba402d22e630308e6af05da8dd4f05b51b7d672ca5fc9e3b0a57776365c"
-        }}"#, bid_txid);
+        }}"#,
+            bid_txid
+        );
         let request = Request::new(Body::from(data));
         let _ = handle_challengeproof(request, challenge_state.clone(), resp_tx.clone())
             .map(|res| {
@@ -603,13 +577,16 @@ mod tests {
         assert!(resp_rx.try_recv() == Err(TryRecvError::Empty)); // check receiver empty
 
         // Request send for an invalid / out of date challenge hash
-        let data = format!(r#"
+        let data = format!(
+            r#"
         {{
             "txid": "{}",
             "pubkey": "{}",
             "hash": "0404040404040404040404040404040404040404040404040404040404040404",
             "sig": "304402201742daea5ec3b7306b9164be862fc1659cc830032180b8b17beffe02645860d602201039eba402d22e630308e6af05da8dd4f05b51b7d672ca5fc9e3b0a57776365c"
-        }}"#, bid_txid, bid_pubkey);
+        }}"#,
+            bid_txid, bid_pubkey
+        );
         let request = Request::new(Body::from(data));
         let _ = handle_challengeproof(request, challenge_state.clone(), resp_tx.clone())
             .map(|res| {
@@ -625,13 +602,16 @@ mod tests {
         assert!(resp_rx.try_recv() == Err(TryRecvError::Empty)); // check receiver empty
 
         // Request sent an invalid sig for the correct bid and challenge hash
-        let data = format!(r#"
+        let data = format!(
+            r#"
         {{
             "txid": "{}",
             "pubkey": "{}",
             "hash": "{}",
             "sig": "304402201742daea5ec3b7306b9164be862fc1659cc830032180b8b17beffe02645860d602201039eba402d22e630308e6af05da8dd4f05b51b7d672ca5fc9e3b0a57776365c"
-        }}"#, bid_txid, bid_pubkey, chl_hash);
+        }}"#,
+            bid_txid, bid_pubkey, chl_hash
+        );
         let request = Request::new(Body::from(data));
         let _ = handle_challengeproof(request, challenge_state.clone(), resp_tx.clone())
             .map(|res| {

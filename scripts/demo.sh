@@ -25,20 +25,11 @@ printf '%s\n' '#!/bin/sh' 'rpcuser=user1' \
     'challengecoinsdestination=76a914be70510653867b1c648b43cfb3b0edf8420f08d788ac' > ~/co-client-dir/ocean.conf
 
 ocd
-sleep 5
+sleep 8
 
 echo "Importing challenger key"
 ocl importprivkey cScSHCQp9AEwzZoucRpX9bMRkLCJ4LoQWBNFTZuD6tPX9qwNMWfQ
 sleep 2
-
-# Issue asset for bid creation
-echo "Issue asset for guardnodes"
-asset=`ocl issueasset 500 0`
-asset_hash=`echo $asset | jq -r ".asset"`
-
-echo "Issue another asset for guardnodes"
-asset=`ocl issueasset 100 0`
-asset_hash2=`echo $asset | jq -r ".asset"`
 
 # Create request
 echo "Create request"
@@ -52,22 +43,35 @@ outputs="{\"decayConst\":1000,\"endBlockHeight\":10,\"fee\":3,\"genesisBlockHash
 \"startBlockHeight\":5,\"tickets\":2,\"startPrice\":50,\"value\":$value,\"pubkey\":\"$pub\"}"
 
 signedtx=`ocl signrawtransaction $(ocl createrawrequesttx $inputs $outputs)`
-txid=`ocl sendrawtransaction $(echo $signedtx | jq -r ".hex")`
+request_txid=`ocl sendrawtransaction $(echo $signedtx | jq -r ".hex")`
 
 ocl generate 1
 ocl getrequests
 
 # Create bid
 echo "Create request bid"
+
+# Create tx for bid to spend from
+bid_txid=$(ocl sendtoaddress `ocl getnewaddress` 100 "" "" false "CBT")
+ocl generate 1
+
 addr=`ocl getnewaddress`
 pub=`ocl validateaddress $addr | jq -r ".pubkey"`
-unspent=`ocl listunspent 1 9999999 [] true $asset_hash | jq .[0]`
-value=`echo $unspent | jq -r ".amount"`
+bid_tx=$(ocl decoderawtransaction `ocl getrawtransaction $bid_txid`)
+value=$(echo $bid_tx | jq '.vout[0].value')
+if [ $value = 100 ]   # Find correct vout
+then
+  vout=$(echo $bid_tx | jq '.vout[0].n')
+else
+  vout=$(echo $bid_tx | jq '.vout[1].n')
+fi
+domain_asset=$(echo $bid_tx | jq '.vout['$vout'].asset')
 
-inputs="[{\"txid\":$(echo $unspent | jq ".txid"),\"vout\":$(echo $unspent | jq -r ".vout"),\"asset\":\"$asset_hash\"}]"
-outputs="{\"endBlockHeight\":10,\"requestTxid\":\"$txid\",\"pubkey\":\"$pub\",\
+
+inputs="[{\"txid\":\"$bid_txid\",\"vout\":$vout,\"asset\":$domain_asset}]"
+outputs="{\"endBlockHeight\":10,\"requestTxid\":\"$request_txid\",\"pubkey\":\"$pub\",\
 \"feePubkey\":\"026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3\",\
-\"value\":50,\"change\":449.999,\"changeAddress\":\"$addr\",\"fee\":0.001}"
+\"value\":55,\"change\":\"44.999\",\"changeAddress\":\"$addr\",\"fee\":0.001}"
 
 signedtx=`ocl signrawtransaction $(ocl createrawbidtx $inputs $outputs)`
 txid=`ocl sendrawtransaction $(echo $signedtx | jq -r ".hex")`
@@ -78,19 +82,32 @@ ocl importprivkey cPjJhtAgmbkovqCd1BgnY2nxGftX2tqen6UzaMxvFeH8xT3PWUod
 sleep 2
 
 echo "Create another request bid"
+# Create tx for bid to spend from
+bid_txid2=$(ocl sendtoaddress `ocl getnewaddress` 100 "" "" false "CBT")
+ocl generate 1
+
 addr=`ocl getnewaddress`
 pub=`ocl validateaddress $addr | jq -r ".pubkey"`
-unspent=`ocl listunspent 1 9999999 [] true $asset_hash2 | jq .[0]`
-value=`echo $unspent | jq -r ".amount"`
+bid_tx=$(ocl decoderawtransaction `ocl getrawtransaction $bid_txid2`)
+value=$(echo $bid_tx | jq '.vout[0].value')
+if [ $value = 100 ]
+then
+  vout=$(echo $bid_tx | jq '.vout[0].n')
+else
+  vout=$(echo $bid_tx | jq '.vout[1].n')
+fi
+domain_asset=$(echo $bid_tx | jq '.vout['$vout'].asset')
 
-inputs="[{\"txid\":$(echo $unspent | jq ".txid"),\"vout\":$(echo $unspent | jq -r ".vout"),\"asset\":\"$asset_hash2\"}]"
-outputs="{\"endBlockHeight\":10,\"requestTxid\":\"$txid\",\"pubkey\":\"$pub\",\
-\"feePubkey\":\"029aaa76fcf7b8012041c6b4375ad476408344d842000087aa93c5a33f65d50d92\",\
-\"value\":50,\"change\":49.999,\"changeAddress\":\"$addr\",\"fee\":0.001}"
+inputs="[{\"txid\":\"$bid_txid2\",\"vout\":$vout,\"asset\":$domain_asset}]"
+outputs="{\"endBlockHeight\":10,\"requestTxid\":\"$request_txid\",\"pubkey\":\"$pub\",\
+\"feePubkey\":\"026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3\",\
+\"value\":55,\"change\":\"44.999\",\"changeAddress\":\"$addr\",\"fee\":0.001}"
 
 signedtx=`ocl signrawtransaction $(ocl createrawbidtx $inputs $outputs)`
 txid=`ocl sendrawtransaction $(echo $signedtx | jq -r ".hex")`
 
+echo "mempool"
+ocl getrawmempool
 ocl generate 1
 ocl getrequestbids $(ocl getrequests | jq -r ".[].txid")
 echo "Guardnode txid: $txid"

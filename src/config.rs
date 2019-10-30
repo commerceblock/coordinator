@@ -3,10 +3,12 @@
 //! Config module handling config options from file/env
 
 use config_rs::{Config as ConfigRs, Environment, File};
+use error::InputErrorType::{GenHash, PrivKey};
 use serde::{Deserialize, Serialize};
 use std::env;
+use util::checks::{check_hash_string, check_privkey_string};
 
-use crate::error::Result;
+use crate::error::{CError, Error, Result};
 
 #[derive(Debug, Serialize, Deserialize)]
 /// Api specific config
@@ -59,8 +61,6 @@ pub struct ClientChainConfig {
     pub user: String,
     /// Client rpc pass
     pub pass: String,
-    /// Client asset hash
-    pub asset_hash: String,
     /// Client genesis hash
     pub genesis_hash: String,
     /// Client asset label
@@ -75,7 +75,6 @@ impl Default for ClientChainConfig {
             host: String::new(),
             user: String::new(),
             pass: String::new(),
-            asset_hash: String::new(),
             genesis_hash: String::new(),
             asset: String::from("CHALLENGE"),
             asset_key: String::new(),
@@ -208,9 +207,6 @@ impl Config {
         if let Ok(v) = env::var("CO_CLIENTCHAIN_ASSET_KEY") {
             let _ = conf_rs.set("clientchain.asset_key", v)?;
         }
-        if let Ok(v) = env::var("CO_CLIENTCHAIN_ASSET_HASH") {
-            let _ = conf_rs.set("clientchain.asset_hash", v)?;
-        }
         if let Ok(v) = env::var("CO_CLIENTCHAIN_GENESIS_HASH") {
             let _ = conf_rs.set("clientchain.genesis_hash", v)?;
         }
@@ -228,6 +224,19 @@ impl Config {
             let _ = conf_rs.set("storage.name", v)?;
         }
 
+        // Perform type checks
+        if let Ok(key) = conf_rs.get_str("clientchain.asset_key") {
+            if !check_privkey_string(&key) {
+                println!("{}", CError::InputError(PrivKey, key.clone()));
+                return Err(Error::from(CError::InputError(PrivKey, key)));
+            }
+        }
+        if let Ok(hash) = conf_rs.get_str("clientchain.genesis_hash") {
+            if !check_hash_string(&hash) {
+                println!("{}", CError::InputError(GenHash, hash.clone()));
+                return Err(Error::from(CError::InputError(GenHash, hash)));
+            }
+        }
         Ok(conf_rs.try_into()?)
     }
 }
