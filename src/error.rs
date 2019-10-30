@@ -26,7 +26,7 @@ pub enum CError {
     /// chain
     MissingUnspent(String, String),
     /// Config input error. Takes parameter input error type
-    InputError(InputErrorType),
+    InputError(InputErrorType, String),
     /// Generic error from string error message
     Generic(String),
 }
@@ -61,7 +61,9 @@ impl fmt::Display for CError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             CError::Generic(ref e) => write!(f, "generic Error: {}", e),
-            CError::InputError(ref e) => write!(f, "Input Error: {}", e.as_str()),
+            CError::InputError(ref error, ref value) => {
+                write!(f, "Input Error: {} \nProblem value: {}", error.as_str(), value)
+            }
             CError::MissingUnspent(ref asset, ref chain) => {
                 write!(f, "No unspent found for {} asset on {} chain", asset, chain)
             }
@@ -77,7 +79,7 @@ impl error::Error for CError {
             CError::MissingBids => "No bids found",
             CError::ReceiverDisconnected => "Challenge response receiver disconnected",
             CError::MissingUnspent(_, _) => "No unspent found for asset",
-            CError::InputError(_) => "Input parameter error",
+            CError::InputError(_, _) => "Input parameter error",
         }
     }
     fn source(&self) -> Option<&(dyn error::Error + 'static)> {
