@@ -39,11 +39,15 @@ then
     exit
 fi
 
+# check start price > end price
+if [ $2 -lt $3 ]; then
+    printf "Input parameter error: Start price must be larger than end price."
+    exit
+fi
 # Client chain genesis block hash
 genesis=$1
 # check for currently active request for given genesis hash
-if [[ `ocl getrequests | jq "if .[].genesisBlock == \"$genesis\" then 1 else 0 end"` == *"1"* ]]
-then
+if [[ `ocl getrequests | jq "if .[].genesisBlock == \"$genesis\" then 1 else 0 end"` == *"1"* ]]; then
     printf "Input parameter error: Genesis hash already in active request list. Relevant request info below.\n\n"
     echo "Current block height: " `ocl getblockcount`
     ocl getrequests $1 | jq '.[]'
@@ -67,33 +71,28 @@ fee=$7
 
 unspent=`ocl listunspent '[1, 9999999, [], true, "PERMISSION"]' | jq -c '.[]'`
 # Import private key. Check if list unspent is empty first to avoid unnessesary re-scanning every time script runs
-if [ ! -z $8 ] && [[ -z $unspent ]]
-then
+if [ ! -z $8 ] && [[ -z $unspent ]]; then
         echo "Importing private key..."
         ocl importprivkey $8 > /dev/null
         unspent=`ocl listunspent '[1, 9999999, [], true, "PERMISSION"]' | jq -c '.[]'`
 fi
 
 checkLockTime () {
-    if [[ $currentblockheight -gt `echo $1 | jq -r '.locktime'` ]]
-    then
+    if [[ $currentblockheight -gt `echo $1 | jq -r '.locktime'` ]]; then
         return 0
     fi
     return 1
 }
 # Check for specified previous request transaction info and set txid, vout variables accordingly
-if [ -n "$9" ] || [ -n "${10}" ]
-then
-    if [ -z $9 ] || [ -z ${10} ]
-    then
+if [ -n "$9" ] || [ -n "${10}" ]; then
+    if [ -z $9 ] || [ -z ${10} ]; then
         printf "Input parameter error: txid and vout must be provided for previous request transaction.\n"
         exit
     fi
     txid=$9
     vout=$10
     tx=`ocl decoderawtransaction $(ocl getrawtransaction $txid)`
-    if checkLockTime "$tx";
-    then
+    if checkLockTime "$tx"; then
         value=`echo $tx | jq -r '.vout[0].value'`
     else
         printf "Input parameter error: Previous request transaction nlocktime not met.\n"
@@ -103,12 +102,10 @@ else
     # Get previously locked TX_LOCKED_MULTISIG unspent output
     for i in $unspent;
     do
-        if [ `echo $i | jq ".solvable"` = "false" ]
-        then
+        if [ `echo $i | jq ".solvable"` = "false" ]; then
             txid=`echo $i | jq -r ".txid"`
             tx=`ocl decoderawtransaction $(ocl getrawtransaction $txid | jq -r '.')`
-            if checkLockTime "$tx";
-            then
+            if checkLockTime "$tx"; then
                 value=`echo $tx | jq -r '.vout[0].value'` # TX_LOCKED_MULTISIG permission
                 vout=0                                    # asset always vout=0
                 break
@@ -116,8 +113,7 @@ else
         fi
     done
     # If value not set yet then get standard permission asset unspent output
-    if [ -z $value ]
-    then
+    if [ -z $value ]; then
         for i in $unspent;
         do
             txid=`echo $i | jq -r ".txid"`
@@ -130,8 +126,7 @@ else
             fi
         done
     fi
-    if [[ ${#unspent[0]} = 4 || -z $txid ]] # unspent or txid is null
-    then
+    if [[ ${#unspent[0]} = 4 || -z $txid ]]; then # unspent or txid is null
         printf "Error: No unspent TX_LOCKED_MULTISIG or permission asset transaction outputs available in wallet.\n"
         exit
     fi
@@ -148,8 +143,7 @@ rawtx=`ocl createrawrequesttx '['$(echo $inputs)','$(echo $outputs)']' | jq -r '
 signedrawtx=`ocl signrawtransaction $rawtx`
 
 # Catch signing error
-if [ `echo $signedrawtx | jq ".complete"` = "false" ]
-then
+if [ `echo $signedrawtx | jq ".complete"` = "false" ]; then
     echo "Signing error: Script cannot be signed. Is the input transaction information correct and is it unlockable now?"
 fi
 

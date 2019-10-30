@@ -180,7 +180,7 @@ mod tests {
     use bitcoin_hashes::hex::ToHex;
     use secp256k1::SecretKey;
 
-    use crate::testing_utils::{gen_dummy_hash,gen_challenge_state_with_challenge};
+    use crate::util::testing::{gen_challenge_state_with_challenge, gen_dummy_hash};
 
     #[test]
     fn challengeproof_from_json_test() {
@@ -552,13 +552,16 @@ mod tests {
         assert!(resp_rx.try_recv() == Err(TryRecvError::Empty)); // check receiver empty
 
         // Invalid bid on request body (pubkey does not exist)
-        let data = format!(r#"
+        let data = format!(
+            r#"
         {{
             "txid": "{}",
             "pubkey": "03356190524d52d7e94e1bd43e8f23778e585a4fe1f275e65a06fa5ceedb67d111",
             "hash": "0404040404040404040404040404040404040404040404040404040404040404",
             "sig": "304402201742daea5ec3b7306b9164be862fc1659cc830032180b8b17beffe02645860d602201039eba402d22e630308e6af05da8dd4f05b51b7d672ca5fc9e3b0a57776365c"
-        }}"#, bid_txid);
+        }}"#,
+            bid_txid
+        );
         let request = Request::new(Body::from(data));
         let _ = handle_challengeproof(request, challenge_state.clone(), resp_tx.clone())
             .map(|res| {
@@ -574,13 +577,16 @@ mod tests {
         assert!(resp_rx.try_recv() == Err(TryRecvError::Empty)); // check receiver empty
 
         // Request send for an invalid / out of date challenge hash
-        let data = format!(r#"
+        let data = format!(
+            r#"
         {{
             "txid": "{}",
             "pubkey": "{}",
             "hash": "0404040404040404040404040404040404040404040404040404040404040404",
             "sig": "304402201742daea5ec3b7306b9164be862fc1659cc830032180b8b17beffe02645860d602201039eba402d22e630308e6af05da8dd4f05b51b7d672ca5fc9e3b0a57776365c"
-        }}"#, bid_txid, bid_pubkey);
+        }}"#,
+            bid_txid, bid_pubkey
+        );
         let request = Request::new(Body::from(data));
         let _ = handle_challengeproof(request, challenge_state.clone(), resp_tx.clone())
             .map(|res| {
@@ -596,13 +602,16 @@ mod tests {
         assert!(resp_rx.try_recv() == Err(TryRecvError::Empty)); // check receiver empty
 
         // Request sent an invalid sig for the correct bid and challenge hash
-        let data = format!(r#"
+        let data = format!(
+            r#"
         {{
             "txid": "{}",
             "pubkey": "{}",
             "hash": "{}",
             "sig": "304402201742daea5ec3b7306b9164be862fc1659cc830032180b8b17beffe02645860d602201039eba402d22e630308e6af05da8dd4f05b51b7d672ca5fc9e3b0a57776365c"
-        }}"#, bid_txid, bid_pubkey, chl_hash);
+        }}"#,
+            bid_txid, bid_pubkey, chl_hash
+        );
         let request = Request::new(Body::from(data));
         let _ = handle_challengeproof(request, challenge_state.clone(), resp_tx.clone())
             .map(|res| {

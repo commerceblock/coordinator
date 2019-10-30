@@ -22,6 +22,7 @@ use hyper::{
 use ocean_rpc::RpcApi;
 use secp256k1::{Message, Secp256k1, SecretKey};
 
+use coordinator::clientchain::get_first_unspent;
 use coordinator::coordinator as coordinator_main;
 use coordinator::ocean::OceanClient;
 
@@ -50,32 +51,35 @@ fn main() {
     // auto client chain block generation
     let client_rpc_clone = client_rpc.clone();
     thread::spawn(move || loop {
-        thread::sleep(time::Duration::from_secs(10));
+        thread::sleep(time::Duration::from_secs(5));
         if let Err(e) = client_rpc_clone.clone().client.generate(1) {
             error!("{}", e);
         }
     });
 
     let genesis_hash = sha256d::Hash::from_hex(&config.clientchain.genesis_hash).unwrap();
-    let request_txid = &client_rpc.get_requests(Some(&genesis_hash)).unwrap()[0].txid;
+    let request = &client_rpc.get_requests(Some(&genesis_hash));
+    if request.as_ref().unwrap().is_empty() {
+        panic!("No active request in client blockchain!")
+    }
+    let request_txid = request.as_ref().unwrap()[0].txid;
     let guardnode_pubkey = "026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3";
     let mut guardnode_txid = genesis_hash; // dummy init
-    for bid in client_rpc.get_request_bids(request_txid).unwrap().unwrap().bids {
+    for bid in client_rpc.get_request_bids(&request_txid).unwrap().unwrap().bids {
         if bid.fee_pub_key.to_string() == guardnode_pubkey {
             guardnode_txid = bid.txid;
+            println!("guardnode bid txid: {}", guardnode_txid);
             break;
         }
     }
 
     // add two guardnodes with valid keys and one without
     // keys based on mockservice request bids
-    let asset_hash = config.clientchain.asset_hash.clone();
     let listener_host = config.listener_host.clone();
     let client_rpc_clone = client_rpc.clone();
     thread::spawn(move || {
         guardnode(
             &client_rpc_clone,
-            sha256d::Hash::from_hex(&asset_hash).unwrap(),
             listener_host.clone(),
             guardnode_txid,
             SecretKey::from_slice(&[0xaa; 32]).unwrap(),
@@ -92,7 +96,6 @@ fn main() {
 /// Bid info (key/txid) are based on MockService data for demo purpose
 fn guardnode(
     client_rpc: &OceanClient,
-    asset_hash: sha256d::Hash,
     listener_host: String,
     guard_txid: sha256d::Hash,
     guard_key: SecretKey,
@@ -100,6 +103,13 @@ fn guardnode(
 ) {
     let secp = Secp256k1::new();
     let mut prev_block_count = 0;
+    // Get asset hash from unspent list
+    let asset_hash;
+    match get_first_unspent(&client_rpc, &String::from("CHALLENGE")) {
+        Err(_) => panic!("No challenge asset issued in client blockchain!"),
+        Ok(res) => asset_hash = res.asset,
+    }
+
     loop {
         if let Ok(block_count) = client_rpc.get_block_count() {
             if block_count > prev_block_count {

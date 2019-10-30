@@ -22,8 +22,11 @@ pub enum CError {
     MissingBids,
     /// Listener receiver disconnected error
     ReceiverDisconnected,
-    /// Missing unspent for challenge asset
-    MissingUnspent,
+    /// Missing unspent for challenge asset. Takes parameters asset label and
+    /// chain
+    MissingUnspent(String, String),
+    /// Config input error. Takes parameter input error type
+    InputError(InputErrorType, String),
     /// Generic error from string error message
     Generic(String),
 }
@@ -34,10 +37,36 @@ impl From<String> for CError {
     }
 }
 
+/// Input parameter error types
+#[derive(Debug)]
+pub enum InputErrorType {
+    /// Invalid private key string
+    PrivKey,
+    /// Invalid genesis hash string
+    GenHash,
+}
+
+impl InputErrorType {
+    fn as_str(&self) -> &'static str {
+        match *self {
+            InputErrorType::PrivKey => "Invalid private key input - must be base58check string of length 52.",
+            InputErrorType::GenHash => {
+                "Invalid client chain genesis hash input - must be hexadecimal string of length 64."
+            }
+        }
+    }
+}
+
 impl fmt::Display for CError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            CError::Generic(ref e) => write!(f, "generic error: {}", e),
+            CError::Generic(ref e) => write!(f, "generic Error: {}", e),
+            CError::InputError(ref error, ref value) => {
+                write!(f, "Input Error: {} \nProblem value: {}", error.as_str(), value)
+            }
+            CError::MissingUnspent(ref asset, ref chain) => {
+                write!(f, "No unspent found for {} asset on {} chain", asset, chain)
+            }
             _ => f.write_str(error::Error::description(self)),
         }
     }
@@ -46,10 +75,11 @@ impl fmt::Display for CError {
 impl error::Error for CError {
     fn description(&self) -> &str {
         match *self {
-            CError::Generic(_) => "generic error",
-            CError::MissingBids => "no bids found",
-            CError::ReceiverDisconnected => "challenge response receiver disconnected",
-            CError::MissingUnspent => "no unspent found for challenge asset",
+            CError::Generic(_) => "Generic error",
+            CError::MissingBids => "No bids found",
+            CError::ReceiverDisconnected => "Challenge response receiver disconnected",
+            CError::MissingUnspent(_, _) => "No unspent found for asset",
+            CError::InputError(_, _) => "Input parameter error",
         }
     }
     fn source(&self) -> Option<&(dyn error::Error + 'static)> {

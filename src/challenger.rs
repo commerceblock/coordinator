@@ -93,6 +93,7 @@ pub fn run_challenge_request<T: Service, K: ClientChain, D: Storage>(
     verify_duration: time::Duration,
     challenge_duration: time::Duration,
     challenge_frequency: u64,
+    refresh_delay: time::Duration,
 ) -> Result<()> {
     let request = challenge_state.lock().unwrap().request.clone(); // clone as const and drop mutex
     info! {"Running challenge request: {:?}", request};
@@ -103,8 +104,8 @@ pub fn run_challenge_request<T: Service, K: ClientChain, D: Storage>(
         if (request.end_blockheight as u64) < challenge_height {
             break;
         } else if (challenge_height - prev_challenge_height) < challenge_frequency {
-            info! {"Sleeping for 10 sec..."}
-            thread::sleep(time::Duration::from_secs(10));
+            info! {"Sleeping for {} sec...",time::Duration::as_secs(&refresh_delay)}
+            thread::sleep(refresh_delay);
             continue;
         }
 
@@ -207,11 +208,8 @@ mod tests {
 
     use std::sync::mpsc::{channel, Receiver, Sender};
 
-    use crate::clientchain::MockClientChain;
     use crate::error::Error;
-    use crate::service::MockService;
-    use crate::storage::MockStorage;
-    use crate::testing_utils::gen_dummy_hash;
+    use crate::util::testing::{gen_dummy_hash, MockClientChain, MockService, MockStorage};
 
     #[test]
     fn verify_challenge_test() {
@@ -390,6 +388,7 @@ mod tests {
             time::Duration::from_millis(10),
             time::Duration::from_millis(10),
             3,
+            time::Duration::from_millis(10),
         );
         match res {
             Ok(_) => {
@@ -422,6 +421,7 @@ mod tests {
             time::Duration::from_millis(10),
             time::Duration::from_millis(10),
             1,
+            time::Duration::from_millis(10),
         );
         match res {
             Ok(_) => {
@@ -458,6 +458,7 @@ mod tests {
             time::Duration::from_millis(10),
             time::Duration::from_millis(10),
             1,
+            time::Duration::from_millis(10),
         )
         .is_err());
         clientchain.return_err = false;
@@ -476,6 +477,7 @@ mod tests {
             time::Duration::from_millis(10),
             time::Duration::from_millis(10),
             1,
+            time::Duration::from_millis(10),
         )
         .is_err());
         service.return_err = false;
@@ -495,6 +497,7 @@ mod tests {
             time::Duration::from_millis(10),
             time::Duration::from_millis(10),
             1,
+            time::Duration::from_millis(10),
         )
         .is_err());
 
@@ -516,6 +519,7 @@ mod tests {
             time::Duration::from_millis(10),
             time::Duration::from_millis(10),
             1,
+            time::Duration::from_millis(10),
         );
         match res {
             Ok(_) => {
@@ -541,6 +545,7 @@ mod tests {
             time::Duration::from_millis(10),
             time::Duration::from_millis(10),
             1,
+            time::Duration::from_millis(10),
         );
         match res {
             Ok(_) => {

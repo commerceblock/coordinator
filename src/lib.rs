@@ -44,4 +44,8 @@ pub mod ocean;
 pub mod request;
 pub mod service;
 pub mod storage;
-pub mod testing_utils;
+/// utilities
+pub mod util {
+    pub mod checks;
+    pub mod testing;
+}

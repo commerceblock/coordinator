@@ -25,7 +25,7 @@ printf '%s\n' '#!/bin/sh' 'rpcuser=user1' \
     'challengecoinsdestination=76a914be70510653867b1c648b43cfb3b0edf8420f08d788ac' > ~/co-client-dir/ocean.conf
 
 ocd
-sleep 5
+sleep 8
 
 echo "Importing challenger key"
 ocl importprivkey cScSHCQp9AEwzZoucRpX9bMRkLCJ4LoQWBNFTZuD6tPX9qwNMWfQ
@@ -59,7 +59,7 @@ addr=`ocl getnewaddress`
 pub=`ocl validateaddress $addr | jq -r ".pubkey"`
 bid_tx=$(ocl decoderawtransaction `ocl getrawtransaction $bid_txid`)
 value=$(echo $bid_tx | jq '.vout[0].value')
-if [ $value = 100 ]   # Find correct vout 
+if [ $value = 100 ]   # Find correct vout
 then
   vout=$(echo $bid_tx | jq '.vout[0].n')
 else
@@ -100,7 +100,7 @@ domain_asset=$(echo $bid_tx | jq '.vout['$vout'].asset')
 
 inputs="[{\"txid\":\"$bid_txid2\",\"vout\":$vout,\"asset\":$domain_asset}]"
 outputs="{\"endBlockHeight\":10,\"requestTxid\":\"$request_txid\",\"pubkey\":\"$pub\",\
-\"feePubkey\":\"026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3\",
+\"feePubkey\":\"026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3\",\
 \"value\":55,\"change\":\"44.999\",\"changeAddress\":\"$addr\",\"fee\":0.001}"
 
 signedtx=`ocl signrawtransaction $(ocl createrawbidtx $inputs $outputs)`
