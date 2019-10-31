@@ -1,4 +1,9 @@
 //! Simple demo of coordinator with mock guard node
+//!
+//! Demo Coordinator connects to demo client chain (can be built by running
+//! ./scripts/demo.sh) and sends challenges to mock guardnodes that made bids.
+//! When guardnode responses are received by coordinator they are verified and
+//! can be stored ready for fee payments to be made.
 
 #[macro_use]
 extern crate log;
@@ -68,7 +73,7 @@ fn main() {
     for bid in client_rpc.get_request_bids(&request_txid).unwrap().unwrap().bids {
         if bid.fee_pub_key.to_string() == guardnode_pubkey {
             guardnode_txid = bid.txid;
-            println!("guardnode bid txid: {}", guardnode_txid);
+            println!("Guardnode bid txid: {}", guardnode_txid);
             break;
         }
     }

@@ -1,3 +1,12 @@
+# Script builds, signs and sends a request transaction on service chain whose
+# connectivity information is specified in $RPC_USER, RPC_PASS, RPC_CONNECT,
+# and RPC_PORT env variables from the local ocean wallet.
+#
+# Several checks are made for validity of given arguments. If all is well then an
+# unspent permission asset output is found (or provided in argument 9 and 10) and
+# used as input to a raw request tx. The request is broadcast and its spending script
+# address imported to the wallet to allow for automatic renewal of the request.
+
 #!/bin/bash
 shopt -s expand_aliases
 alias ocl="$HOME/jsonrpc-cli/jsonrpc-cli --user=$RPC_USER --pass=$RPC_PASS --format=jsonpretty --resultonly=on --highlight=off  http://$RPC_CONNECT:$RPC_PORT/"

@@ -1,3 +1,11 @@
+# Script to generate report of responses from guardnodes using
+# coordinator RPC API interface.
+#
+# First connection to a local Ocean node is made, the request data for a
+# txid is found via getrequest RPC and fee size is calculated.
+# Then getrequestresponses RPC is called to get challenge responses which can be
+# used to determine rewards for guardnodes.
+
 #!/usr/bin/env python3
 import requests
 import json
