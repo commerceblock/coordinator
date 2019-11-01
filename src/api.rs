@@ -179,7 +179,7 @@ mod tests {
 
         // save actual state
         let state = gen_challenge_state(&dummy_hash);
-        storage.save_challenge_state(&state).unwrap();
+        storage.save_challenge_state(&state, 0).unwrap();
         let s = format!(r#"{{"txid": "{}"}}"#, dummy_hash.to_string());
         let params: Params = serde_json::from_str(&s).unwrap();
         let resp = get_request(params, storage.clone());
@@ -203,7 +203,7 @@ mod tests {
 
         // save actual state
         let state = gen_challenge_state(&dummy_hash);
-        storage.save_challenge_state(&state).unwrap();
+        storage.save_challenge_state(&state, 0).unwrap();
         let resp = get_requests(storage.clone());
         assert_eq!(
             format!(
@@ -215,7 +215,7 @@ mod tests {
 
         let dummy_hash2 = gen_dummy_hash(2);
         let state2 = gen_challenge_state(&dummy_hash2);
-        storage.save_challenge_state(&state2).unwrap();
+        storage.save_challenge_state(&state2, 0).unwrap();
         let resp = get_requests(storage.clone());
         assert_eq!(
             format!(

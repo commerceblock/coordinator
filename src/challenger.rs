@@ -102,6 +102,7 @@ pub fn run_challenge_request<T: Service, K: ClientChain, D: Storage>(
         let challenge_height = service.get_blockheight()?;
         info! {"service chain height: {}", challenge_height}
         if (request.end_blockheight as u64) < challenge_height {
+            let _ = storage.set_end_blockheight_cli(request.txid.to_string(), clientchain.get_block_count());
             break;
         } else if (challenge_height - prev_challenge_height) < challenge_frequency {
             info! {"Sleeping for {} sec...",time::Duration::as_secs(&refresh_delay)}
@@ -366,7 +367,9 @@ mod tests {
         // the first challenge
         let _ = service.height.replace(dummy_request.start_blockheight as u64); // set height for fetch_next to succeed
         let challenge_state = fetch_next(&service, &dummy_hash).unwrap().unwrap();
-        storage.save_challenge_state(&challenge_state).unwrap();
+        storage
+            .save_challenge_state(&challenge_state, clientchain.get_block_count())
+            .unwrap();
 
         let (vtx, vrx): (Sender<ChallengeResponse>, Receiver<ChallengeResponse>) = channel();
 

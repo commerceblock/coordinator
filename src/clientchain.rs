@@ -33,6 +33,8 @@ pub trait ClientChain {
     fn send_challenge(&self) -> Result<sha256d::Hash>;
     /// Verify challenge transaction has been included in the chain
     fn verify_challenge(&self, txid: &sha256d::Hash) -> Result<bool>;
+    /// Get height of client chain
+    fn get_block_count(&self) -> u32;
 }
 
 /// Rpc implementation of Service using an underlying ocean rpc connection
@@ -123,5 +125,8 @@ impl<'a> ClientChain for RpcClientChain<'a> {
             Err(e) => warn!("verify challenge error{}", e),
         }
         Ok(false)
+    }
+    fn get_block_count(&self) -> u32 {
+        self.client.get_block_count().unwrap() as u32
     }
 }

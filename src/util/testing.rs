@@ -114,6 +114,9 @@ impl ClientChain for MockClientChain {
         }
         Ok(true)
     }
+    fn get_block_count(&self) -> u32 {
+        0
+    }
 }
 
 /// Mock implementation of Service using some mock logic for testing
@@ -242,7 +245,7 @@ impl MockStorage {
 
 impl Storage for MockStorage {
     /// Store the state of a challenge request
-    fn save_challenge_state(&self, challenge: &ChallengeState) -> Result<()> {
+    fn save_challenge_state(&self, challenge: &ChallengeState, _cli_chain_height: u32) -> Result<()> {
         if self.return_err {
             return Err(Error::from(CError::Generic("save_challenge_state failed".to_owned())));
         }
@@ -252,6 +255,10 @@ impl Storage for MockStorage {
                 .borrow_mut()
                 .push(bid_to_doc(&Bson::String(challenge.request.txid.to_string()), bid))
         }
+        Ok(())
+    }
+
+    fn set_end_blockheight_cli(&self, _txid: String, _cli_chain_height: u32) -> Result<()> {
         Ok(())
     }
 

@@ -19,7 +19,9 @@ use crate::request::{BidSet, Request};
 /// and challenge information
 pub trait Storage {
     /// Store the state of a challenge request
-    fn save_challenge_state(&self, challenge: &ChallengeState) -> Result<()>;
+    fn save_challenge_state(&self, challenge: &ChallengeState, cli_chain_height: u32) -> Result<()>;
+    /// Set end_blockheight_cli in Request table if not already set
+    fn set_end_blockheight_cli(&self, txid: String, cli_chain_height: u32) -> Result<()>;
     /// Store responses for a specific challenge request
     fn save_response(&self, request_hash: sha256d::Hash, ids: &ChallengeResponseIds) -> Result<()>;
     /// Get all challenge responses for a specific request
@@ -76,16 +78,23 @@ impl MongoStorage {
 
 impl Storage for MongoStorage {
     /// Store the state of a challenge request
-    fn save_challenge_state(&self, challenge: &ChallengeState) -> Result<()> {
+    fn save_challenge_state(&self, challenge: &ChallengeState, cli_chain_height: u32) -> Result<()> {
         let db_locked = self.db.lock().unwrap();
         self.auth(&db_locked)?;
 
         let request_id;
         let coll = db_locked.collection("Request");
-        let doc = request_to_doc(&challenge.request);
-        match coll.find_one(Some(doc.clone()), None)? {
-            Some(res) => request_id = res.get("_id").unwrap().clone(),
+        let mut doc = request_to_doc(&challenge.request);
+        println!("doc: {}", doc);
+        let filter = doc! {"txid"=>doc.get_str("txid").unwrap()};
+        match coll.find_one(Some(filter), None)? {
+            Some(res) => {
+                println!("res: {}", res);
+                request_id = res.get("_id").unwrap().clone();
+            }
             None => {
+                // Set start_blockheight_cli if new to DB
+                let _ = doc.insert("start_blockheight_cli", cli_chain_height);
                 request_id = coll.insert_one(doc, None)?.inserted_id.unwrap();
             }
         }
@@ -99,6 +108,23 @@ impl Storage for MongoStorage {
                     let _ = coll.insert_one(doc, None)?;
                 }
             }
+        }
+        Ok(())
+    }
+
+    /// Set end_blockheight_cli in Request table if not already set
+    fn set_end_blockheight_cli(&self, txid: String, cli_chain_height: u32) -> Result<()> {
+        let db_locked = self.db.lock().unwrap();
+        self.auth(&db_locked)?;
+        let coll = db_locked.collection("Request");
+        let filter = doc! {"txid"=>txid.clone()};
+        let update = doc! {"$set" => {"end_blockheight_cli"=>cli_chain_height}};
+        match coll.find_one_and_update(filter, update, None)? {
+            Some(res) => println!("update: {}", res),
+            None => warn!(
+                "Failed to find Request collection entry for end_blockheight_cli update. Request txid: {}",
+                txid
+            ),
         }
         Ok(())
     }
@@ -237,11 +263,11 @@ impl Storage for MongoStorage {
 mod tests {
     use super::*;
 
-    use std::str::FromStr;
+    use bitcoin_hashes::hex::FromHex;
     use mongodb::oid::ObjectId;
     use mongodb::Bson;
     use secp256k1::key::PublicKey;
-    use bitcoin_hashes::hex::FromHex;
+    use std::str::FromStr;
 
     use crate::request::Bid;
     use crate::util::testing::gen_dummy_hash;

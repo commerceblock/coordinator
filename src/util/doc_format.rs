@@ -1,6 +1,7 @@
 //! doc_format
 //!
-//! Methods to convert to/from document format
+//! doc format is used to store items in the db.
+//! File contains methods to convert to/from document format.
 
 use bitcoin_hashes::{hex::FromHex, sha256d};
 use mongodb::{ordered::OrderedDocument, Bson};
@@ -18,9 +19,9 @@ pub fn request_to_doc(request: &Request) -> OrderedDocument {
         "end_blockheight_serv": request.end_blockheight,
         "genesis_blockhash": request.genesis_blockhash.to_string(),
         "fee_percentage": request.fee_percentage,
-        "num_tickets": request.num_tickets
-        // "start_blockheight_cli": request.start_blockheight,
-        // "end_blockheight_cli": request.end_blockheight,
+        "num_tickets": request.num_tickets,
+        "start_blockheight_cli": "".to_string(),
+        "end_blockheight_cli": "".to_string(),
     }
 }
 
