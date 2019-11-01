@@ -8,6 +8,7 @@ use mongodb::Bson;
 use secp256k1::PublicKey;
 use std::cell::RefCell;
 use std::str::FromStr;
+use util::doc_format::*;
 
 use crate::challenger::{ChallengeResponseIds, ChallengeState};
 use crate::clientchain::ClientChain;
