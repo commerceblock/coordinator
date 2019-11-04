@@ -12,7 +12,7 @@ use util::doc_format::*;
 
 use crate::challenger::{ChallengeResponseIds, ChallengeState};
 use crate::config::StorageConfig;
-use crate::error::Result;
+use crate::error::{Error::MongoDb, Result};
 use crate::request::{BidSet, Request};
 
 /// Storage trait defining required functionality for objects that store request
@@ -51,6 +51,17 @@ impl MongoStorage {
             if let Some(ref pass) = storage_config.pass {
                 db.auth(user, pass)?;
             }
+        }
+
+        // Specify Indexes
+        if let Err(e) = db.collection("Request").create_index(doc! ("txid":1), None) {
+            return Err(MongoDb(e));
+        }
+        if let Err(e) = db.collection("Bid").create_index(doc! ("request_id":1), None) {
+            return Err(MongoDb(e));
+        }
+        if let Err(e) = db.collection("Response").create_index(doc! ("request_id":1), None) {
+            return Err(MongoDb(e));
         }
 
         Ok(MongoStorage {
