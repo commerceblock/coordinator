@@ -53,7 +53,7 @@ pub fn run_request<T: Service, K: ClientChain, D: Storage>(
 ) -> Result<Option<sha256d::Hash>> {
     match ::challenger::fetch_next(service, &genesis_hash)? {
         Some(challenge) => {
-            // Get current client chain height for request storage  
+            // Get current client chain height for request storage
             let cli_chain_height = clientchain.get_block_count();
             // first attempt to store the challenge state information
             // on requests and winning bids and exit if that fails

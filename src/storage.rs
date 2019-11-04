@@ -121,7 +121,8 @@ impl Storage for MongoStorage {
         Ok(())
     }
 
-    /// Set end_blockheight_cli in Request collection for given request txid if not already set
+    /// Set end_blockheight_cli in Request collection for given request txid if
+    /// not already set
     fn set_end_blockheight_cli(&self, txid: String, cli_chain_height: u32) -> Result<()> {
         let db_locked = self.db.lock().unwrap();
         self.auth(&db_locked)?;
@@ -139,7 +140,7 @@ impl Storage for MongoStorage {
                         ),
                     }
                 }
-            },
+            }
             None => warn!(
                 "Failed to find Request collection entry for end_blockheight_cli update. Request txid: {}.",
                 txid
