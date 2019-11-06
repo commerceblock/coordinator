@@ -15,32 +15,34 @@ use crate::request::{Bid, BidSet, Request};
 use crate::service::Service;
 use crate::storage::Storage;
 
-/// Number of verify attempts for challenge transaction
-pub const CHALLENGER_VERIFY_ATTEMPTS: u32 = 5;
+/// Verify attempt interval to client in ms
+pub const CHALLENGER_VERIFY_INTERVAL: u64 = 100;
 
 /// Attempts to verify that a challenge has been included in the client chain
-/// Method tries a fixed number of attempts CHALLENGER_VERIFY_ATTEMPTS for a
-/// variable delay time to allow easy configuration
+/// This makes attempts every CHALLENGER_VERIFY_INTERVAL ms and for the verify
+/// duration specified, which is variable in order to allow easy configuration
 fn verify_challenge<K: ClientChain>(
     hash: &sha256d::Hash,
     clientchain: &K,
-    attempt_delay: time::Duration,
-) -> Result<bool> {
+    verify_duration: time::Duration,
+) -> Result<()> {
     info! {"verifying challenge hash: {}", hash}
-    for i in 0..CHALLENGER_VERIFY_ATTEMPTS {
-        // fixed number of attempts?
-        if clientchain.verify_challenge(&hash)? {
-            info! {"challenge verified"}
-            return Ok(true);
-        }
-        warn! {"attempt {} failed", i+1}
-        if i + 1 == CHALLENGER_VERIFY_ATTEMPTS {
+    let start_time = time::Instant::now();
+    loop {
+        let now = time::Instant::now();
+        if start_time + verify_duration > now {
+            if clientchain.verify_challenge(&hash)? {
+                info! {"challenge verified"}
+                return Ok(());
+            }
+        } else {
             break;
         }
-        info! {"sleeping for {:?}...", attempt_delay/CHALLENGER_VERIFY_ATTEMPTS}
-        thread::sleep(attempt_delay / CHALLENGER_VERIFY_ATTEMPTS)
+        // This will potentially be replaced by subscribing to the ocean node
+        // for transaction updates but this is good enough for now
+        thread::sleep(std::time::Duration::from_millis(CHALLENGER_VERIFY_INTERVAL))
     }
-    Ok(false)
+    Err(Error::from(CError::UnverifiedChallenge))
 }
 
 /// Get responses to the challenge by reading data from the channel receiver
@@ -115,9 +117,9 @@ pub fn run_challenge_request<T: Service, K: ClientChain, D: Storage>(
         let challenge_hash = clientchain.send_challenge()?;
         challenge_state.lock().unwrap().latest_challenge = Some(challenge_hash);
 
-        if !verify_challenge(&challenge_hash, clientchain, verify_duration)? {
+        if let Err(e) = verify_challenge(&challenge_hash, clientchain, verify_duration) {
             challenge_state.lock().unwrap().latest_challenge = None; // stop receiving responses
-            continue;
+            return Err(e);
         }
 
         info! {"fetching responses..."}
@@ -218,15 +220,21 @@ mod tests {
         let mut clientchain = MockClientChain::new();
         let dummy_hash = gen_dummy_hash(5);
 
-        assert!(verify_challenge(&dummy_hash, &clientchain, time::Duration::from_nanos(1)).unwrap() == true);
+        // duration doesn't matter here
+        assert!(verify_challenge(&dummy_hash, &clientchain, time::Duration::from_millis(10)).unwrap() == ());
 
         clientchain.return_false = true;
-        assert!(verify_challenge(&dummy_hash, &clientchain, time::Duration::from_nanos(1)).unwrap() == false);
+        let res = verify_challenge(&dummy_hash, &clientchain, time::Duration::from_millis(10));
+        match res {
+            Ok(_) => assert!(false, "should not return Ok"),
+            Err(Error::Coordinator(e)) => assert_eq!(CError::UnverifiedChallenge.to_string(), e.to_string()),
+            Err(_) => assert!(false, "should not return any error"),
+        }
         clientchain.return_false = false;
 
         clientchain.return_err = true;
         assert!(
-            verify_challenge(&dummy_hash, &clientchain, time::Duration::from_nanos(1)).is_err(),
+            verify_challenge(&dummy_hash, &clientchain, time::Duration::from_millis(10)).is_err(),
             "verify_challenge failed"
         )
     }
@@ -553,10 +561,12 @@ mod tests {
             time::Duration::from_millis(10),
         );
         match res {
-            Ok(_) => {
+            Ok(_) => assert!(false, "should not return Ok"),
+            Err(Error::Coordinator(e)) => {
                 assert_eq!(0, storage.challenge_responses.borrow().len());
+                assert_eq!(CError::UnverifiedChallenge.to_string(), e.to_string());
             }
-            Err(_) => assert!(false, "should not return error"),
+            Err(_) => assert!(false, "should not return any error"),
         }
         clientchain.return_false = false;
 

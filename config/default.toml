@@ -31,5 +31,5 @@ asset_key = "cScSHCQp9AEwzZoucRpX9bMRkLCJ4LoQWBNFTZuD6tPX9qwNMWfQ"
 [storage]
 host = "localhost:27017"
 name = "coordinator"
-#user = "user"
-#pass = "pass"
+user = "user"
+pass = "pass"

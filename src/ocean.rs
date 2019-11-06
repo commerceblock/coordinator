@@ -22,7 +22,7 @@ impl OceanClient {
 }
 
 /// Interval between retry attempts of rpc client
-pub const OCEAN_CLIENT_INTERVAL: u64 = 10;
+pub const OCEAN_CLIENT_RETRY_INTERVAL: u64 = 10;
 
 /// Number of retry attemps for rpc client calls
 pub const OCEAN_CLIENT_RETRY_ATTEMPTS: u8 = 5;
@@ -38,7 +38,7 @@ impl RpcApi for OceanClient {
                 Ok(ret) => return Ok(ret),
                 Err(ocean_rpc::Error::JsonRpc(e)) => {
                     warn!("rpc error: {}, retrying...", e);
-                    ::std::thread::sleep(::std::time::Duration::from_millis(OCEAN_CLIENT_INTERVAL));
+                    ::std::thread::sleep(::std::time::Duration::from_millis(OCEAN_CLIENT_RETRY_INTERVAL));
                     continue;
                 }
                 Err(e) => return Err(e),

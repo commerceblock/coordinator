@@ -20,6 +20,8 @@ pub type Result<T> = result::Result<T, Error>;
 pub enum CError {
     /// Missing bids for a specific request error
     MissingBids,
+    /// Challenge was not successfully verified
+    UnverifiedChallenge,
     /// Listener receiver disconnected error
     ReceiverDisconnected,
     /// Missing unspent for challenge asset. Takes parameters asset label and
@@ -77,6 +79,7 @@ impl error::Error for CError {
         match *self {
             CError::Generic(_) => "Generic error",
             CError::MissingBids => "No bids found",
+            CError::UnverifiedChallenge => "Challenge not successfully verified",
             CError::ReceiverDisconnected => "Challenge response receiver disconnected",
             CError::MissingUnspent(_, _) => "No unspent found for asset",
             CError::InputError(_, _) => "Input parameter error",
