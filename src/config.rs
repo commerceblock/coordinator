@@ -115,8 +115,6 @@ pub struct Config {
     pub challenge_duration: u64,
     /// Challenge frequency in number of blocks
     pub challenge_frequency: u64,
-    /// Verify duration in seconds
-    pub verify_duration: u64,
     /// Listener host address
     pub listener_host: String,
     /// Api configuration
@@ -135,7 +133,6 @@ impl Default for Config {
             log_level: String::from("coordinator"),
             challenge_duration: 60,
             challenge_frequency: 1,
-            verify_duration: 150,
             listener_host: String::from("localhost:80"),
             api: ApiConfig::default(),
             service: ServiceConfig::default(),

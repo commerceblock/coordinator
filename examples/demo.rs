@@ -30,6 +30,7 @@ use secp256k1::{Message, Secp256k1, SecretKey};
 use coordinator::clientchain::get_first_unspent;
 use coordinator::coordinator as coordinator_main;
 use coordinator::ocean::OceanClient;
+use coordinator::service::SERVICE_BLOCK_TIME;
 
 /// Demo coordinator with listener and challenge service running
 /// mock implementation for service chain interface and ocean
@@ -38,7 +39,6 @@ use coordinator::ocean::OceanClient;
 fn main() {
     let mut config = coordinator::config::Config::new().unwrap();
     config.challenge_duration = 5;
-    config.verify_duration = 30;
 
     env::set_var("RUST_LOG", &config.log_level);
     env::set_var("RUST_BACKTRACE", "1");
@@ -56,7 +56,7 @@ fn main() {
     // auto client chain block generation
     let client_rpc_clone = client_rpc.clone();
     thread::spawn(move || loop {
-        thread::sleep(time::Duration::from_secs(5));
+        thread::sleep(time::Duration::from_secs(SERVICE_BLOCK_TIME));
         if let Err(e) = client_rpc_clone.clone().client.generate(1) {
             error!("{}", e);
         }

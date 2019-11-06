@@ -13,7 +13,7 @@ use crate::challenger::ChallengeResponse;
 use crate::clientchain::{ClientChain, RpcClientChain};
 use crate::config::Config;
 use crate::error::Result;
-use crate::service::{RpcService, Service};
+use crate::service::{RpcService, Service, SERVICE_BLOCK_TIME};
 use crate::storage::{MongoStorage, Storage};
 
 /// Run coordinator main method
@@ -36,8 +36,8 @@ pub fn run(config: Config) -> Result<()> {
             let resp = storage.get_responses(request_id).unwrap();
             println! {"{}", serde_json::to_string_pretty(&resp).unwrap()};
         }
-        info! {"Sleeping for 10 sec..."}
-        thread::sleep(time::Duration::from_secs(10))
+        info! {"Sleeping for {} sec...", SERVICE_BLOCK_TIME}
+        thread::sleep(time::Duration::from_secs(SERVICE_BLOCK_TIME))
     }
 }
 
@@ -85,10 +85,10 @@ pub fn run_request<T: Service, K: ClientChain, D: Storage>(
                 shared_challenge.clone(),
                 &verify_rx,
                 storage.clone(),
-                time::Duration::from_secs(config.verify_duration),
+                time::Duration::from_secs(5 * SERVICE_BLOCK_TIME),
                 time::Duration::from_secs(config.challenge_duration),
                 config.challenge_frequency,
-                time::Duration::from_secs(10),
+                time::Duration::from_secs(SERVICE_BLOCK_TIME / 2),
             )?;
 
             // stop listener service

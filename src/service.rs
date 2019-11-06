@@ -10,6 +10,9 @@ use crate::error::Result;
 use crate::ocean::OceanClient;
 use crate::request::{Bid, BidSet, Request};
 
+/// Service chain block time in seconds
+pub const SERVICE_BLOCK_TIME: u64 = 60;
+
 /// Service trait defining functionality for interfacing with service chain
 pub trait Service {
     /// Get all active requests, if any, from service chain
