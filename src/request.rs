@@ -25,6 +25,10 @@ pub struct Request {
     pub fee_percentage: u32,
     /// Num of Guardnode tickets set by client
     pub num_tickets: u32,
+    /// Request client chain start block height
+    pub start_blockheight_clientchain: u32,
+    /// Request client chain end block height
+    pub end_blockheight_clientchain: u32,
 }
 
 impl Request {
@@ -37,6 +41,8 @@ impl Request {
             genesis_blockhash: res.genesis_block,
             fee_percentage: res.fee_percentage,
             num_tickets: res.num_tickets,
+            start_blockheight_clientchain: 0,
+            end_blockheight_clientchain: 0,
         }
     }
 }

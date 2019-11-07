@@ -21,7 +21,7 @@ pub trait Storage {
     /// Store the state of a challenge request
     fn save_challenge_state(&self, challenge: &ChallengeState, cli_chain_height: u32) -> Result<()>;
     /// Set end_blockheight_cli in Request collection if not already set
-    fn set_end_blockheight_cli(&self, txid: String, cli_chain_height: u32) -> Result<()>;
+    fn set_end_blockheight_clientchain(&self, txid: String, cli_chain_height: u32) -> Result<()>;
     /// Store responses for a specific challenge request
     fn save_response(&self, request_hash: sha256d::Hash, ids: &ChallengeResponseIds) -> Result<()>;
     /// Get all challenge responses for a specific request
@@ -95,14 +95,14 @@ impl Storage for MongoStorage {
 
         let request_id;
         let coll = db_locked.collection("Request");
-        let mut doc = request_to_doc(&challenge.request);
-        let filter = doc! {"txid"=>doc.get_str("txid").unwrap()};
+        let filter = doc! {"txid"=>challenge.request.txid.to_string()};
         match coll.find_one(Some(filter), None)? {
             Some(res) => {
                 request_id = res.get("_id").unwrap().clone();
             }
             None => {
                 // Set start_blockheight_cli if new entry to Collection
+                let mut doc = request_to_doc(&challenge.request);
                 let _ = doc.insert("start_blockheight_cli", cli_chain_height);
                 request_id = coll.insert_one(doc, None)?.inserted_id.unwrap();
             }
@@ -123,28 +123,19 @@ impl Storage for MongoStorage {
 
     /// Set end_blockheight_cli in Request collection for given request txid if
     /// not already set
-    fn set_end_blockheight_cli(&self, txid: String, cli_chain_height: u32) -> Result<()> {
+    fn set_end_blockheight_clientchain(&self, txid: String, cli_chain_height: u32) -> Result<()> {
         let db_locked = self.db.lock().unwrap();
         self.auth(&db_locked)?;
         let coll = db_locked.collection("Request");
         let filter = doc! {"txid"=>txid.clone()};
-        let update = doc! {"$set" => {"end_blockheight_cli"=>cli_chain_height}};
         match coll.find_one(Some(filter.clone()), None)? {
             Some(res) => {
-                if res.get("end_blockheight_cli").unwrap().as_i32() == Some(0) {
-                    match coll.find_one_and_update(filter, update, None)? {
-                        Some(_) => (),
-                        None => warn!(
-                            "Failed to update Request collection entry for end_blockheight_cli. Request txid: {}.",
-                            txid
-                        ),
-                    }
+                if res.get("end_blockheight_clientchain").unwrap().as_i32() == Some(0) {
+                    let update = doc! {"$set"=>{"end_blockheight_clientchain"=>cli_chain_height}};
+                    let _ = coll.find_one_and_update(filter, update, None)?;
                 }
             }
-            None => warn!(
-                "Failed to find Request collection entry for end_blockheight_cli update. Request txid: {}.",
-                txid
-            ),
+            None => (),
         }
         Ok(())
     }

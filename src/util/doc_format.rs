@@ -15,13 +15,13 @@ use crate::request::{Bid, Request};
 pub fn request_to_doc(request: &Request) -> OrderedDocument {
     doc! {
         "txid": request.txid.to_string(),
-        "start_blockheight_serv": request.start_blockheight,
-        "end_blockheight_serv": request.end_blockheight,
+        "start_blockheight": request.start_blockheight,
+        "end_blockheight": request.end_blockheight,
         "genesis_blockhash": request.genesis_blockhash.to_string(),
         "fee_percentage": request.fee_percentage,
         "num_tickets": request.num_tickets,
-        "start_blockheight_cli": 0,
-        "end_blockheight_cli": 0,
+        "start_blockheight_clientchain": request.start_blockheight_clientchain,
+        "end_blockheight_clientchain": request.end_blockheight_clientchain,
     }
 }
 
@@ -29,11 +29,13 @@ pub fn request_to_doc(request: &Request) -> OrderedDocument {
 pub fn doc_to_request(doc: &OrderedDocument) -> Request {
     Request {
         txid: sha256d::Hash::from_hex(doc.get("txid").unwrap().as_str().unwrap()).unwrap(),
-        start_blockheight: doc.get("start_blockheight_serv").unwrap().as_i32().unwrap() as u32,
-        end_blockheight: doc.get("end_blockheight_serv").unwrap().as_i32().unwrap() as u32,
+        start_blockheight: doc.get("start_blockheight").unwrap().as_i32().unwrap() as u32,
+        end_blockheight: doc.get("end_blockheight").unwrap().as_i32().unwrap() as u32,
         genesis_blockhash: sha256d::Hash::from_hex(doc.get("genesis_blockhash").unwrap().as_str().unwrap()).unwrap(),
         fee_percentage: doc.get("fee_percentage").unwrap().as_i32().unwrap() as u32,
         num_tickets: doc.get("num_tickets").unwrap().as_i32().unwrap() as u32,
+        start_blockheight_clientchain: doc.get("start_blockheight_clientchain").unwrap().as_i32().unwrap() as u32,
+        end_blockheight_clientchain: doc.get("end_blockheight_clientchain").unwrap().as_i32().unwrap() as u32,
     }
 }
 
@@ -99,19 +101,21 @@ mod tests {
             genesis_blockhash: sha256d::Hash::from_hex(genesis_hash).unwrap(),
             fee_percentage: 5,
             num_tickets: 10,
+            start_blockheight_clientchain: 0,
+            end_blockheight_clientchain: 0,
         };
 
         let doc = request_to_doc(&request);
         assert_eq!(
             doc! {
                 "txid": request_hash.to_string(),
-                "start_blockheight_serv": 2,
-                "end_blockheight_serv": 5,
+                "start_blockheight": 2,
+                "end_blockheight": 5,
                 "genesis_blockhash": genesis_hash,
                 "fee_percentage": 5,
                 "num_tickets": 10,
-                "start_blockheight_cli":0,
-                "end_blockheight_cli":0
+                "start_blockheight_clientchain":0,
+                "end_blockheight_clientchain":0
             },
             doc
         );

@@ -102,7 +102,7 @@ pub fn run_challenge_request<T: Service, K: ClientChain, D: Storage>(
         let challenge_height = service.get_blockheight()?;
         info! {"service chain height: {}", challenge_height}
         if (request.end_blockheight as u64) < challenge_height {
-            let _ = storage.set_end_blockheight_cli(request.txid.to_string(), clientchain.get_block_count());
+            let _ = storage.set_end_blockheight_clientchain(request.txid.to_string(), clientchain.get_block_count()?);
             break;
         } else if (challenge_height - prev_challenge_height) < challenge_frequency {
             info! {"Sleeping for {} sec...",time::Duration::as_secs(&refresh_delay)}
@@ -366,14 +366,15 @@ mod tests {
         // test normal operation of run_challenge_request by adding some responses for
         // the first challenge
         let _ = service.height.replace(dummy_request.start_blockheight as u64); // set height for fetch_next to succeed
+
         let challenge_state = fetch_next(&service, &dummy_hash).unwrap().unwrap();
         storage
-            .save_challenge_state(&challenge_state, clientchain.get_block_count())
+            .save_challenge_state(&challenge_state, clientchain.get_block_count().unwrap())
             .unwrap();
 
         let (vtx, vrx): (Sender<ChallengeResponse>, Receiver<ChallengeResponse>) = channel();
 
-        let _ = clientchain.height.replace((dummy_request.start_blockheight as u64) + 1); // set height +1 for challenge hash response
+        let _ = clientchain.height.replace((dummy_request.start_blockheight) + 1); // set height +1 for challenge hash response
         let dummy_challenge_hash = clientchain.send_challenge().unwrap();
         let dummy_bid = challenge_state.bids.iter().next().unwrap().clone();
         vtx.send(ChallengeResponse(dummy_challenge_hash, dummy_bid.clone()))
@@ -393,6 +394,14 @@ mod tests {
             3,
             time::Duration::from_millis(10),
         );
+
+        // Reset end_blockheight_clientchain field which is updated in
+        // run_challenge_request but gets in the way of other tests
+        let _ = storage.set_end_blockheight_clientchain(
+            "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff".to_string(),
+            0,
+        );
+
         match res {
             Ok(_) => {
                 let resps = storage.get_responses(dummy_request.txid).unwrap();
@@ -426,6 +435,14 @@ mod tests {
             1,
             time::Duration::from_millis(10),
         );
+
+        // Reset end_blockheight_clientchain field which is updated in
+        // run_challenge_request but gets in the way of other tests
+        let _ = storage.set_end_blockheight_clientchain(
+            "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff".to_string(),
+            0,
+        );
+
         match res {
             Ok(_) => {
                 let resps = storage.get_responses(dummy_request.txid).unwrap();
@@ -556,5 +573,27 @@ mod tests {
             }
             Err(_) => assert!(false, "should not return error"),
         }
+
+        //test end_blockheight_clientchain set correctly
+        let challenge_state = fetch_next(&service, &dummy_hash).unwrap().unwrap();
+        storage
+            .save_challenge_state(&challenge_state, clientchain.get_block_count().unwrap())
+            .unwrap();
+        let _ = service.height.replace(dummy_request.start_blockheight as u64); // set height back to starting height
+        let _ = run_challenge_request(
+            &service,
+            &clientchain,
+            Arc::new(Mutex::new(challenge_state.clone())),
+            &vrx,
+            storage.clone(),
+            time::Duration::from_millis(10),
+            time::Duration::from_millis(10),
+            3,
+            time::Duration::from_millis(10),
+        );
+        assert_eq!(
+            storage.get_requests().unwrap()[0].end_blockheight_clientchain,
+            *clientchain.height.borrow()
+        );
     }
 }
