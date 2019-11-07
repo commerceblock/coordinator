@@ -253,7 +253,7 @@ impl MockStorage {
 
 impl Storage for MockStorage {
     /// Store the state of a challenge request
-    fn save_challenge_state(&self, challenge: &ChallengeState, _cli_chain_height: u32) -> Result<()> {
+    fn save_challenge_state(&self, challenge: &ChallengeState) -> Result<()> {
         if self.return_err {
             return Err(Error::from(CError::Generic("save_challenge_state failed".to_owned())));
         }
@@ -266,10 +266,11 @@ impl Storage for MockStorage {
         Ok(())
     }
 
-    fn set_end_blockheight_clientchain(&self, txid: String, cli_chain_height: u32) -> Result<()> {
+    /// update request in storage
+    fn update_request_storage(&self, request_update: ServiceRequest) -> Result<()> {
         for request in self.requests.borrow_mut().iter_mut() {
-            if request.get("txid").unwrap().as_str().unwrap() == txid {
-                let _ = request.insert("end_blockheight_clientchain", cli_chain_height);
+            if request.get("txid").unwrap().as_str() == Some(&request_update.txid.to_string()) {
+                *request = request_to_doc(&request_update);
             }
         }
         Ok(())
