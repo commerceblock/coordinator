@@ -470,10 +470,7 @@ mod tests {
             Ok(_) => {
                 // manual set of end_blockheight_clientchain for comparison
                 dummy_request.end_blockheight_clientchain = *clientchain.height.borrow();
-                assert_eq!(
-                    storage.get_requests().unwrap()[0],
-                    dummy_request
-                );
+                assert_eq!(storage.get_requests().unwrap()[0], dummy_request);
             }
             Err(_) => assert!(false, "should not return error"),
         };

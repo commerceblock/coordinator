@@ -59,7 +59,7 @@ pub fn run_request<T: Service, K: ClientChain, D: Storage>(
             // request in table (catcher for coordinator failure after storing
             // request but before request service period over)
             match storage.get_request(challenge.request.txid)? {
-                Some(req) => {challenge.request = req},
+                Some(req) => challenge.request = req,
                 None => {
                     // Set request's start_blockheight_clientchain
                     challenge.request.start_blockheight_clientchain = clientchain.get_block_count()?;
