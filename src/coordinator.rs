@@ -53,7 +53,7 @@ pub fn run_request<T: Service, K: ClientChain, D: Storage>(
 ) -> Result<Option<sha256d::Hash>> {
     match ::challenger::fetch_next(service, &genesis_hash)? {
         Some(mut challenge) => {
-            // Set requests start_blockheight_clientchain if not already set
+            // Set request's start_blockheight_clientchain
             challenge.request.start_blockheight_clientchain = clientchain.get_block_count()?;
 
             // first attempt to store the challenge state information

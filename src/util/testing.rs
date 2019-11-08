@@ -121,7 +121,7 @@ impl ClientChain for MockClientChain {
 
     /// Get block count dummy
     fn get_block_count(&self) -> Result<u32> {
-        Ok(self.height.clone().into_inner() as u32)
+        Ok(self.height.clone().into_inner())
     }
 }
 
@@ -257,7 +257,15 @@ impl Storage for MockStorage {
         if self.return_err {
             return Err(Error::from(CError::Generic("save_challenge_state failed".to_owned())));
         }
-        self.requests.borrow_mut().push(request_to_doc(&challenge.request));
+        // do not add request if already exists
+        if !self
+            .requests
+            .borrow_mut()
+            .iter()
+            .any(|request| request.get("txid").unwrap().as_str().unwrap() == &challenge.request.txid.to_string())
+        {
+            self.requests.borrow_mut().push(request_to_doc(&challenge.request));
+        }
         for bid in challenge.bids.iter() {
             self.bids
                 .borrow_mut()
@@ -266,10 +274,10 @@ impl Storage for MockStorage {
         Ok(())
     }
 
-    /// update request in storage
-    fn update_request_storage(&self, request_update: ServiceRequest) -> Result<()> {
+    /// update request in Request collection
+    fn update_request(&self, request_update: ServiceRequest) -> Result<()> {
         for request in self.requests.borrow_mut().iter_mut() {
-            if request.get("txid").unwrap().as_str() == Some(&request_update.txid.to_string()) {
+            if request.get("txid").unwrap().as_str().unwrap() == &request_update.txid.to_string() {
                 *request = request_to_doc(&request_update);
             }
         }

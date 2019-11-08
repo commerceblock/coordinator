@@ -96,14 +96,14 @@ pub fn run_challenge_request<T: Service, K: ClientChain, D: Storage>(
     refresh_delay: time::Duration,
 ) -> Result<()> {
     let mut request = challenge_state.lock().unwrap().request.clone(); // clone as const and drop mutex
-    info! {"Running challenge request: {:?}", request};
+    info! {"Running challenge request: {:?}", request.txid};
     let mut prev_challenge_height: u64 = 0;
     loop {
         let challenge_height = service.get_blockheight()?;
         info! {"service chain height: {}", challenge_height}
         if (request.end_blockheight as u64) < challenge_height {
             request.end_blockheight_clientchain = clientchain.get_block_count()?;
-            storage.update_request_storage(request)?;
+            storage.update_request(request)?;
             break;
         } else if (challenge_height - prev_challenge_height) < challenge_frequency {
             info! {"Sleeping for {} sec...",time::Duration::as_secs(&refresh_delay)}
@@ -560,25 +560,5 @@ mod tests {
             }
             Err(_) => assert!(false, "should not return error"),
         }
-
-        //test end_blockheight_clientchain set correctly
-        let challenge_state = fetch_next(&service, &dummy_hash).unwrap().unwrap();
-        storage.save_challenge_state(&challenge_state).unwrap();
-        let _ = service.height.replace(dummy_request.start_blockheight as u64); // set height back to starting height
-        let _ = run_challenge_request(
-            &service,
-            &clientchain,
-            Arc::new(Mutex::new(challenge_state.clone())),
-            &vrx,
-            storage.clone(),
-            time::Duration::from_millis(10),
-            time::Duration::from_millis(10),
-            3,
-            time::Duration::from_millis(10),
-        );
-        assert_eq!(
-            storage.get_requests().unwrap()[0].end_blockheight_clientchain,
-            *clientchain.height.borrow()
-        );
     }
 }
