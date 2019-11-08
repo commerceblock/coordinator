@@ -362,7 +362,7 @@ mod tests {
 
         let dummy_hash = gen_dummy_hash(0);
         let dummy_other_hash = gen_dummy_hash(9);
-        let dummy_request = service.get_request(&dummy_hash).unwrap().unwrap();
+        let mut dummy_request = service.get_request(&dummy_hash).unwrap().unwrap();
 
         // test normal operation of run_challenge_request by adding some responses for
         // the first challenge
@@ -450,6 +450,33 @@ mod tests {
             }
             Err(_) => assert!(false, "should not return error"),
         }
+
+        // test end_blockheight_clientchain set correctly in request
+        vtx.send(ChallengeResponse(dummy_challenge_hash, dummy_bid.clone()))
+            .unwrap(); // send again
+        let _ = service.height.replace(dummy_request.start_blockheight as u64); // set height back to starting height
+        let res = run_challenge_request(
+            &service,
+            &clientchain,
+            Arc::new(Mutex::new(challenge_state.clone())),
+            &vrx,
+            storage.clone(),
+            time::Duration::from_millis(10),
+            time::Duration::from_millis(10),
+            1,
+            time::Duration::from_millis(10),
+        );
+        match res {
+            Ok(_) => {
+                // manual set of end_blockheight_clientchain for comparison
+                dummy_request.end_blockheight_clientchain = *clientchain.height.borrow();
+                assert_eq!(
+                    storage.get_requests().unwrap()[0],
+                    dummy_request
+                );
+            }
+            Err(_) => assert!(false, "should not return error"),
+        };
 
         // test client chain failure
         let _ = service.height.replace(dummy_request.start_blockheight as u64); // set height for fetch_next to succeed

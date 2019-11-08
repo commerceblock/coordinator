@@ -316,25 +316,7 @@ mod tests {
         let _ = storage.update_request(update_request);
         assert_eq!(storage.get_requests().unwrap()[0].end_blockheight_clientchain, 10);
 
-        //test end_blockheight_clientchain set correctly after run_challenge_request
-        let _ = service.height.replace(dummy_request.start_blockheight as u64); // set height back to starting height
-        let _ = run_challenge_request(
-            &service,
-            &clientchain,
-            Arc::new(Mutex::new(challenge_state.clone())),
-            &vrx,
-            storage.clone(),
-            time::Duration::from_millis(10),
-            time::Duration::from_millis(10),
-            3,
-            time::Duration::from_millis(10),
-        );
-        assert_eq!(
-            storage.get_requests().unwrap()[0].end_blockheight_clientchain,
-            *clientchain.height.borrow()
-        );
-
-        // test not added if already exists
+        // test request not added if already exists
         let _ = service.height.replace(dummy_request.start_blockheight as u64); // set height back to starting height
         let _ = run_challenge_request(
             &service,
