@@ -404,7 +404,7 @@ mod tests {
 
         match res {
             Ok(_) => {
-                let resps = storage.get_responses(dummy_request.txid).unwrap();
+                let resps = storage.get_response(dummy_request.txid).unwrap();
                 assert_eq!(1, resps.len());
                 let bids = storage.get_bids(dummy_request.txid).unwrap();
                 assert_eq!(challenge_state.bids, bids);
@@ -440,7 +440,7 @@ mod tests {
 
         match res {
             Ok(_) => {
-                let resps = storage.get_responses(dummy_request.txid).unwrap();
+                let resps = storage.get_response(dummy_request.txid).unwrap();
                 assert_eq!(5, resps.len());
                 assert_eq!(1, resps[1].len());
                 assert_eq!(dummy_bid.txid, *resps[1].iter().next().unwrap());

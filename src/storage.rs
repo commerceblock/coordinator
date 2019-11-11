@@ -22,10 +22,10 @@ pub trait Storage {
     fn save_challenge_state(&self, challenge: &ChallengeState) -> Result<()>;
     /// Update request in storage
     fn update_request(&self, request: Request) -> Result<()>;
-    /// Store responses for a specific challenge request
+    /// Store response for a specific challenge request
     fn save_response(&self, request_hash: sha256d::Hash, ids: &ChallengeResponseIds) -> Result<()>;
-    /// Get all challenge responses for a specific request
-    fn get_responses(&self, request_hash: sha256d::Hash) -> Result<Vec<ChallengeResponseIds>>;
+    /// Get challenge response for a specific request
+    fn get_response(&self, request_hash: sha256d::Hash) -> Result<Vec<ChallengeResponseIds>>;
     /// Get all bids for a specific request
     fn get_bids(&self, request_hash: sha256d::Hash) -> Result<BidSet>;
     /// Get all the requests
@@ -132,7 +132,7 @@ impl Storage for MongoStorage {
         Ok(())
     }
 
-    /// Store responses for a specific challenge request
+    /// Store response for a specific challenge request
     fn save_response(&self, request_hash: sha256d::Hash, ids: &ChallengeResponseIds) -> Result<()> {
         let db_locked = self.db.lock().unwrap();
         self.auth(&db_locked)?;
@@ -153,8 +153,8 @@ impl Storage for MongoStorage {
         Ok(())
     }
 
-    /// Get all challenge responses for a specific request
-    fn get_responses(&self, request_hash: sha256d::Hash) -> Result<Vec<ChallengeResponseIds>> {
+    /// Get challenge response for a specific request
+    fn get_response(&self, request_hash: sha256d::Hash) -> Result<Vec<ChallengeResponseIds>> {
         let db_locked = self.db.lock().unwrap();
         self.auth(&db_locked)?;
 

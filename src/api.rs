@@ -84,7 +84,7 @@ fn get_request_responses(params: Params, storage: Arc<dyn Storage>) -> futures::
     let try_parse = params.parse::<GetRequestResponsesParams>();
     match try_parse {
         Ok(parse) => {
-            let responses = storage.get_responses(parse.txid).unwrap();
+            let responses = storage.get_response(parse.txid).unwrap();
             let res_serialized = serde_json::to_string(&GetRequestResponsesResponse { responses }).unwrap();
             return futures::finished(Value::String(res_serialized));
         }

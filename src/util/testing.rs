@@ -284,7 +284,7 @@ impl Storage for MockStorage {
         Ok(())
     }
 
-    /// Store responses for a specific challenge request
+    /// Store response for a specific challenge request
     fn save_response(&self, request_hash: sha256d::Hash, ids: &ChallengeResponseIds) -> Result<()> {
         if self.return_err {
             return Err(Error::from(CError::Generic("save_response failed".to_owned())));
@@ -295,8 +295,8 @@ impl Storage for MockStorage {
         Ok(())
     }
 
-    /// Get all challenge responses for a specific request
-    fn get_responses(&self, request_hash: sha256d::Hash) -> Result<Vec<ChallengeResponseIds>> {
+    /// Get challenge response for a specific request
+    fn get_response(&self, request_hash: sha256d::Hash) -> Result<Vec<ChallengeResponseIds>> {
         let mut challenge_responses = vec![];
         for doc in self.challenge_responses.borrow().to_vec().iter() {
             if doc.get("request_id").unwrap().as_str().unwrap() == request_hash.to_string() {
