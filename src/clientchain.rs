@@ -126,6 +126,7 @@ impl<'a> ClientChain for RpcClientChain<'a> {
         }
         Ok(false)
     }
+    /// Return block count of chain
     fn get_block_count(&self) -> Result<u32> {
         Ok(self.client.get_block_count()? as u32)
     }

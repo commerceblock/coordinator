@@ -274,7 +274,7 @@ impl Storage for MockStorage {
         Ok(())
     }
 
-    /// update request in Request collection
+    /// update request in mock storage
     fn update_request(&self, request_update: ServiceRequest) -> Result<()> {
         for request in self.requests.borrow_mut().iter_mut() {
             if request.get("txid").unwrap().as_str().unwrap() == &request_update.txid.to_string() {

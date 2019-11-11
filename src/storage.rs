@@ -20,7 +20,7 @@ use crate::request::{BidSet, Request};
 pub trait Storage {
     /// Store the state of a challenge request
     fn save_challenge_state(&self, challenge: &ChallengeState) -> Result<()>;
-    /// Update request DB entry
+    /// Update request in storage
     fn update_request(&self, request: Request) -> Result<()>;
     /// Store responses for a specific challenge request
     fn save_response(&self, request_hash: sha256d::Hash, ids: &ChallengeResponseIds) -> Result<()>;
@@ -259,76 +259,5 @@ impl Storage for MongoStorage {
             Some(doc) => Ok(Some(doc_to_request(&doc))),
             None => Ok(None),
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    use bitcoin_hashes::Hash;
-    use std::sync::mpsc::{channel, Receiver, Sender};
-    use std::sync::{Arc, Mutex};
-    use std::time;
-
-    use crate::challenger::*;
-    use crate::clientchain::ClientChain;
-    use crate::request::Request;
-    use crate::service::Service;
-    use crate::storage::Storage;
-    use crate::util::testing::{gen_dummy_hash, MockClientChain, MockService, MockStorage};
-
-    #[test]
-    fn set_request_clientchain_height_test() {
-        let clientchain = MockClientChain::new();
-        let storage = Arc::new(MockStorage::new());
-        let service = MockService::new();
-
-        // Make new request
-        let dummy_hash = sha256d::Hash::from_slice(&[0xff as u8; 32]).unwrap();
-        let dummy_request = service.get_request(&dummy_hash).unwrap().unwrap();
-        assert_eq!(dummy_request.start_blockheight_clientchain, 0);
-        assert_eq!(dummy_request.end_blockheight_clientchain, 0);
-
-        // build dummy challenge state
-        let _ = service.height.replace(dummy_request.start_blockheight as u64); // set height for fetch_next to succeed
-        let challenge_state = fetch_next(&service, &dummy_hash).unwrap().unwrap();
-        storage.save_challenge_state(&challenge_state).unwrap();
-        let (vtx, vrx): (Sender<ChallengeResponse>, Receiver<ChallengeResponse>) = channel();
-        let _ = clientchain.height.replace((dummy_request.start_blockheight) + 1); // set height +1 for challenge hash response
-        let dummy_challenge_hash = clientchain.send_challenge().unwrap();
-        let dummy_bid = challenge_state.bids.iter().next().unwrap().clone();
-        vtx.send(ChallengeResponse(dummy_challenge_hash, dummy_bid.clone()))
-            .unwrap();
-
-        // test update_request
-        assert_eq!(storage.get_requests().unwrap()[0].end_blockheight_clientchain, 0);
-        let update_request = Request {
-            txid: dummy_hash.clone(),
-            start_blockheight: 2,
-            end_blockheight: 5,
-            genesis_blockhash: gen_dummy_hash(0),
-            fee_percentage: 5,
-            num_tickets: 10,
-            start_blockheight_clientchain: 0,
-            end_blockheight_clientchain: 10,
-        };
-        let _ = storage.update_request(update_request);
-        assert_eq!(storage.get_requests().unwrap()[0].end_blockheight_clientchain, 10);
-
-        // test request not added if already exists
-        let _ = service.height.replace(dummy_request.start_blockheight as u64); // set height back to starting height
-        let _ = run_challenge_request(
-            &service,
-            &clientchain,
-            Arc::new(Mutex::new(challenge_state.clone())),
-            &vrx,
-            storage.clone(),
-            time::Duration::from_millis(10),
-            time::Duration::from_millis(10),
-            3,
-            time::Duration::from_millis(10),
-        );
-        assert_eq!(storage.get_requests().unwrap().len(), 1);
     }
 }
