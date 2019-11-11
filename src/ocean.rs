@@ -22,10 +22,10 @@ impl OceanClient {
 }
 
 /// Interval between retry attempts of rpc client
-pub const CLIENT_INTERVAL: u64 = 10;
+pub const OCEAN_CLIENT_RETRY_INTERVAL: u64 = 10;
 
 /// Number of retry attemps for rpc client calls
-pub const CLIENT_RETRY_ATTEMPTS: u8 = 5;
+pub const OCEAN_CLIENT_RETRY_ATTEMPTS: u8 = 5;
 
 impl RpcApi for OceanClient {
     fn call<T: for<'b> serde::de::Deserialize<'b>>(
@@ -33,12 +33,12 @@ impl RpcApi for OceanClient {
         cmd: &str,
         args: &[serde_json::Value],
     ) -> ocean_rpc::Result<T> {
-        for _ in 0..CLIENT_RETRY_ATTEMPTS {
+        for _ in 0..OCEAN_CLIENT_RETRY_ATTEMPTS {
             match self.client.call(cmd, args) {
                 Ok(ret) => return Ok(ret),
                 Err(ocean_rpc::Error::JsonRpc(e)) => {
                     warn!("rpc error: {}, retrying...", e);
-                    ::std::thread::sleep(::std::time::Duration::from_millis(CLIENT_INTERVAL));
+                    ::std::thread::sleep(::std::time::Duration::from_millis(OCEAN_CLIENT_RETRY_INTERVAL));
                     continue;
                 }
                 Err(e) => return Err(e),

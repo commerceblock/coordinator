@@ -38,9 +38,10 @@ use coordinator::ocean::OceanClient;
 fn main() {
     let mut config = coordinator::config::Config::new().unwrap();
     config.challenge_duration = 5;
-    config.verify_duration = 30;
+    config.challenge_frequency = 2;
+    config.block_time = 10;
 
-    env::set_var("RUST_LOG", &config.log_level);
+    env::set_var("RUST_LOG", "coordinator,demo");
     env::set_var("RUST_BACKTRACE", "1");
     env_logger::init();
 
@@ -56,7 +57,7 @@ fn main() {
     // auto client chain block generation
     let client_rpc_clone = client_rpc.clone();
     thread::spawn(move || loop {
-        thread::sleep(time::Duration::from_secs(5));
+        thread::sleep(time::Duration::from_secs(10));
         if let Err(e) = client_rpc_clone.clone().client.generate(1) {
             error!("{}", e);
         }

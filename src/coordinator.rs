@@ -36,8 +36,8 @@ pub fn run(config: Config) -> Result<()> {
             let resp = storage.get_responses(request_id).unwrap();
             println! {"{}", serde_json::to_string_pretty(&resp).unwrap()};
         }
-        info! {"Sleeping for 10 sec..."}
-        thread::sleep(time::Duration::from_secs(10))
+        info! {"Sleeping for {} sec...", config.block_time}
+        thread::sleep(time::Duration::from_secs(config.block_time))
     }
 }
 
@@ -85,10 +85,10 @@ pub fn run_request<T: Service, K: ClientChain, D: Storage>(
                 shared_challenge.clone(),
                 &verify_rx,
                 storage.clone(),
-                time::Duration::from_secs(config.verify_duration),
+                time::Duration::from_secs(5 * config.block_time),
                 time::Duration::from_secs(config.challenge_duration),
                 config.challenge_frequency,
-                time::Duration::from_secs(10),
+                time::Duration::from_secs(config.block_time / 2),
             )?;
 
             // stop listener service
