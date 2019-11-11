@@ -13,6 +13,7 @@ use util::doc_format::*;
 use crate::challenger::{ChallengeResponseIds, ChallengeState};
 use crate::clientchain::ClientChain;
 use crate::request::{Bid, BidSet, Request as ServiceRequest};
+use crate::response::Response;
 use crate::service::Service;
 use crate::storage::*;
 
@@ -289,21 +290,32 @@ impl Storage for MockStorage {
         if self.return_err {
             return Err(Error::from(CError::Generic("save_response failed".to_owned())));
         }
+
+        for resp_doc in self.challenge_responses.borrow_mut().iter_mut() {
+            if resp_doc.get("request_id").unwrap().as_str().unwrap() == &request_hash.to_string() {
+                let mut resp = doc_to_response(resp_doc);
+                resp.update(&ids);
+                *resp_doc = response_to_doc(&Bson::String(request_hash.to_string()), &resp);
+                return Ok(());
+            }
+        }
+
+        let mut resp = Response::new();
+        resp.update(&ids);
         self.challenge_responses
             .borrow_mut()
-            .push(challenge_responses_to_doc(&Bson::String(request_hash.to_string()), ids));
+            .push(response_to_doc(&Bson::String(request_hash.to_string()), &resp));
         Ok(())
     }
 
     /// Get challenge response for a specific request
-    fn get_response(&self, request_hash: sha256d::Hash) -> Result<Vec<ChallengeResponseIds>> {
-        let mut challenge_responses = vec![];
+    fn get_response(&self, request_hash: sha256d::Hash) -> Result<Option<Response>> {
         for doc in self.challenge_responses.borrow().to_vec().iter() {
             if doc.get("request_id").unwrap().as_str().unwrap() == request_hash.to_string() {
-                challenge_responses.push(doc_to_challenge_responses(doc));
+                return Ok(Some(doc_to_response(doc)));
             }
         }
-        Ok(challenge_responses)
+        Ok(None)
     }
 
     /// Get all bids for a specific request

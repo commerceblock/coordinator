@@ -14,9 +14,9 @@ use jsonrpc_http_server::jsonrpc_core::{Error, ErrorCode, IoHandler, Params, Val
 use jsonrpc_http_server::{hyper::header, AccessControlAllowOrigin, DomainsValidation, Response, ServerBuilder};
 use serde::{Deserialize, Serialize};
 
-use crate::challenger::ChallengeResponseIds;
 use crate::config::ApiConfig;
 use crate::request::{BidSet, Request as ServiceRequest};
+use crate::response::Response as ChallengeResponse;
 use crate::storage::Storage;
 
 #[derive(Deserialize, Debug)]
@@ -75,7 +75,7 @@ struct GetRequestResponsesParams {
 
 #[derive(Serialize, Debug)]
 struct GetRequestResponsesResponse {
-    responses: Vec<ChallengeResponseIds>,
+    response: ChallengeResponse,
 }
 
 /// Get requests responses RPC call returning all responses for a specific
@@ -84,9 +84,17 @@ fn get_request_responses(params: Params, storage: Arc<dyn Storage>) -> futures::
     let try_parse = params.parse::<GetRequestResponsesParams>();
     match try_parse {
         Ok(parse) => {
-            let responses = storage.get_response(parse.txid).unwrap();
-            let res_serialized = serde_json::to_string(&GetRequestResponsesResponse { responses }).unwrap();
-            return futures::finished(Value::String(res_serialized));
+            let response_get = storage.get_response(parse.txid).unwrap();
+            if let Some(response) = response_get {
+                let res_serialized = serde_json::to_string(&GetRequestResponsesResponse { response }).unwrap();
+                return futures::finished(Value::String(res_serialized));
+            } else {
+                return futures::failed(Error {
+                    code: ErrorCode::InvalidParams,
+                    message: "Invalid params: `txid` does not exist.".to_string(),
+                    data: None,
+                });
+            }
         }
         Err(e) => return futures::failed(e),
     }
@@ -161,6 +169,7 @@ mod tests {
 
     use futures::Future;
 
+    use crate::challenger::ChallengeResponseIds;
     use crate::util::testing::{gen_challenge_state, gen_dummy_hash, MockStorage};
 
     #[test]
@@ -232,6 +241,16 @@ mod tests {
         let storage = Arc::new(MockStorage::new());
         let dummy_hash = gen_dummy_hash(1);
         let dummy_hash_bid = gen_dummy_hash(2);
+
+        // no such request
+        let s = format!(r#"{{"txid": "{}"}}"#, dummy_hash.to_string());
+        let params: Params = serde_json::from_str(&s).unwrap();
+        let resp = get_request_responses(params, storage.clone());
+        assert_eq!(
+            "Invalid params: `txid` does not exist.",
+            resp.wait().unwrap_err().message
+        );
+
         let mut dummy_response_set = ChallengeResponseIds::new();
         let _ = dummy_response_set.insert(dummy_hash_bid);
         let _ = storage.save_response(dummy_hash, &dummy_response_set);
@@ -259,7 +278,10 @@ mod tests {
         let params: Params = serde_json::from_str(&s).unwrap();
         let resp = get_request_responses(params, storage.clone());
         assert_eq!(
-            format!("{{\"responses\":[[\"{}\"]]}}", dummy_hash_bid.to_string()),
+            format!(
+                r#"{{"response":{{"num_challenges":1,"bid_responses":{{"{}":1}}}}}}"#,
+                dummy_hash_bid.to_string()
+            ),
             resp.wait().unwrap()
         );
     }

@@ -213,6 +213,7 @@ mod tests {
     use std::sync::mpsc::{channel, Receiver, Sender};
 
     use crate::error::Error;
+    use crate::response::Response;
     use crate::util::testing::{gen_dummy_hash, MockClientChain, MockService, MockStorage};
 
     #[test]
@@ -398,14 +399,14 @@ mod tests {
             storage.clone(),
             time::Duration::from_millis(10),
             time::Duration::from_millis(10),
-            3,
+            50,
             time::Duration::from_millis(10),
         );
 
         match res {
             Ok(_) => {
                 let resps = storage.get_response(dummy_request.txid).unwrap();
-                assert_eq!(1, resps.len());
+                assert_eq!(resps, None);
                 let bids = storage.get_bids(dummy_request.txid).unwrap();
                 assert_eq!(challenge_state.bids, bids);
                 let requests = storage.get_requests().unwrap();
@@ -441,10 +442,14 @@ mod tests {
         match res {
             Ok(_) => {
                 let resps = storage.get_response(dummy_request.txid).unwrap();
-                assert_eq!(5, resps.len());
-                assert_eq!(1, resps[1].len());
-                assert_eq!(dummy_bid.txid, *resps[1].iter().next().unwrap());
-                assert_eq!(5, storage.challenge_responses.borrow().len());
+                assert_eq!(
+                    resps.unwrap(),
+                    Response {
+                        num_challenges: 4,
+                        bid_responses: [(dummy_bid.txid, 1)].iter().cloned().collect()
+                    }
+                );
+                assert_eq!(1, storage.challenge_responses.borrow().len());
                 let bids = storage.get_bids(dummy_request.txid).unwrap();
                 assert_eq!(challenge_state.bids, bids);
                 let requests = storage.get_requests().unwrap();

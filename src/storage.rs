@@ -14,6 +14,7 @@ use crate::challenger::{ChallengeResponseIds, ChallengeState};
 use crate::config::StorageConfig;
 use crate::error::{Error::MongoDb, Result};
 use crate::request::{BidSet, Request};
+use crate::response::Response;
 
 /// Storage trait defining required functionality for objects that store request
 /// and challenge information
@@ -25,7 +26,7 @@ pub trait Storage {
     /// Store response for a specific challenge request
     fn save_response(&self, request_hash: sha256d::Hash, ids: &ChallengeResponseIds) -> Result<()>;
     /// Get challenge response for a specific request
-    fn get_response(&self, request_hash: sha256d::Hash) -> Result<Vec<ChallengeResponseIds>>;
+    fn get_response(&self, request_hash: sha256d::Hash) -> Result<Option<Response>>;
     /// Get all bids for a specific request
     fn get_bids(&self, request_hash: sha256d::Hash) -> Result<BidSet>;
     /// Get all the requests
@@ -137,7 +138,7 @@ impl Storage for MongoStorage {
         let db_locked = self.db.lock().unwrap();
         self.auth(&db_locked)?;
 
-        let request = db_locked
+        let request_id = db_locked
             .collection("Request")
             .find_one(
                 Some(doc! {
@@ -145,16 +146,31 @@ impl Storage for MongoStorage {
                 }),
                 None,
             )?
-            .unwrap();
+            .unwrap()
+            .get("_id")
+            .unwrap()
+            .clone();
 
-        let _ = db_locked
-            .collection("Response")
-            .insert_one(challenge_responses_to_doc(request.get("_id").unwrap(), ids), None)?;
+        let coll = db_locked.collection("Response");
+        let filter = doc! {"request_id": request_id.clone()};
+        match coll.find_one(Some(filter.clone()), None)? {
+            Some(res) => {
+                let mut resp = doc_to_response(&res);
+                resp.update(ids);
+                let update = doc! {"$set" => response_to_doc(&request_id, &resp)};
+                let _ = coll.update_one(filter, update, None)?;
+            }
+            None => {
+                let mut resp = Response::new();
+                resp.update(ids);
+                let _ = coll.insert_one(response_to_doc(&request_id, &resp), None)?;
+            }
+        }
         Ok(())
     }
 
     /// Get challenge response for a specific request
-    fn get_response(&self, request_hash: sha256d::Hash) -> Result<Vec<ChallengeResponseIds>> {
+    fn get_response(&self, request_hash: sha256d::Hash) -> Result<Option<Response>> {
         let db_locked = self.db.lock().unwrap();
         self.auth(&db_locked)?;
 
@@ -165,7 +181,7 @@ impl Storage for MongoStorage {
                         "from": "Response",
                         "localField": "_id",
                         "foreignField": "request_id",
-                        "as": "challenges"
+                        "as": "response"
                     }
                 },
                 doc! {
@@ -173,19 +189,21 @@ impl Storage for MongoStorage {
                         "txid": request_hash.to_string()
                     },
                 },
+                doc! {
+                    "$unwind": {
+                        "path": "$response"
+                    }
+                },
             ]
             .to_vec(),
             None,
         )?;
         drop(db_locked); // drop immediately on get requests
 
-        let mut all_resps: Vec<ChallengeResponseIds> = Vec::new();
         if let Some(resp) = resp_aggr.next() {
-            for challenge in resp?.get_array("challenges").unwrap().iter() {
-                all_resps.push(doc_to_challenge_responses(challenge.as_document().unwrap()))
-            }
+            return Ok(Some(doc_to_response(&resp?.get_document("response").unwrap())));
         }
-        Ok(all_resps)
+        Ok(None)
     }
 
     /// Get all bids for a specific request
