@@ -8,6 +8,7 @@ use mongodb::Bson;
 use secp256k1::PublicKey;
 use std::cell::RefCell;
 use std::str::FromStr;
+use util::doc_format::*;
 
 use crate::challenger::{ChallengeResponseIds, ChallengeState};
 use crate::clientchain::ClientChain;
@@ -31,6 +32,8 @@ pub fn gen_challenge_state(request_hash: &sha256d::Hash) -> ChallengeState {
         genesis_blockhash: gen_dummy_hash(0),
         fee_percentage: 5,
         num_tickets: 10,
+        start_blockheight_clientchain: 0,
+        end_blockheight_clientchain: 0,
     };
     let mut bids = BidSet::new();
     let _ = bids.insert(Bid {
@@ -56,6 +59,8 @@ pub fn gen_challenge_state_with_challenge(
         genesis_blockhash: *request_hash,
         fee_percentage: 5,
         num_tickets: 10,
+        start_blockheight_clientchain: 0,
+        end_blockheight_clientchain: 0,
     };
     let mut bids = BidSet::new();
     let _ = bids.insert(Bid {
@@ -79,7 +84,7 @@ pub struct MockClientChain {
     /// bool
     pub return_false: bool,
     /// Mock client chain blockheight
-    pub height: RefCell<u64>,
+    pub height: RefCell<u32>,
 }
 
 impl MockClientChain {
@@ -113,6 +118,11 @@ impl ClientChain for MockClientChain {
         }
         Ok(true)
     }
+
+    /// Get block count dummy
+    fn get_block_count(&self) -> Result<u32> {
+        Ok(self.height.clone().into_inner())
+    }
 }
 
 /// Mock implementation of Service using some mock logic for testing
@@ -124,7 +134,7 @@ pub struct MockService {
     /// Option
     pub return_none: bool,
     /// Current active request
-    pub request: ServiceRequest,
+    pub request: RefCell<ServiceRequest>,
     /// Mock service chain blockheight - incremented by default on
     /// get_blockheight
     pub height: RefCell<u64>,
@@ -143,12 +153,14 @@ impl MockService {
             .unwrap(),
             fee_percentage: 5,
             num_tickets: 10,
+            start_blockheight_clientchain: 0,
+            end_blockheight_clientchain: 0,
         };
 
         MockService {
             return_err: false,
             return_none: false,
-            request,
+            request: RefCell::new(request),
             height: RefCell::new(0),
         }
     }
@@ -169,9 +181,9 @@ impl Service for MockService {
             return Err(Error::from(CError::Generic("get_request failed".to_owned())));
         }
 
-        let mut dummy_req = self.request.clone();
+        let mut dummy_req = self.request.borrow_mut();
         dummy_req.genesis_blockhash = *hash;
-        Ok(Some(dummy_req))
+        Ok(Some(dummy_req.clone()))
     }
 
     /// Try get active request bids, by transaction hash, from service chain
@@ -245,11 +257,29 @@ impl Storage for MockStorage {
         if self.return_err {
             return Err(Error::from(CError::Generic("save_challenge_state failed".to_owned())));
         }
-        self.requests.borrow_mut().push(request_to_doc(&challenge.request));
+        // do not add request if already exists
+        if !self
+            .requests
+            .borrow_mut()
+            .iter()
+            .any(|request| request.get("txid").unwrap().as_str().unwrap() == &challenge.request.txid.to_string())
+        {
+            self.requests.borrow_mut().push(request_to_doc(&challenge.request));
+        }
         for bid in challenge.bids.iter() {
             self.bids
                 .borrow_mut()
                 .push(bid_to_doc(&Bson::String(challenge.request.txid.to_string()), bid))
+        }
+        Ok(())
+    }
+
+    /// update request in mock storage
+    fn update_request(&self, request_update: ServiceRequest) -> Result<()> {
+        for request in self.requests.borrow_mut().iter_mut() {
+            if request.get("txid").unwrap().as_str().unwrap() == &request_update.txid.to_string() {
+                *request = request_to_doc(&request_update);
+            }
         }
         Ok(())
     }

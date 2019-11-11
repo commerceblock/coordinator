@@ -47,5 +47,6 @@ pub mod storage;
 /// utilities
 pub mod util {
     pub mod checks;
+    pub mod doc_format;
     pub mod testing;
 }
