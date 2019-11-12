@@ -35,14 +35,11 @@ extern crate jsonrpc_http_server;
 
 pub mod api;
 pub mod challenger;
-pub mod clientchain;
 pub mod config;
 pub mod coordinator;
 pub mod error;
 pub mod listener;
-pub mod request;
-pub mod response;
-pub mod service;
-pub mod storage;
-/// utilities
+
+pub mod interfaces;
+/// sub-mods
 pub mod util;

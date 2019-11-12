@@ -27,8 +27,8 @@ use hyper::{
 use ocean_rpc::RpcApi;
 use secp256k1::{Message, Secp256k1, SecretKey};
 
-use coordinator::clientchain::get_first_unspent;
 use coordinator::coordinator as coordinator_main;
+use coordinator::interfaces::clientchain::get_first_unspent;
 use coordinator::util::ocean::OceanClient;
 
 /// Demo coordinator with listener and challenge service running
