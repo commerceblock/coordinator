@@ -7,8 +7,8 @@ use ocean_rpc::RpcApi;
 
 use crate::config::ServiceConfig;
 use crate::error::Result;
-use crate::ocean::OceanClient;
 use crate::request::{Bid, BidSet, Request};
+use crate::util::ocean::OceanClient;
 
 /// Service trait defining functionality for interfacing with service chain
 pub trait Service {

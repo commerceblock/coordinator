@@ -1,6 +1,6 @@
 //! # Coordinator Library
 //!
-//! Basic functionality required by Coordinator daemon
+//! Core functionality of the coordinator library
 
 // Coding conventions
 #![deny(non_upper_case_globals)]
@@ -40,14 +40,9 @@ pub mod config;
 pub mod coordinator;
 pub mod error;
 pub mod listener;
-pub mod ocean;
 pub mod request;
 pub mod response;
 pub mod service;
 pub mod storage;
 /// utilities
-pub mod util {
-    pub mod checks;
-    pub mod doc_format;
-    pub mod testing;
-}
+pub mod util;

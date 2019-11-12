@@ -29,7 +29,7 @@ use secp256k1::{Message, Secp256k1, SecretKey};
 
 use coordinator::clientchain::get_first_unspent;
 use coordinator::coordinator as coordinator_main;
-use coordinator::ocean::OceanClient;
+use coordinator::util::ocean::OceanClient;
 
 /// Demo coordinator with listener and challenge service running
 /// mock implementation for service chain interface and ocean
