@@ -42,6 +42,7 @@ pub mod error;
 pub mod listener;
 pub mod ocean;
 pub mod request;
+pub mod response;
 pub mod service;
 pub mod storage;
 /// utilities

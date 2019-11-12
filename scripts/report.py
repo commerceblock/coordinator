@@ -3,7 +3,7 @@
 #
 # First connection to a local Ocean node is made, the request data for a
 # txid is found via getrequest RPC and fee size is calculated.
-# Then getrequestresponses RPC is called to get challenge responses which can be
+# Then getrequestresponse RPC is called to get challenge responses which can be
 # used to determine rewards for guardnodes.
 
 #!/usr/bin/env python3
@@ -82,9 +82,9 @@ def calculate_fees(rpc, start_height, end_height):
     return fee
 
 addr_prefix = 235
-txid = "78f954d07de5badbc1526a60fe0ea639216f17f490a3bf41e48840453eca243f"
-url = 'https://userApi:passwordApi@coordinator-api.testnet.commerceblock.com:10006'
-rpc = connect("ocean", "oceanpass", "localhost", "7043")
+txid = "6e993034df3203c0867c98f420f85b5ffecd7cb8580e2b6f2d33764e1cbfb074"
+url = 'http://userApi:passwordApi@localhost:3333'
+rpc = connect("user1", "password1", "localhost", "5555")
 
 payload = '{{"jsonrpc": "2.0", "method": "getrequest", "params": {{"txid": "{}"}}, "id": 1}}'.format(txid)
 headers = {'content-type': 'application/json', 'Accept-Charset': 'UTF-8'}
@@ -98,11 +98,8 @@ print("Request details:\n{}".format(request))
 print("")
 
 print("Calculating total fees...")
-# For requests that are serving the service chain the fee start/end heights
-# can be picked up from the request information. For requests in client chains
-# these heights need to be found manually and inserted below to calculate fees
-fee_start_height = request['start_blockheight']
-fee_end_height = request['end_blockheight']
+fee_start_height = request['start_blockheight_clientchain']
+fee_end_height = request['end_blockheight_clientchain']
 fee = calculate_fees(rpc, fee_start_height, fee_end_height)
 fee_percentage = request['fee_percentage']
 fee_out = fee*fee_percentage/100
@@ -120,21 +117,17 @@ if len(bids) > 0:
     fee_per_guard = float(fee_out/len(bids))
 print("")
 
-payload = '{{"jsonrpc": "2.0", "method": "getrequestresponses", "params": {{"txid": "{}"}}, "id": 1}}'.format(txid)
+payload = '{{"jsonrpc": "2.0", "method": "getrequestresponse", "params": {{"txid": "{}"}}, "id": 1}}'.format(txid)
 headers = {'content-type': 'application/json', 'Accept-Charset': 'UTF-8'}
 r = requests.post(url, data=payload, headers=headers)
 
 result = json.loads(json.loads(r.content)['result'])
-challenge_resps = result["responses"]
-num_of_challenges = len(challenge_resps)
+challenge_resps = result["response"]
+num_of_challenges = challenge_resps["num_challenges"]
 print("Number of challenges: {}".format(num_of_challenges))
 resps = {}
-for challenge_resp in challenge_resps:
-    for bid_resp in challenge_resp:
-        if bid_resp in resps:
-            resps[bid_resp] += (1/num_of_challenges)
-        else:
-            resps[bid_resp] = (1/num_of_challenges)
+for (bid, resp_num) in challenge_resps["bid_responses"].items():
+    resps[bid] = resp_num / num_of_challenges
 
 print("Results")
 for bid, key in bids.items():
