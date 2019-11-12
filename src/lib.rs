@@ -41,5 +41,4 @@ pub mod error;
 pub mod listener;
 
 pub mod interfaces;
-/// sub-mods
 pub mod util;
