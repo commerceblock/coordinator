@@ -97,14 +97,9 @@ pub fn doc_to_response(doc: &OrderedDocument) -> Response {
 mod tests {
     use super::*;
 
-    use bitcoin_hashes::hex::FromHex;
     use mongodb::oid::ObjectId;
-    use mongodb::Bson;
-    use secp256k1::key::PublicKey;
-    use std::str::FromStr;
 
     use crate::challenger::ChallengeResponseIds;
-    use crate::request::Bid;
     use crate::util::testing::gen_dummy_hash;
 
     #[test]
