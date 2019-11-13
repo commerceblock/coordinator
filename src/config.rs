@@ -109,10 +109,6 @@ impl Default for StorageConfig {
     }
 }
 
-// pub trait Config {
-//     fn new(&self) -> Result<Self> where Self: std::marker::Sized;
-// }
-
 /// Config struct storing all config
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
