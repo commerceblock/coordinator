@@ -10,6 +10,7 @@ use std::{thread, time};
 
 use bitcoin_hashes::sha256d;
 
+use crate::config::Config;
 use crate::error::{CError, Error, Result};
 use crate::interfaces::clientchain::ClientChain;
 use crate::interfaces::request::{Bid, BidSet, Request};
@@ -242,7 +243,7 @@ mod tests {
     use crate::config;
     use crate::error::Error;
     use crate::interfaces::response::Response;
-    use crate::util::testing::{gen_dummy_hash, MockClientChain, MockService, MockStorage};
+    use crate::util::testing::{gen_challenge_state, gen_dummy_hash, MockClientChain, MockService, MockStorage};
 
     #[test]
     fn verify_challenge_test() {
@@ -547,28 +548,6 @@ mod tests {
             }
             Err(_) => assert!(false, "should not return error"),
         }
-
-        // test end_blockheight_clientchain set correctly in request
-        vtx.send(ChallengeResponse(dummy_challenge_hash, dummy_bid.clone()))
-            .unwrap(); // send again
-        let _ = service.height.replace(dummy_request.start_blockheight as u64); // set height back to starting height
-        let res = run_challenge_request(
-            &service,
-            &clientchain,
-            Arc::new(Mutex::new(challenge_state.clone())),
-            &vrx,
-            storage.clone(),
-            time::Duration::from_millis(10),
-            time::Duration::from_millis(10),
-            1,
-            time::Duration::from_millis(10),
-        );
-        match res {
-            Ok(_) => {
-                assert_eq!(storage.get_requests().unwrap()[0], dummy_request);
-            }
-            Err(_) => assert!(false, "should not return error"),
-        };
 
         // test client chain failure
         let _ = service.height.replace(dummy_request.start_blockheight as u64); // set height for fetch_next to succeed
