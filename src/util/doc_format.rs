@@ -10,8 +10,8 @@ use bitcoin_hashes::{hex::FromHex, sha256d};
 use mongodb::{ordered::OrderedDocument, Bson};
 use secp256k1::key::PublicKey;
 
-use crate::request::{Bid, Request};
-use crate::response::Response;
+use crate::interfaces::request::{Bid, Request};
+use crate::interfaces::response::Response;
 
 /// Util method that generates a Request document from a request
 pub fn request_to_doc(request: &Request) -> OrderedDocument {
@@ -97,14 +97,9 @@ pub fn doc_to_response(doc: &OrderedDocument) -> Response {
 mod tests {
     use super::*;
 
-    use bitcoin_hashes::hex::FromHex;
     use mongodb::oid::ObjectId;
-    use mongodb::Bson;
-    use secp256k1::key::PublicKey;
-    use std::str::FromStr;
 
     use crate::challenger::ChallengeResponseIds;
-    use crate::request::Bid;
     use crate::util::testing::gen_dummy_hash;
 
     #[test]

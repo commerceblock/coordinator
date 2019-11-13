@@ -10,12 +10,11 @@ use std::{thread, time};
 
 use bitcoin_hashes::sha256d;
 
-use crate::clientchain::ClientChain;
-use crate::config::Config;
 use crate::error::{CError, Error, Result};
-use crate::request::{Bid, BidSet, Request};
-use crate::service::Service;
-use crate::storage::Storage;
+use crate::interfaces::clientchain::ClientChain;
+use crate::interfaces::request::{Bid, BidSet, Request};
+use crate::interfaces::service::Service;
+use crate::interfaces::storage::Storage;
 
 /// Verify attempt interval to client in ms
 pub const CHALLENGER_VERIFY_INTERVAL: u64 = 100;
@@ -242,8 +241,8 @@ mod tests {
 
     use crate::config;
     use crate::error::Error;
-    use crate::response::Response;
-    use crate::util::testing::{gen_challenge_state, gen_dummy_hash, MockClientChain, MockService, MockStorage};
+    use crate::interfaces::response::Response;
+    use crate::util::testing::{gen_dummy_hash, MockClientChain, MockService, MockStorage};
 
     #[test]
     fn verify_challenge_test() {

@@ -11,11 +11,11 @@ use std::str::FromStr;
 use util::doc_format::*;
 
 use crate::challenger::{ChallengeResponseIds, ChallengeState};
-use crate::clientchain::ClientChain;
-use crate::request::{Bid, BidSet, Request as ServiceRequest};
-use crate::response::Response;
-use crate::service::Service;
-use crate::storage::*;
+use crate::interfaces::clientchain::ClientChain;
+use crate::interfaces::request::{Bid, BidSet, Request as ServiceRequest};
+use crate::interfaces::response::Response;
+use crate::interfaces::service::Service;
+use crate::interfaces::storage::*;
 
 use crate::error::*;
 

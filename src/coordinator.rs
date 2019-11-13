@@ -10,11 +10,11 @@ use bitcoin_hashes::{hex::FromHex, sha256d};
 use futures::sync::oneshot;
 
 use crate::challenger::ChallengeResponse;
-use crate::clientchain::{ClientChain, RpcClientChain};
 use crate::config::Config;
 use crate::error::Result;
-use crate::service::{RpcService, Service};
-use crate::storage::{MongoStorage, Storage};
+use crate::interfaces::clientchain::{ClientChain, RpcClientChain};
+use crate::interfaces::service::{RpcService, Service};
+use crate::interfaces::storage::{MongoStorage, Storage};
 
 /// Run coordinator main method
 pub fn run(config: Config) -> Result<()> {
