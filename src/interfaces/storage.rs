@@ -13,8 +13,8 @@ use util::doc_format::*;
 use crate::challenger::{ChallengeResponseIds, ChallengeState};
 use crate::config::StorageConfig;
 use crate::error::{Error::MongoDb, Result};
-use crate::request::{BidSet, Request};
-use crate::response::Response;
+use crate::interfaces::request::{BidSet, Request};
+use crate::interfaces::response::Response;
 
 /// Storage trait defining required functionality for objects that store request
 /// and challenge information

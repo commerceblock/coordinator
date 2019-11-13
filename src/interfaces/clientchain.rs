@@ -9,7 +9,7 @@ use ocean_rpc::{json, RpcApi};
 
 use crate::config::ClientChainConfig;
 use crate::error::{CError, Error, Result};
-use crate::ocean::OceanClient;
+use crate::util::ocean::OceanClient;
 
 /// Method that returns the first unspent output for given asset
 /// or an error if the client wallet does not have any unspent/funds
