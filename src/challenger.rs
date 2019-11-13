@@ -1,6 +1,7 @@
 //! Challenger
 //!
-//! Methods and models for fetching, structuring and running challenge requests
+//! Methods and models for fetching, structuring, storing and running challenge
+//! requests
 
 use std::collections::HashSet;
 use std::sync::mpsc::{Receiver, RecvTimeoutError};
@@ -10,6 +11,7 @@ use std::{thread, time};
 use bitcoin_hashes::sha256d;
 
 use crate::clientchain::ClientChain;
+use crate::config::Config;
 use crate::error::{CError, Error, Result};
 use crate::request::{Bid, BidSet, Request};
 use crate::service::Service;
@@ -97,15 +99,13 @@ pub fn run_challenge_request<T: Service, K: ClientChain, D: Storage>(
     challenge_frequency: u64,
     refresh_delay: time::Duration,
 ) -> Result<()> {
-    let mut request = challenge_state.lock().unwrap().request.clone(); // clone as const and drop mutex
+    let request = challenge_state.lock().unwrap().request.clone(); // clone as const and drop mutex
     info! {"Running challenge request: {:?}", request.txid};
     let mut prev_challenge_height: u64 = 0;
     loop {
         let challenge_height = service.get_blockheight()?;
         info! {"service chain height: {}", challenge_height}
         if (request.end_blockheight as u64) < challenge_height {
-            request.end_blockheight_clientchain = clientchain.get_block_count()?;
-            storage.update_request(request)?;
             break;
         } else if (challenge_height - prev_challenge_height) < challenge_frequency {
             info! {"Sleeping for {} sec...",time::Duration::as_secs(&refresh_delay)}
@@ -131,6 +131,34 @@ pub fn run_challenge_request<T: Service, K: ClientChain, D: Storage>(
         prev_challenge_height = challenge_height; // update prev height
     }
     info! {"Challenge request ended"}
+    Ok(())
+}
+
+/// Update challenge state request with client chain start and end block
+/// heights and store challenge state
+/// If request already stored set challenge state request to request in
+/// storage (catcher for coordinator failure after storing request but
+/// before request service period over)
+pub fn update_challenge_request_state<K: ClientChain, D: Storage>(
+    config: &Config,
+    clientchain: &K,
+    storage: Arc<D>,
+    challenge: &mut ChallengeState,
+) -> Result<()> {
+    match storage.get_request(challenge.request.txid)? {
+        Some(req) => challenge.request = req,
+        None => {
+            // Set request's start_blockheight_clientchain
+            challenge.request.start_blockheight_clientchain = clientchain.get_blockheight()?;
+            let service_period_time_s =
+                (challenge.request.end_blockheight - challenge.request.start_blockheight) * config.block_time as u32;
+            // Calculate and set request's end_blockheight_clientchain
+            challenge.request.end_blockheight_clientchain = challenge.request.start_blockheight_clientchain
+                + (service_period_time_s as f32 / config.clientchain.block_time as f32).floor() as u32;
+            storage.save_challenge_state(&challenge)?; // Store Challenge
+                                                       // Request
+        }
+    }
     Ok(())
 }
 
@@ -212,9 +240,10 @@ mod tests {
 
     use std::sync::mpsc::{channel, Receiver, Sender};
 
+    use crate::config;
     use crate::error::Error;
     use crate::response::Response;
-    use crate::util::testing::{gen_dummy_hash, MockClientChain, MockService, MockStorage};
+    use crate::util::testing::{gen_challenge_state, gen_dummy_hash, MockClientChain, MockService, MockStorage};
 
     #[test]
     fn verify_challenge_test() {
@@ -280,6 +309,64 @@ mod tests {
             Err(Error::Coordinator(e)) => assert_eq!(CError::ReceiverDisconnected.to_string(), e.to_string()),
             Err(_) => assert!(false, "should not return any error"),
         }
+    }
+
+    #[test]
+    fn update_challenge_request_state_test() {
+        let mut config = config::Config::new().unwrap();
+        let clientchain = MockClientChain::new();
+        let storage = Arc::new(MockStorage::new());
+
+        let dummy_hash = gen_dummy_hash(11);
+        let mut challenge = gen_challenge_state(&dummy_hash);
+
+        // Test challenge state request set and stored correctly
+        let _ = clientchain.height.replace(1);
+        config.block_time = 1;
+        config.clientchain.block_time = 1;
+        let _ = update_challenge_request_state(&config, &clientchain, storage.clone(), &mut challenge);
+        // All fields stay the same but start and end blockheight_clientchain
+        let mut comparison_challenge_request = challenge.request.clone();
+        comparison_challenge_request.start_blockheight_clientchain = 1;
+        comparison_challenge_request.end_blockheight_clientchain = 1 + 3;
+        assert_eq!(challenge.request, comparison_challenge_request);
+        assert_eq!(
+            storage.get_request(challenge.request.txid).unwrap().unwrap(),
+            comparison_challenge_request
+        );
+
+        // Test challenge state set and storage performed correctly
+        // for client chain block time half of service chain block time
+        let storage = Arc::new(MockStorage::new()); //reset storage
+        let _ = clientchain.height.replace(1);
+        config.block_time = 2;
+        config.clientchain.block_time = 1;
+        let _ = update_challenge_request_state(&config, &clientchain, storage.clone(), &mut challenge);
+        let mut comparison_challenge_request = challenge.request.clone();
+        comparison_challenge_request.start_blockheight_clientchain = 1;
+        comparison_challenge_request.end_blockheight_clientchain = 1 + 2 * 3;
+        assert_eq!(challenge.request, comparison_challenge_request);
+        assert_eq!(
+            storage.get_request(challenge.request.txid).unwrap().unwrap(),
+            comparison_challenge_request
+        );
+
+        // Test stored version unchanged if attempt is made to store request a second
+        // time
+        let old_challenge = challenge.clone(); // save old challenge state
+        challenge.request.fee_percentage = 25; // alter random field
+        let new_challenge = challenge.clone(); // save new challenge state
+        let _ = update_challenge_request_state(&config, &clientchain, storage.clone(), &mut challenge);
+        assert_eq!(challenge.request, old_challenge.request);
+        assert_eq!(
+            storage.get_request(challenge.request.txid).unwrap().unwrap(),
+            old_challenge.request
+        );
+        assert_ne!(challenge.request, new_challenge.request);
+        assert_ne!(
+            storage.get_request(challenge.request.txid).unwrap().unwrap(),
+            new_challenge.request
+        );
     }
 
     #[test]
@@ -371,13 +458,13 @@ mod tests {
 
         let dummy_hash = gen_dummy_hash(0);
         let dummy_other_hash = gen_dummy_hash(9);
-        let mut dummy_request = service.get_request(&dummy_hash).unwrap().unwrap();
+        let dummy_request = service.get_request(&dummy_hash).unwrap().unwrap();
 
         // test normal operation of run_challenge_request by adding some responses for
         // the first challenge
         let _ = service.height.replace(dummy_request.start_blockheight as u64); // set height for fetch_next to succeed
 
-        let mut challenge_state = fetch_next(&service, &dummy_hash).unwrap().unwrap();
+        let challenge_state = fetch_next(&service, &dummy_hash).unwrap().unwrap();
         storage.save_challenge_state(&challenge_state).unwrap();
 
         let (vtx, vrx): (Sender<ChallengeResponse>, Receiver<ChallengeResponse>) = channel();
@@ -411,8 +498,6 @@ mod tests {
                 assert_eq!(challenge_state.bids, bids);
                 let requests = storage.get_requests().unwrap();
                 assert_eq!(1, requests.len());
-                // manually set to allow for comparison of all unchanged fields
-                challenge_state.request.end_blockheight_clientchain = 3;
                 assert_eq!(&challenge_state.request, &requests[0]);
                 assert_eq!(
                     challenge_state.request,
@@ -481,8 +566,6 @@ mod tests {
         );
         match res {
             Ok(_) => {
-                // manual set of end_blockheight_clientchain for comparison
-                dummy_request.end_blockheight_clientchain = *clientchain.height.borrow();
                 assert_eq!(storage.get_requests().unwrap()[0], dummy_request);
             }
             Err(_) => assert!(false, "should not return error"),

@@ -63,6 +63,8 @@ pub struct ClientChainConfig {
     pub pass: String,
     /// Client genesis hash
     pub genesis_hash: String,
+    /// Block time in seconds
+    pub block_time: u64,
     /// Client asset label
     pub asset: String,
     /// Client asset key
@@ -76,6 +78,7 @@ impl Default for ClientChainConfig {
             user: String::new(),
             pass: String::new(),
             genesis_hash: String::new(),
+            block_time: CONFIG_BLOCK_TIME_DEFAULT,
             asset: String::from("CHALLENGE"),
             asset_key: String::new(),
         }
@@ -106,6 +109,10 @@ impl Default for StorageConfig {
     }
 }
 
+// pub trait Config {
+//     fn new(&self) -> Result<Self> where Self: std::marker::Sized;
+// }
+
 /// Config struct storing all config
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
@@ -115,7 +122,7 @@ pub struct Config {
     pub challenge_duration: u64,
     /// Challenge frequency in number of blocks
     pub challenge_frequency: u64,
-    /// Block time in seconds
+    /// Block time of service chain in seconds
     pub block_time: u64,
     /// Listener host address
     pub listener_host: String,
@@ -214,6 +221,9 @@ impl Config {
         }
         if let Ok(v) = env::var("CO_CLIENTCHAIN_GENESIS_HASH") {
             let _ = conf_rs.set("clientchain.genesis_hash", v)?;
+        }
+        if let Ok(v) = env::var("CO_CLIENTCHAIN_BLOCK_TIME") {
+            let _ = conf_rs.set("clientchain.block_time", v)?;
         }
 
         if let Ok(v) = env::var("CO_STORAGE_HOST") {

@@ -7,6 +7,9 @@
 # Frequency of creating new challenges, in number of blocks
 # challenge_frequency = 2
 
+# Block find time of service chain, in seconds
+# block_time = 60
+
 # Host address that the listener binds to and receives guardnode requests
 listener_host = "127.0.0.1:9999"
 
@@ -25,6 +28,7 @@ host = "127.0.0.1:5555"
 user = "user1"
 pass = "password1"
 genesis_hash = "ff8950160a77988cdc485913568d06c2d69a8c952ef0f179b4b097e3de63d7cc"
+block_time = 60
 asset = "CHALLENGE"
 asset_key = "cScSHCQp9AEwzZoucRpX9bMRkLCJ4LoQWBNFTZuD6tPX9qwNMWfQ"
 
