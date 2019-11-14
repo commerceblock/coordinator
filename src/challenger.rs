@@ -10,7 +10,6 @@ use std::{thread, time};
 
 use bitcoin_hashes::sha256d;
 
-use crate::config::Config;
 use crate::error::{CError, Error, Result};
 use crate::interfaces::clientchain::ClientChain;
 use crate::interfaces::request::{Bid, BidSet, Request};
@@ -140,21 +139,22 @@ pub fn run_challenge_request<T: Service, K: ClientChain, D: Storage>(
 /// storage (catcher for coordinator failure after storing request but
 /// before request service period over)
 pub fn update_challenge_request_state<K: ClientChain, D: Storage>(
-    config: &Config,
     clientchain: &K,
     storage: Arc<D>,
     challenge: &mut ChallengeState,
+    block_time_servicechain: u64,
+    block_time_clientchain: u64,
 ) -> Result<()> {
     match storage.get_request(challenge.request.txid)? {
         Some(req) => challenge.request = req,
         None => {
             // Set request's start_blockheight_clientchain
             challenge.request.start_blockheight_clientchain = clientchain.get_blockheight()?;
-            let service_period_time_s =
-                (challenge.request.end_blockheight - challenge.request.start_blockheight) * config.block_time as u32;
+            let service_period_time_s = (challenge.request.end_blockheight - challenge.request.start_blockheight)
+                * block_time_servicechain as u32;
             // Calculate and set request's end_blockheight_clientchain
             challenge.request.end_blockheight_clientchain = challenge.request.start_blockheight_clientchain
-                + (service_period_time_s as f32 / config.clientchain.block_time as f32).floor() as u32;
+                + (service_period_time_s as f32 / block_time_clientchain as f32).floor() as u32;
             storage.save_challenge_state(&challenge)?; // Store Challenge
                                                        // Request
         }
@@ -240,7 +240,6 @@ mod tests {
 
     use std::sync::mpsc::{channel, Receiver, Sender};
 
-    use crate::config;
     use crate::error::Error;
     use crate::interfaces::response::Response;
     use crate::util::testing::{gen_challenge_state, gen_dummy_hash, MockClientChain, MockService, MockStorage};
@@ -313,22 +312,21 @@ mod tests {
 
     #[test]
     fn update_challenge_request_state_test() {
-        let mut config = config::Config::new().unwrap();
         let clientchain = MockClientChain::new();
         let storage = Arc::new(MockStorage::new());
 
         let dummy_hash = gen_dummy_hash(11);
         let mut challenge = gen_challenge_state(&dummy_hash);
+        let num_service_chain_blocks = challenge.request.end_blockheight - challenge.request.start_blockheight;
 
         // Test challenge state request set and stored correctly
         let _ = clientchain.height.replace(1);
-        config.block_time = 1;
-        config.clientchain.block_time = 1;
-        let _ = update_challenge_request_state(&config, &clientchain, storage.clone(), &mut challenge);
+        let _ = update_challenge_request_state(&clientchain, storage.clone(), &mut challenge, 1, 1);
         // All fields stay the same but start and end blockheight_clientchain
         let mut comparison_challenge_request = challenge.request.clone();
-        comparison_challenge_request.start_blockheight_clientchain = 1;
-        comparison_challenge_request.end_blockheight_clientchain = 1 + 3;
+        comparison_challenge_request.start_blockheight_clientchain = challenge.request.start_blockheight_clientchain;
+        comparison_challenge_request.end_blockheight_clientchain =
+            challenge.request.start_blockheight_clientchain + num_service_chain_blocks; // start_height + number of servcie chain blocks
         assert_eq!(challenge.request, comparison_challenge_request);
         assert_eq!(
             storage.get_request(challenge.request.txid).unwrap().unwrap(),
@@ -339,12 +337,12 @@ mod tests {
         // for client chain block time half of service chain block time
         let storage = Arc::new(MockStorage::new()); //reset storage
         let _ = clientchain.height.replace(1);
-        config.block_time = 2;
-        config.clientchain.block_time = 1;
-        let _ = update_challenge_request_state(&config, &clientchain, storage.clone(), &mut challenge);
+        let _ = update_challenge_request_state(&clientchain, storage.clone(), &mut challenge, 2, 1);
         let mut comparison_challenge_request = challenge.request.clone();
-        comparison_challenge_request.start_blockheight_clientchain = 1;
-        comparison_challenge_request.end_blockheight_clientchain = 1 + 2 * 3;
+        comparison_challenge_request.start_blockheight_clientchain = challenge.request.start_blockheight_clientchain;
+        comparison_challenge_request.end_blockheight_clientchain =
+            challenge.request.start_blockheight_clientchain + 2 * num_service_chain_blocks; // start_height + (2 times client chain blocks as service chain blocks in same
+                                                                                            // time period * number of service chain block)
         assert_eq!(challenge.request, comparison_challenge_request);
         assert_eq!(
             storage.get_request(challenge.request.txid).unwrap().unwrap(),
@@ -356,7 +354,7 @@ mod tests {
         let old_challenge = challenge.clone(); // save old challenge state
         challenge.request.fee_percentage = 25; // alter random field
         let new_challenge = challenge.clone(); // save new challenge state
-        let _ = update_challenge_request_state(&config, &clientchain, storage.clone(), &mut challenge);
+        let _ = update_challenge_request_state(&clientchain, storage.clone(), &mut challenge, 2, 1);
         assert_eq!(challenge.request, old_challenge.request);
         assert_eq!(
             storage.get_request(challenge.request.txid).unwrap().unwrap(),

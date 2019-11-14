@@ -56,7 +56,13 @@ pub fn run_request<T: Service, K: ClientChain, D: Storage>(
             // First attempt to store the challenge state information
             // on requests and winning bids and exit if it fails.
             // If already set update challenge state with correct version from storage
-            ::challenger::update_challenge_request_state(config, clientchain, storage.clone(), &mut challenge)?;
+            ::challenger::update_challenge_request_state(
+                clientchain,
+                storage.clone(),
+                &mut challenge,
+                config.block_time,
+                config.clientchain.block_time,
+            )?;
 
             // create a challenge state mutex to share between challenger and listener
             let shared_challenge = Arc::new(Mutex::new(challenge));
