@@ -321,10 +321,10 @@ mod tests {
 
         // Test challenge state request set and stored correctly
         let _ = clientchain.height.replace(1);
+        let mut comparison_challenge_request = challenge.request.clone(); // Clone request for comparison
         let _ = update_challenge_request_state(&clientchain, storage.clone(), &mut challenge, 1, 1);
         // All fields stay the same but start and end blockheight_clientchain
-        let mut comparison_challenge_request = challenge.request.clone();
-        comparison_challenge_request.start_blockheight_clientchain = challenge.request.start_blockheight_clientchain;
+        comparison_challenge_request.start_blockheight_clientchain = *clientchain.height.borrow();
         comparison_challenge_request.end_blockheight_clientchain =
             challenge.request.start_blockheight_clientchain + num_service_chain_blocks; // start_height + number of servcie chain blocks
         assert_eq!(challenge.request, comparison_challenge_request);
@@ -337,9 +337,10 @@ mod tests {
         // for client chain block time half of service chain block time
         let storage = Arc::new(MockStorage::new()); //reset storage
         let _ = clientchain.height.replace(1);
+        let mut comparison_challenge_request = challenge.request.clone(); // Clone request for comparison
         let _ = update_challenge_request_state(&clientchain, storage.clone(), &mut challenge, 2, 1);
-        let mut comparison_challenge_request = challenge.request.clone();
-        comparison_challenge_request.start_blockheight_clientchain = challenge.request.start_blockheight_clientchain;
+        // All fields stay the same but start and end blockheight_clientchain
+        comparison_challenge_request.start_blockheight_clientchain = *clientchain.height.borrow();
         comparison_challenge_request.end_blockheight_clientchain =
             challenge.request.start_blockheight_clientchain + 2 * num_service_chain_blocks; // start_height + (2 times client chain blocks as service chain blocks in same
                                                                                             // time period * number of service chain block)
