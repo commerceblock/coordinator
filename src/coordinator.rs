@@ -54,19 +54,15 @@ pub fn run_request<T: Service, K: ClientChain, D: Storage>(
     match ::challenger::fetch_next(service, &genesis_hash)? {
         Some(mut challenge) => {
             // First attempt to store the challenge state information
-            // on requests and winning bids and exit if that fails
-            // Check if request already stored. If so set challenge request to
-            // request in table (catcher for coordinator failure after storing
-            // request but before request service period over)
-            match storage.get_request(challenge.request.txid)? {
-                Some(req) => challenge.request = req,
-                None => {
-                    // Set request's start_blockheight_clientchain
-                    challenge.request.start_blockheight_clientchain = clientchain.get_block_count()?;
-                    // Store Challenge Request
-                    storage.save_challenge_state(&challenge)?;
-                }
-            }
+            // on requests and winning bids and exit if it fails.
+            // If already set update challenge state with correct version from storage
+            ::challenger::update_challenge_request_state(
+                clientchain,
+                storage.clone(),
+                &mut challenge,
+                config.block_time,
+                config.clientchain.block_time,
+            )?;
 
             // create a challenge state mutex to share between challenger and listener
             let shared_challenge = Arc::new(Mutex::new(challenge));

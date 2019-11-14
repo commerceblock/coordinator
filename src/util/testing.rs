@@ -121,7 +121,7 @@ impl ClientChain for MockClientChain {
     }
 
     /// Get block count dummy
-    fn get_block_count(&self) -> Result<u32> {
+    fn get_blockheight(&self) -> Result<u32> {
         Ok(self.height.clone().into_inner())
     }
 }
