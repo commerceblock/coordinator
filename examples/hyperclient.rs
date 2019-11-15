@@ -1,19 +1,17 @@
 //! Mock Example of client sending a POST request to server
 
 extern crate bitcoin;
-extern crate bitcoin_hashes;
 extern crate hyper;
-extern crate secp256k1;
 
 use bitcoin::consensus::encode::serialize;
-use bitcoin_hashes::hex::{FromHex, ToHex};
-use bitcoin_hashes::sha256d;
+use bitcoin::hashes::hex::{FromHex, ToHex};
+use bitcoin::hashes::sha256d;
+use bitcoin::secp256k1::{Message, Secp256k1, SecretKey};
 use hyper::{
     header::HeaderValue,
     rt::{self, Future, Stream},
     Body, Client, Method, Request,
 };
-use secp256k1::{Message, Secp256k1, SecretKey};
 
 fn main() {
     let client = Client::new();

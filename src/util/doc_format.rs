@@ -6,9 +6,9 @@
 use std::collections::HashMap;
 use std::str::FromStr;
 
-use bitcoin_hashes::{hex::FromHex, sha256d};
+use bitcoin::hashes::{hex::FromHex, sha256d};
+use bitcoin::secp256k1::PublicKey;
 use mongodb::{ordered::OrderedDocument, Bson};
-use secp256k1::key::PublicKey;
 
 use crate::interfaces::request::{Bid, Request};
 use crate::interfaces::response::Response;

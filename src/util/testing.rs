@@ -2,10 +2,10 @@
 //!
 //! Colleciton of helper functions used in tests module
 
-use bitcoin_hashes::{hex::FromHex, sha256d, Hash};
+use bitcoin::hashes::{hex::FromHex, sha256d, Hash};
+use bitcoin::secp256k1::PublicKey;
 use mongodb::ordered::OrderedDocument;
 use mongodb::Bson;
-use secp256k1::PublicKey;
 use std::cell::RefCell;
 use std::str::FromStr;
 use util::doc_format::*;

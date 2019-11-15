@@ -8,7 +8,7 @@ use std::sync::Arc;
 use std::thread;
 
 use base64::decode;
-use bitcoin_hashes::sha256d;
+use bitcoin::hashes::sha256d;
 use hyper::{Body, Request, StatusCode};
 use jsonrpc_http_server::jsonrpc_core::{Error, ErrorCode, IoHandler, Params, Value};
 use jsonrpc_http_server::{hyper::header, AccessControlAllowOrigin, DomainsValidation, Response, ServerBuilder};
@@ -269,7 +269,7 @@ mod tests {
         let params: Params = serde_json::from_str(&s).unwrap();
         let resp = get_request_response(params, storage.clone());
         assert_eq!(
-            "Invalid params: bad hex string length 65 (expected 64).",
+            "Invalid params: odd hex string length 65.",
             resp.wait().unwrap_err().message
         );
 

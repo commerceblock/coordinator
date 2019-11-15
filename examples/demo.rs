@@ -8,24 +8,22 @@
 #[macro_use]
 extern crate log;
 extern crate bitcoin;
-extern crate bitcoin_hashes;
 extern crate coordinator;
 extern crate env_logger;
 extern crate hyper;
 extern crate ocean_rpc;
-extern crate secp256k1;
 
 use std::sync::Arc;
 use std::{env, thread, time};
 
 use bitcoin::consensus::encode::serialize;
-use bitcoin_hashes::{hex::FromHex, hex::ToHex, sha256d};
+use bitcoin::hashes::{hex::FromHex, hex::ToHex, sha256d};
+use bitcoin::secp256k1::{Message, Secp256k1, SecretKey};
 use hyper::{
     rt::{self, Future, Stream},
     Body, Client, Method, Request,
 };
 use ocean_rpc::RpcApi;
-use secp256k1::{Message, Secp256k1, SecretKey};
 
 use coordinator::coordinator as coordinator_main;
 use coordinator::interfaces::clientchain::get_first_unspent;
@@ -58,7 +56,7 @@ fn main() {
     let client_rpc_clone = client_rpc.clone();
     thread::spawn(move || loop {
         thread::sleep(time::Duration::from_secs(10));
-        if let Err(e) = client_rpc_clone.clone().client.generate(1) {
+        if let Err(e) = client_rpc_clone.clone().client.generate(1, None) {
             error!("{}", e);
         }
     });

@@ -5,7 +5,7 @@
 use std::collections::HashMap;
 
 use crate::challenger::ChallengeResponseIds;
-use bitcoin_hashes::sha256d;
+use bitcoin::hashes::sha256d;
 use serde::Serialize;
 
 /// Response struct that models responses to service challenges

@@ -4,9 +4,9 @@
 
 use std::collections::HashSet;
 
-use bitcoin_hashes::sha256d;
+use bitcoin::hashes::sha256d;
+use bitcoin::secp256k1::PublicKey;
 use ocean_rpc::json::{GetRequestBidsResultBid, GetRequestsResult};
-use secp256k1::key::PublicKey;
 use serde::{Serialize, Serializer};
 
 /// Request struct storing info on client request and modelling data that need
@@ -62,7 +62,7 @@ impl Bid {
     pub fn from_json(res: &GetRequestBidsResultBid) -> Self {
         Bid {
             txid: res.txid,
-            pubkey: res.fee_pub_key,
+            pubkey: res.fee_pub_key.key,
         }
     }
 }
@@ -85,7 +85,7 @@ mod tests {
 
     use std::str::FromStr;
 
-    use bitcoin_hashes::hex::FromHex;
+    use bitcoin::hashes::hex::FromHex;
 
     #[test]
     fn serialize_pubkey_test() {
