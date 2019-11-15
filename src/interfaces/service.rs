@@ -2,7 +2,7 @@
 //!
 //! Service chain interface and implementations
 
-use bitcoin_hashes::sha256d;
+use bitcoin::hashes::sha256d;
 use ocean_rpc::RpcApi;
 
 use crate::config::ServiceConfig;

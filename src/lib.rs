@@ -20,13 +20,11 @@
 extern crate log;
 extern crate base64;
 extern crate bitcoin;
-extern crate bitcoin_hashes;
 extern crate config as config_rs;
 extern crate futures;
 extern crate hyper;
 extern crate ocean_rpc;
 extern crate rust_ocean as _ocean;
-extern crate secp256k1;
 extern crate serde as serde;
 extern crate serde_json;
 #[macro_use]

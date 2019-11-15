@@ -6,7 +6,7 @@ use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::{thread, time};
 
-use bitcoin_hashes::{hex::FromHex, sha256d};
+use bitcoin::hashes::{hex::FromHex, sha256d};
 use futures::sync::oneshot;
 
 use crate::challenger::ChallengeResponse;

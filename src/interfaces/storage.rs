@@ -5,7 +5,7 @@
 use std::mem::drop;
 use std::sync::{Mutex, MutexGuard};
 
-use bitcoin_hashes::sha256d;
+use bitcoin::hashes::sha256d;
 use mongodb::db::{Database, ThreadedDatabase};
 use mongodb::{coll::options::FindOptions, Client, ThreadedClient};
 use util::doc_format::*;

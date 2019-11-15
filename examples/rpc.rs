@@ -3,7 +3,7 @@
 extern crate ocean_rpc;
 extern crate rust_ocean;
 
-use ocean_rpc::{Client, Error, RpcApi};
+use ocean_rpc::{Auth, Client, Error, RpcApi};
 
 fn main_result() -> Result<(), Error> {
     let mut args = std::env::args();
@@ -14,7 +14,7 @@ fn main_result() -> Result<(), Error> {
     let user = args.next();
     let pass = args.next();
 
-    let rpc = Client::new(url, user, pass);
+    let rpc = Client::new(url, Auth::UserPass(user.unwrap(), pass.unwrap())).unwrap();
 
     let blockchain_info = rpc.get_blockchain_info()?;
     println!("info\n{:?}", blockchain_info);

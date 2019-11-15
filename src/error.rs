@@ -6,11 +6,12 @@ use std::error;
 use std::fmt;
 use std::result;
 
-use bitcoin_hashes::Error as HashesError;
+use bitcoin::hashes::hex::Error as HashesHexError;
+use bitcoin::hashes::Error as HashesError;
+use bitcoin::secp256k1::Error as Secp256k1Error;
 use config_rs::ConfigError;
 use mongodb::Error as MongoDbError;
 use ocean_rpc::Error as OceanRpcError;
-use secp256k1::Error as Secp256k1Error;
 
 /// Crate specific Result for crate specific Errors
 pub type Result<T> = result::Result<T, Error>;
@@ -99,6 +100,8 @@ pub enum Error {
     OceanRpc(OceanRpcError),
     /// Bitcoin hashes error
     BitcoinHashes(HashesError),
+    /// Bitcoin hex hashes error
+    BitcoinHashesHex(HashesHexError),
     /// Secp256k1 error
     Secp256k1(Secp256k1Error),
     /// Mongodb error
@@ -127,6 +130,12 @@ impl From<HashesError> for Error {
     }
 }
 
+impl From<HashesHexError> for Error {
+    fn from(e: HashesHexError) -> Error {
+        Error::BitcoinHashesHex(e)
+    }
+}
+
 impl From<Secp256k1Error> for Error {
     fn from(e: Secp256k1Error) -> Error {
         Error::Secp256k1(e)
@@ -150,6 +159,7 @@ impl fmt::Display for Error {
         match *self {
             Error::OceanRpc(ref e) => write!(f, "ocean rpc error: {}", e),
             Error::BitcoinHashes(ref e) => write!(f, "bitcoin hashes error: {}", e),
+            Error::BitcoinHashesHex(ref e) => write!(f, "bitcoin hashes hex error: {}", e),
             Error::Secp256k1(ref e) => write!(f, "secp256k1 error: {}", e),
             Error::MongoDb(ref e) => write!(f, "mongodb error: {}", e),
             Error::Config(ref e) => write!(f, "config error: {}", e),
@@ -163,6 +173,7 @@ impl error::Error for Error {
         match *self {
             Error::OceanRpc(ref e) => Some(e),
             Error::BitcoinHashes(ref e) => Some(e),
+            Error::BitcoinHashesHex(ref e) => Some(e),
             Error::Secp256k1(ref e) => Some(e),
             Error::MongoDb(ref e) => Some(e),
             Error::Config(ref e) => Some(e),

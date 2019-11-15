@@ -8,7 +8,7 @@ use std::sync::mpsc::{Receiver, RecvTimeoutError};
 use std::sync::{Arc, Mutex};
 use std::{thread, time};
 
-use bitcoin_hashes::sha256d;
+use bitcoin::hashes::sha256d;
 
 use crate::error::{CError, Error, Result};
 use crate::interfaces::clientchain::ClientChain;

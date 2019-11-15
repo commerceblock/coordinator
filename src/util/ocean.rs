@@ -2,7 +2,7 @@
 //!
 //! Ocean node communication implementations
 
-use ocean_rpc::{Client, RpcApi};
+use ocean_rpc::{Auth, Client, RpcApi};
 
 use crate::error::Result;
 
@@ -15,8 +15,14 @@ pub struct OceanClient {
 impl OceanClient {
     /// Create an OceanClient with underlying rpc client connectivity
     pub fn new(url: String, user: Option<String>, pass: Option<String>) -> Result<Self> {
+        let mut auth = Auth::None;
+        if let Some(ref _user) = user {
+            if let Some(ref _pass) = pass {
+                auth = Auth::UserPass(_user.clone(), _pass.clone());
+            }
+        }
         Ok(OceanClient {
-            client: Client::new(format!("http://{}", url), user, pass),
+            client: Client::new(format!("http://{}", url), auth)?,
         })
     }
 }

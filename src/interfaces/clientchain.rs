@@ -4,7 +4,7 @@
 
 use std::collections::HashMap;
 
-use bitcoin_hashes::{hex::FromHex, sha256d};
+use bitcoin::hashes::{hex::FromHex, sha256d};
 use ocean_rpc::{json, RpcApi};
 
 use crate::config::ClientChainConfig;
@@ -13,7 +13,7 @@ use crate::util::ocean::OceanClient;
 
 /// Method that returns the first unspent output for given asset
 /// or an error if the client wallet does not have any unspent/funds
-pub fn get_first_unspent(client: &OceanClient, asset: &str) -> Result<json::ListUnspentResult> {
+pub fn get_first_unspent(client: &OceanClient, asset: &str) -> Result<json::ListUnspentResultEntry> {
     // Check asset is held by the wallet and return unspent tx
     let unspent = client.list_unspent(None, None, None, None, Some(asset))?;
     if unspent.is_empty() {
@@ -87,26 +87,21 @@ impl<'a> ClientChain for RpcClientChain<'a> {
         }];
 
         let mut outs = HashMap::new();
-        let _ = outs.insert(
-            unspent.address.clone(),
-            (unspent.amount.into_inner() / 100000000) as f64,
-        );
+        let _ = outs.insert(unspent.address.to_string(), unspent.amount);
 
         let mut outs_assets = HashMap::new();
-        let _ = outs_assets.insert(unspent.address.clone(), unspent.asset.to_string());
+        let _ = outs_assets.insert(unspent.address.to_string(), unspent.asset);
 
         let tx_hex = self
             .client
-            .create_raw_transaction_hex(&utxos, Some(&outs), Some(&outs_assets), None)?;
+            .create_raw_transaction_hex(&utxos, &outs, Some(&outs_assets), None)?;
 
         // sign the transaction and send via the client rpc
-        let tx_signed =
-            self.client
-                .sign_raw_transaction((&Vec::<u8>::from_hex(&tx_hex)? as &[u8]).into(), None, None, None)?;
+        let tx_signed = self
+            .client
+            .sign_raw_transaction(&Vec::<u8>::from_hex(&tx_hex)? as &[u8], None, None, None)?;
 
-        Ok(sha256d::Hash::from_hex(
-            &self.client.send_raw_transaction(&tx_signed.hex)?,
-        )?)
+        Ok(self.client.send_raw_transaction(&tx_signed.hex)?)
     }
 
     /// Verify challenge transaction has been included in the chain
