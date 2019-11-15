@@ -37,6 +37,7 @@ pub mod config;
 pub mod coordinator;
 pub mod error;
 pub mod listener;
+pub mod payments;
 
 pub mod interfaces;
 pub mod util;
