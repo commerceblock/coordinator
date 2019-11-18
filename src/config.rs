@@ -3,8 +3,10 @@
 //! Config module handling config options from file/env
 
 use std::env;
+use std::str::FromStr;
 
 use config_rs::{Config as ConfigRs, Environment, File};
+use ocean::Address;
 use serde::{Deserialize, Serialize};
 
 use crate::error::InputErrorType::{GenHash, MissingArgument, PrivKey};
@@ -53,7 +55,7 @@ impl Default for ServiceConfig {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 /// Clientchain specific config
 pub struct ClientChainConfig {
     /// Client rpc host
@@ -76,6 +78,8 @@ pub struct ClientChainConfig {
     pub payment_asset: String,
     /// Payment key; optional as the coordinator might not be doing payments
     pub payment_key: Option<String>,
+    /// Payment address corresponding to payment key
+    pub payment_addr: Option<String>,
 }
 
 impl Default for ClientChainConfig {
@@ -91,6 +95,7 @@ impl Default for ClientChainConfig {
             chain: String::new(),
             payment_asset: String::new(),
             payment_key: None,
+            payment_addr: None,
         }
     }
 }
@@ -240,6 +245,9 @@ impl Config {
         if let Ok(v) = env::var("CO_CLIENTCHAIN_PAYMENT_KEY") {
             let _ = conf_rs.set("clientchain.payment_key", v)?;
         }
+        if let Ok(v) = env::var("CO_CLIENTCHAIN_PAYMENT_ADDR") {
+            let _ = conf_rs.set("clientchain.payment_addr", v)?;
+        }
 
         if let Ok(v) = env::var("CO_STORAGE_HOST") {
             let _ = conf_rs.set("storage.host", v)?;
@@ -262,6 +270,9 @@ impl Config {
         let payment_key = conf_rs.get::<Option<String>>("clientchain.payment_key")?;
         if !payment_key.is_none() && !check_privkey_string(&payment_key.clone().unwrap()) {
             return Err(Error::from(CError::InputError(PrivKey, payment_key.unwrap())));
+        }
+        if let Some(payment_addr) = conf_rs.get::<Option<String>>("clientchain.payment_addr")? {
+            let _ = Address::from_str(&payment_addr)?;
         }
         let hash = conf_rs.get_str("clientchain.genesis_hash")?;
         if !check_hash_string(&hash) {
