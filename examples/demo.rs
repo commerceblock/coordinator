@@ -73,7 +73,6 @@ fn main() {
     for bid in client_rpc.get_request_bids(&request_txid).unwrap().unwrap().bids {
         if bid.fee_pub_key.to_string() == guardnode_pubkey {
             guardnode_txid = bid.txid;
-            println!("Guardnode bid txid: {}", guardnode_txid);
             break;
         }
     }

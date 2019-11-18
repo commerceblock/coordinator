@@ -47,15 +47,16 @@ pub enum InputErrorType {
     PrivKey,
     /// Invalid genesis hash string
     GenHash,
+    /// Missing input argument
+    MissingArgument,
 }
 
 impl InputErrorType {
     fn as_str(&self) -> &'static str {
         match *self {
-            InputErrorType::PrivKey => "Invalid private key input - must be base58check string of length 52.",
-            InputErrorType::GenHash => {
-                "Invalid client chain genesis hash input - must be hexadecimal string of length 64."
-            }
+            InputErrorType::PrivKey => "Private key input - must be base58check string of length 52",
+            InputErrorType::GenHash => "Chain genesis hash input must be hexadecimal string of length 64",
+            InputErrorType::MissingArgument => "Argument missing",
         }
     }
 }
@@ -64,9 +65,7 @@ impl fmt::Display for CError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             CError::Generic(ref e) => write!(f, "generic Error: {}", e),
-            CError::InputError(ref error, ref value) => {
-                write!(f, "Input Error: {} \nProblem value: {}", error.as_str(), value)
-            }
+            CError::InputError(ref error, ref value) => write!(f, "Input Error: {} (value: {})", error.as_str(), value),
             CError::MissingUnspent(ref asset, ref chain) => {
                 write!(f, "No unspent found for {} asset on {} chain", asset, chain)
             }
