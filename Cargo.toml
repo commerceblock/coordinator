@@ -19,4 +19,4 @@ mongodb = "0.3.11"
 jsonrpc-http-server = "11.0"
 rust-ocean = { git = "https://github.com/commerceblock/rust-ocean"}
 ocean-rpc = { git = "https://github.com/commerceblock/rust-ocean-rpc"}
-bitcoin = { version = "0.19.1", features = [ "use-serde" ] }
+bitcoin = { version = "0.20", features = [ "use-serde" ] }
