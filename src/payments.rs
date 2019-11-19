@@ -9,20 +9,25 @@ use std::thread;
 
 use bitcoin::hashes::sha256d;
 use bitcoin::Amount;
+use bitcoin::PublicKey;
 use ocean::{Address, AddressParams};
 use ocean_rpc::RpcApi;
 
 use crate::config::ClientChainConfig;
 use crate::error::{CError, Error, Result};
-use crate::interfaces::{request::Request, storage::Storage};
+use crate::interfaces::{
+    request::{BidSet, Request},
+    response::Response,
+    storage::Storage,
+};
 use crate::util::ocean::OceanClient;
 
 /// Get addr params from chain name
-pub fn get_chain_addr_params(chain: &String) -> AddressParams {
+pub fn get_chain_addr_params(chain: &String) -> &'static AddressParams {
     match chain.to_lowercase().as_ref() {
-        "ocean_main" => return AddressParams::OCEAN,
-        "gold_main" => return AddressParams::GOLD,
-        _ => AddressParams::ELEMENTS,
+        "ocean_main" => return &AddressParams::OCEAN,
+        "gold_main" => return &AddressParams::GOLD,
+        _ => &AddressParams::ELEMENTS,
     }
 }
 
@@ -45,6 +50,51 @@ fn calculate_fees(request: &Request, client: &OceanClient) -> Result<Amount> {
     Ok(fee_sum)
 }
 
+/// TODO
+fn calculate_bid_payment(fee_amount: &Amount, fee_percentage: u64, num_bids: u64) -> Result<Amount> {
+    info!("amount: {}", fee_amount);
+    let gn_amount = *fee_amount * fee_percentage / 100;
+    info!("gn_amount: {}", gn_amount);
+    let gn_amount_per_gn = gn_amount / num_bids;
+    info!("gn_amount_per_gn: {}", gn_amount_per_gn);
+    Ok(gn_amount_per_gn)
+}
+
+/// TODO
+fn pay_bids(_client: &OceanClient, _clientchain_config: &ClientChainConfig, _bids: &BidSet) -> Result<()> {
+    // pay
+    // set bid txid
+    // update bid
+    Ok(())
+}
+
+/// TODO
+fn process_bids(
+    bids: &BidSet,
+    bids_amount: &Amount,
+    response: &Response,
+    addr_params: &'static AddressParams,
+) -> Result<()> {
+    for bid in bids {
+        if let Some(bid_resp) = response.bid_responses.get(&bid.txid) {
+            let gn_amount_corrected = *bids_amount * (*bid_resp).into() / response.num_challenges.into();
+            let das_pub = PublicKey {
+                key: bid.pubkey,
+                compressed: true,
+            };
+            let gn_pay_to_addr = Address::p2pkh(&das_pub, None, addr_params);
+            info!(
+                "bid: {}\naddr: {}\ngn_amount_corrected: {}\n",
+                bid.txid, gn_pay_to_addr, gn_amount_corrected
+            );
+
+            // set bid amount, addr
+            // update bid
+        }
+    }
+    Ok(())
+}
+
 /// TODO: add comments
 fn do_request_payment(
     clientchain_config: &ClientChainConfig,
@@ -53,19 +103,24 @@ fn do_request_payment(
     storage: &Arc<dyn Storage>,
 ) -> Result<()> {
     let bids = storage.get_bids(request.txid)?;
-    let resp = storage.get_response(request.txid)?;
-    let amount = calculate_fees(request, client)?;
-    info!("amount: {}", amount);
-    Ok(())
+    if bids.len() > 0 {
+        if let Some(resp) = storage.get_response(request.txid)? {
+            let amount = calculate_fees(request, client)?;
+            let bid_payment = calculate_bid_payment(&amount, request.fee_percentage.into(), bids.len() as u64)?;
+            process_bids(
+                &bids,
+                &bid_payment,
+                &resp,
+                get_chain_addr_params(&clientchain_config.chain),
+            )?;
+            //pay_bids()?;
+        }
+    }
 
-    // calculate_fees()
-    // for bids:
-    //     lookup in resps
-    //     get address
-    //     pay
-    //     store
-    //     update Bid
-    // update Request
+    // set request complete
+    // update request
+
+    Ok(())
 }
 
 /// TODO: add comments
@@ -110,7 +165,7 @@ pub fn run_payments(
 
     if let Some(addr) = &clientchain_config.payment_addr {
         let ocean_addr = Address::from_str(&addr)?;
-        if *ocean_addr.params != get_chain_addr_params(&clientchain_config.chain) {
+        if *ocean_addr.params != *get_chain_addr_params(&clientchain_config.chain) {
             warn!("payment addr and chain config addr param mismatch");
         } else if let Some(key) = &clientchain_config.payment_key {
             let addr_unspent = client.list_unspent(None, None, Some(&[ocean_addr]), None, None)?;
