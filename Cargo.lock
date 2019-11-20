@@ -1095,7 +1095,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "rust-ocean"
 version = "0.10.0"
-source = "git+https://github.com/commerceblock/rust-ocean#0caa99b3948e71d82f32a3f898b6385ce42884ef"
+source = "git+https://github.com/commerceblock/rust-ocean#56a64d11f6f073caebfb37c2fc92b97a288be8ec"
 dependencies = [
  "bitcoin 0.20.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.102 (registry+https://github.com/rust-lang/crates.io-index)",
