@@ -8,9 +8,11 @@ use std::str::FromStr;
 
 use bitcoin::hashes::{hex::FromHex, sha256d};
 use bitcoin::secp256k1::PublicKey;
+use bitcoin::Amount;
 use mongodb::{ordered::OrderedDocument, Bson};
+use ocean::Address;
 
-use crate::interfaces::request::{Bid, Request};
+use crate::interfaces::request::{Bid, BidPayment, Request};
 use crate::interfaces::response::Response;
 
 /// Util method that generates a Request document from a request
@@ -43,18 +45,43 @@ pub fn doc_to_request(doc: &OrderedDocument) -> Request {
 
 /// Util method that generates a Bid document from a request bid
 pub fn bid_to_doc(request_id: &Bson, bid: &Bid) -> OrderedDocument {
-    doc! {
+    let mut bid_doc = doc! {
         "request_id": request_id.clone(),
         "txid": bid.txid.to_string(),
-        "pubkey": bid.pubkey.to_string()
+        "pubkey": bid.pubkey.to_string(),
+    };
+    if let Some(payment) = &bid.payment {
+        let mut bid_payment_doc = doc! {
+            "address": payment.address.to_string(),
+            "amount": payment.amount.as_btc(),
+        };
+        if let Some(txid) = payment.txid {
+            let _ = bid_payment_doc.insert("txid", txid.to_string());
+        }
+        let _ = bid_doc.insert("payment", bid_payment_doc);
     }
+    bid_doc
 }
 
 /// Util method that generates a request bid from a Bid document
 pub fn doc_to_bid(doc: &OrderedDocument) -> Bid {
+    let mut payment: Option<BidPayment> = None;
+    if let Some(doc_payment) = doc.get("payment") {
+        let doc_doc_payment = doc_payment.as_document().unwrap();
+        let mut payment_txid: Option<sha256d::Hash> = None;
+        if let Some(doc_payment_txid) = doc_doc_payment.get("txid") {
+            payment_txid = Some(sha256d::Hash::from_hex(doc_payment_txid.as_str().unwrap()).unwrap())
+        }
+        payment = Some(BidPayment {
+            txid: payment_txid,
+            address: Address::from_str(doc_doc_payment.get("address").unwrap().as_str().unwrap()).unwrap(),
+            amount: Amount::from_btc(doc_doc_payment.get("amount").unwrap().as_f64().unwrap()).unwrap(),
+        });
+    }
     Bid {
         txid: sha256d::Hash::from_hex(doc.get("txid").unwrap().as_str().unwrap()).unwrap(),
         pubkey: PublicKey::from_str(doc.get("pubkey").unwrap().as_str().unwrap()).unwrap(),
+        payment: payment,
     }
 }
 
@@ -139,9 +166,10 @@ mod tests {
         let id = ObjectId::new().unwrap();
         let pubkey_hex = "026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3";
         let hash = gen_dummy_hash(1);
-        let bid = Bid {
+        let mut bid = Bid {
             txid: hash,
             pubkey: PublicKey::from_str(pubkey_hex).unwrap(),
+            payment: None,
         };
 
         let doc = bid_to_doc(&Bson::ObjectId(id.clone()), &bid);
@@ -150,6 +178,48 @@ mod tests {
                 "request_id": id.clone(),
                 "txid": hash.to_string(),
                 "pubkey": pubkey_hex
+            },
+            doc
+        );
+        assert_eq!(bid, doc_to_bid(&doc));
+
+        let addr = "1HXfr2qBwT4qGZYn8FczNy68rw5dwG8trc";
+        let amount = 56.123;
+        let mut bid_payment = BidPayment {
+            txid: None,
+            address: Address::from_str(addr).unwrap(),
+            amount: Amount::from_btc(amount).unwrap(),
+        };
+        bid.payment = Some(bid_payment.clone());
+        let doc = bid_to_doc(&Bson::ObjectId(id.clone()), &bid);
+        assert_eq!(
+            doc! {
+                "request_id": id.clone(),
+                "txid": hash.to_string(),
+                "pubkey": pubkey_hex,
+                "payment": doc!{
+                    "address": addr,
+                    "amount": amount
+                }
+            },
+            doc
+        );
+        assert_eq!(bid, doc_to_bid(&doc));
+
+        let payment_txid = gen_dummy_hash(123);
+        bid_payment.txid = Some(payment_txid);
+        bid.payment = Some(bid_payment.clone());
+        let doc = bid_to_doc(&Bson::ObjectId(id.clone()), &bid);
+        assert_eq!(
+            doc! {
+                "request_id": id.clone(),
+                "txid": hash.to_string(),
+                "pubkey": pubkey_hex,
+                "payment": doc!{
+                    "address": addr,
+                    "amount": amount,
+                    "txid": payment_txid.to_string()
+                }
             },
             doc
         );

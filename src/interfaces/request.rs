@@ -4,8 +4,8 @@
 
 use std::collections::HashSet;
 
-use bitcoin::hashes::sha256d;
-use bitcoin::secp256k1::PublicKey;
+use bitcoin::{hashes::sha256d, secp256k1::PublicKey, Amount};
+use ocean::Address;
 use ocean_rpc::json::{GetRequestBidsResultBid, GetRequestsResult};
 use serde::{Serialize, Serializer};
 
@@ -55,6 +55,8 @@ pub struct Bid {
     /// Bid owner verification public key
     #[serde(serialize_with = "serialize_pubkey")]
     pub pubkey: PublicKey,
+    /// Bid payment optional
+    pub payment: Option<BidPayment>,
 }
 
 impl Bid {
@@ -63,8 +65,22 @@ impl Bid {
         Bid {
             txid: res.txid,
             pubkey: res.fee_pub_key.key,
+            payment: None,
         }
     }
+}
+
+/// Bid payment struct holding information for fee payments received by bid
+/// owners
+#[derive(Clone, Debug, PartialEq, Hash, Eq, Serialize)]
+pub struct BidPayment {
+    /// Bid payment transaction id; optional as might not be set yet
+    pub txid: Option<sha256d::Hash>,
+    /// Bid pay to address
+    pub address: Address,
+    /// Bid amount expected
+    #[serde(with = "bitcoin::util::amount::serde::as_btc")]
+    pub amount: Amount,
 }
 
 /// Type defining a set of Bids
@@ -94,11 +110,12 @@ mod tests {
         let bid = Bid {
             txid: sha256d::Hash::from_hex(txid_hex).unwrap(),
             pubkey: PublicKey::from_str(pubkey_hex).unwrap(),
+            payment: None,
         };
 
         let serialized = serde_json::to_string(&bid);
         assert_eq!(
-            format!(r#"{{"txid":"{}","pubkey":"{}"}}"#, txid_hex, pubkey_hex),
+            format!(r#"{{"txid":"{}","pubkey":"{}","payment":null}}"#, txid_hex, pubkey_hex),
             serialized.unwrap()
         );
     }

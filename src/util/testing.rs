@@ -40,6 +40,7 @@ pub fn gen_challenge_state(request_hash: &sha256d::Hash) -> ChallengeState {
     let _ = bids.insert(Bid {
         txid: sha256d::Hash::from_hex("1234567890000000000000000000000000000000000000000000000000000000").unwrap(),
         pubkey: PublicKey::from_str("026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3").unwrap(),
+        payment: None,
     });
     ChallengeState {
         request,
@@ -68,6 +69,7 @@ pub fn gen_challenge_state_with_challenge(
         txid: sha256d::Hash::from_hex("1234567890000000000000000000000000000000000000000000000000000000").unwrap(),
         // pubkey corresponding to SecretKey::from_slice(&[0xaa; 32])
         pubkey: PublicKey::from_str("026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3").unwrap(),
+        payment: None,
     });
     ChallengeState {
         request,
@@ -200,16 +202,19 @@ impl Service for MockService {
             txid: sha256d::Hash::from_hex("1234567890000000000000000000000000000000000000000000000000000000").unwrap(),
             // pubkey corresponding to SecretKey::from_slice(&[0xaa; 32])
             pubkey: PublicKey::from_str("026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3").unwrap(),
+            payment: None,
         });
         let _ = bid_set.insert(Bid {
             txid: sha256d::Hash::from_hex("0000000001234567890000000000000000000000000000000000000000000000").unwrap(),
             // pubkey corresponding to SecretKey::from_slice(&[0xbb; 32])
             pubkey: PublicKey::from_str("0268680737c76dabb801cb2204f57dbe4e4579e4f710cd67dc1b4227592c81e9b5").unwrap(),
+            payment: None,
         });
         let _ = bid_set.insert(Bid {
             txid: sha256d::Hash::from_hex("0000000000000000001234567890000000000000000000000000000000000000").unwrap(),
             // pubkey corresponding to SecretKey::from_slice(&[0xcc; 32])
             pubkey: PublicKey::from_str("02b95c249d84f417e3e395a127425428b540671cc15881eb828c17b722a53fc599").unwrap(),
+            payment: None,
         });
         Ok(Some(bid_set))
     }
