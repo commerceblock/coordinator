@@ -27,6 +27,8 @@ pub struct Request {
     pub start_blockheight_clientchain: u32,
     /// Request client chain end block height
     pub end_blockheight_clientchain: u32,
+    /// Payment complete flag for request
+    pub is_payment_complete: bool,
 }
 
 impl Request {
@@ -41,6 +43,7 @@ impl Request {
             num_tickets: res.num_tickets,
             start_blockheight_clientchain: 0,
             end_blockheight_clientchain: 0,
+            is_payment_complete: false,
         }
     }
 }

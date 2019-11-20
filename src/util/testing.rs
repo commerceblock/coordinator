@@ -38,6 +38,7 @@ pub fn gen_challenge_state(request_hash: &sha256d::Hash) -> ChallengeState {
         num_tickets: 10,
         start_blockheight_clientchain: 0,
         end_blockheight_clientchain: 0,
+        is_payment_complete: false,
     };
     let mut bids = BidSet::new();
     let _ = bids.insert(Bid {
@@ -66,6 +67,7 @@ pub fn gen_challenge_state_with_challenge(
         num_tickets: 10,
         start_blockheight_clientchain: 0,
         end_blockheight_clientchain: 0,
+        is_payment_complete: false,
     };
     let mut bids = BidSet::new();
     let _ = bids.insert(Bid {
@@ -161,6 +163,7 @@ impl MockService {
             num_tickets: 10,
             start_blockheight_clientchain: 0,
             end_blockheight_clientchain: 0,
+            is_payment_complete: false,
         };
 
         MockService {

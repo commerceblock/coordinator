@@ -29,6 +29,7 @@ pub fn request_to_doc(request: &Request) -> OrderedDocument {
         "num_tickets": request.num_tickets,
         "start_blockheight_clientchain": request.start_blockheight_clientchain,
         "end_blockheight_clientchain": request.end_blockheight_clientchain,
+        "is_payment_complete": request.is_payment_complete,
     }
 }
 
@@ -43,6 +44,7 @@ pub fn doc_to_request(doc: &OrderedDocument) -> Request {
         num_tickets: doc.get("num_tickets").unwrap().as_i32().unwrap() as u32,
         start_blockheight_clientchain: doc.get("start_blockheight_clientchain").unwrap().as_i32().unwrap() as u32,
         end_blockheight_clientchain: doc.get("end_blockheight_clientchain").unwrap().as_i32().unwrap() as u32,
+        is_payment_complete: doc.get("is_payment_complete").unwrap().as_bool().unwrap(),
     }
 }
 
@@ -145,6 +147,7 @@ mod tests {
             num_tickets: 10,
             start_blockheight_clientchain: 0,
             end_blockheight_clientchain: 0,
+            is_payment_complete: false,
         };
 
         let doc = request_to_doc(&request);
@@ -157,7 +160,8 @@ mod tests {
                 "fee_percentage": 5,
                 "num_tickets": 10,
                 "start_blockheight_clientchain":0,
-                "end_blockheight_clientchain":0
+                "end_blockheight_clientchain":0,
+                "is_payment_complete": false,
             },
             doc
         );
