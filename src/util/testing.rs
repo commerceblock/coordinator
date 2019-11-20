@@ -12,10 +12,13 @@ use util::doc_format::*;
 
 use crate::challenger::{ChallengeResponseIds, ChallengeState};
 use crate::interfaces::clientchain::ClientChain;
-use crate::interfaces::request::{Bid, BidSet, Request as ServiceRequest};
 use crate::interfaces::response::Response;
 use crate::interfaces::service::Service;
 use crate::interfaces::storage::*;
+use crate::interfaces::{
+    bid::{Bid, BidSet},
+    request::Request as ServiceRequest,
+};
 
 use crate::error::*;
 

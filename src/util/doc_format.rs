@@ -12,8 +12,11 @@ use bitcoin::Amount;
 use mongodb::{ordered::OrderedDocument, Bson};
 use ocean::Address;
 
-use crate::interfaces::request::{Bid, BidPayment, Request};
 use crate::interfaces::response::Response;
+use crate::interfaces::{
+    bid::{Bid, BidPayment},
+    request::Request,
+};
 
 /// Util method that generates a Request document from a request
 pub fn request_to_doc(request: &Request) -> OrderedDocument {

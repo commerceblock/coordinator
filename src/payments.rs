@@ -15,11 +15,7 @@ use ocean_rpc::RpcApi;
 
 use crate::config::ClientChainConfig;
 use crate::error::{CError, Error, Result};
-use crate::interfaces::{
-    request::{BidSet, Request},
-    response::Response,
-    storage::Storage,
-};
+use crate::interfaces::{bid::BidSet, request::Request, response::Response, storage::Storage};
 use crate::util::ocean::OceanClient;
 
 /// Get addr params from chain name

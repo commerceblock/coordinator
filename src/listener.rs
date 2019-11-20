@@ -20,7 +20,7 @@ use serde_json::{self, Value};
 
 use crate::challenger::{ChallengeResponse, ChallengeState};
 use crate::error::Result;
-use crate::interfaces::request::Bid;
+use crate::interfaces::bid::Bid;
 
 /// Messsage type for challenge proofs sent by guardnodes
 #[derive(Debug)]

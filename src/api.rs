@@ -15,9 +15,9 @@ use jsonrpc_http_server::{hyper::header, AccessControlAllowOrigin, DomainsValida
 use serde::{Deserialize, Serialize};
 
 use crate::config::ApiConfig;
-use crate::interfaces::request::{BidSet, Request as ServiceRequest};
 use crate::interfaces::response::Response as ChallengeResponse;
 use crate::interfaces::storage::Storage;
+use crate::interfaces::{bid::BidSet, request::Request as ServiceRequest};
 
 #[derive(Deserialize, Debug)]
 struct GetRequestParams {
