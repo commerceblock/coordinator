@@ -14,7 +14,10 @@ use crate::challenger::{ChallengeResponseIds, ChallengeState};
 use crate::config::StorageConfig;
 use crate::error::{Error::MongoDb, Result};
 use crate::interfaces::response::Response;
-use crate::interfaces::{bid::BidSet, request::Request};
+use crate::interfaces::{
+    bid::{Bid, BidSet},
+    request::Request,
+};
 
 /// Storage trait defining required functionality for objects that store request
 /// and challenge information
@@ -23,6 +26,8 @@ pub trait Storage {
     fn save_challenge_state(&self, challenge: &ChallengeState) -> Result<()>;
     /// Update request in storage
     fn update_request(&self, request: &Request) -> Result<()>;
+    /// Update bid in storage
+    fn update_bid(&self, request_hash: sha256d::Hash, bid: &Bid) -> Result<()>;
     /// Store response for a specific challenge request
     fn save_response(&self, request_hash: sha256d::Hash, ids: &ChallengeResponseIds) -> Result<()>;
     /// Get challenge response for a specific request
@@ -123,13 +128,38 @@ impl Storage for MongoStorage {
         Ok(())
     }
 
-    /// Update entry in Request collection with given Request model
+    /// Update entry in Request collection with given Request object
     fn update_request(&self, request: &Request) -> Result<()> {
         let db_locked = self.db.lock().unwrap();
         self.auth(&db_locked)?;
         let coll = db_locked.collection("Request");
         let filter = doc! {"txid"=>&request.txid.clone().to_string()};
         let update = doc! {"$set" => request_to_doc(&request)};
+        let _ = coll.update_one(filter, update, None)?;
+        Ok(())
+    }
+
+    /// Update entry in Bid collection with given Bid object
+    fn update_bid(&self, request_hash: sha256d::Hash, bid: &Bid) -> Result<()> {
+        let db_locked = self.db.lock().unwrap();
+        self.auth(&db_locked)?;
+
+        let request_id = db_locked
+            .collection("Request")
+            .find_one(
+                Some(doc! {
+                    "txid": request_hash.to_string(),
+                }),
+                None,
+            )?
+            .unwrap()
+            .get("_id")
+            .unwrap()
+            .clone();
+
+        let coll = db_locked.collection("Bid");
+        let filter = doc! {"request_id": request_id.clone()};
+        let update = doc! {"$set" => bid_to_doc(&request_id, &bid)};
         let _ = coll.update_one(filter, update, None)?;
         Ok(())
     }

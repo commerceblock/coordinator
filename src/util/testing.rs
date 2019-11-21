@@ -296,6 +296,11 @@ impl Storage for MockStorage {
         Ok(())
     }
 
+    /// update bid in mock storage
+    fn update_bid(&self, _request_hash: sha256d::Hash, _bid: &Bid) -> Result<()> {
+        Ok(())
+    }
+
     /// Store response for a specific challenge request
     fn save_response(&self, request_hash: sha256d::Hash, ids: &ChallengeResponseIds) -> Result<()> {
         if self.return_err {

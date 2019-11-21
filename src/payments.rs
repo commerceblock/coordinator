@@ -74,7 +74,6 @@ impl Payments {
     fn complete_bid_payments(&self, _bids: &mut Vec<Bid>) -> Result<()> {
         // pay
         // set bid txid
-        // update bid
         Ok(())
     }
 
@@ -101,7 +100,6 @@ impl Payments {
                     address: bid_pay_to_addr,
                     txid: None,
                 });
-                // update bid
             }
         }
         Ok(())
@@ -129,6 +127,11 @@ impl Payments {
                     calculate_bid_payment(&fees_amount, request.fee_percentage.into(), bids.len() as u64)?;
                 self.process_bid_payments(&mut bids, &bid_payment_amount, &resp)?;
                 self.complete_bid_payments(&mut bids)?;
+            }
+
+            // update bids with payment information
+            for bid in bids {
+                self.storage.update_bid(request.txid, &bid)?;
             }
         }
 
