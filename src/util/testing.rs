@@ -2,23 +2,18 @@
 //!
 //! Colleciton of helper functions used in tests module
 
-use bitcoin::hashes::{hex::FromHex, sha256d, Hash};
-use bitcoin::secp256k1::PublicKey;
+use bitcoin_hashes::{hex::FromHex, sha256d, Hash};
 use mongodb::ordered::OrderedDocument;
 use mongodb::Bson;
+use secp256k1::PublicKey;
 use std::cell::RefCell;
 use std::str::FromStr;
-use util::doc_format::*;
 
 use crate::challenger::{ChallengeResponseIds, ChallengeState};
-use crate::interfaces::clientchain::ClientChain;
-use crate::interfaces::response::Response;
-use crate::interfaces::service::Service;
-use crate::interfaces::storage::*;
-use crate::interfaces::{
-    bid::{Bid, BidSet},
-    request::Request as ServiceRequest,
-};
+use crate::clientchain::ClientChain;
+use crate::request::{Bid, BidSet, Request as ServiceRequest};
+use crate::service::Service;
+use crate::storage::*;
 
 use crate::error::*;
 
@@ -36,15 +31,11 @@ pub fn gen_challenge_state(request_hash: &sha256d::Hash) -> ChallengeState {
         genesis_blockhash: gen_dummy_hash(0),
         fee_percentage: 5,
         num_tickets: 10,
-        start_blockheight_clientchain: 0,
-        end_blockheight_clientchain: 0,
-        is_payment_complete: false,
     };
     let mut bids = BidSet::new();
     let _ = bids.insert(Bid {
         txid: sha256d::Hash::from_hex("1234567890000000000000000000000000000000000000000000000000000000").unwrap(),
         pubkey: PublicKey::from_str("026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3").unwrap(),
-        payment: None,
     });
     ChallengeState {
         request,
@@ -65,16 +56,12 @@ pub fn gen_challenge_state_with_challenge(
         genesis_blockhash: *request_hash,
         fee_percentage: 5,
         num_tickets: 10,
-        start_blockheight_clientchain: 0,
-        end_blockheight_clientchain: 0,
-        is_payment_complete: false,
     };
     let mut bids = BidSet::new();
     let _ = bids.insert(Bid {
         txid: sha256d::Hash::from_hex("1234567890000000000000000000000000000000000000000000000000000000").unwrap(),
         // pubkey corresponding to SecretKey::from_slice(&[0xaa; 32])
         pubkey: PublicKey::from_str("026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3").unwrap(),
-        payment: None,
     });
     ChallengeState {
         request,
@@ -92,7 +79,7 @@ pub struct MockClientChain {
     /// bool
     pub return_false: bool,
     /// Mock client chain blockheight
-    pub height: RefCell<u32>,
+    pub height: RefCell<u64>,
 }
 
 impl MockClientChain {
@@ -126,11 +113,6 @@ impl ClientChain for MockClientChain {
         }
         Ok(true)
     }
-
-    /// Get block count dummy
-    fn get_blockheight(&self) -> Result<u32> {
-        Ok(self.height.clone().into_inner())
-    }
 }
 
 /// Mock implementation of Service using some mock logic for testing
@@ -142,7 +124,7 @@ pub struct MockService {
     /// Option
     pub return_none: bool,
     /// Current active request
-    pub request: RefCell<ServiceRequest>,
+    pub request: ServiceRequest,
     /// Mock service chain blockheight - incremented by default on
     /// get_blockheight
     pub height: RefCell<u64>,
@@ -161,15 +143,12 @@ impl MockService {
             .unwrap(),
             fee_percentage: 5,
             num_tickets: 10,
-            start_blockheight_clientchain: 0,
-            end_blockheight_clientchain: 0,
-            is_payment_complete: false,
         };
 
         MockService {
             return_err: false,
             return_none: false,
-            request: RefCell::new(request),
+            request,
             height: RefCell::new(0),
         }
     }
@@ -190,9 +169,9 @@ impl Service for MockService {
             return Err(Error::from(CError::Generic("get_request failed".to_owned())));
         }
 
-        let mut dummy_req = self.request.borrow_mut();
+        let mut dummy_req = self.request.clone();
         dummy_req.genesis_blockhash = *hash;
-        Ok(Some(dummy_req.clone()))
+        Ok(Some(dummy_req))
     }
 
     /// Try get active request bids, by transaction hash, from service chain
@@ -208,19 +187,16 @@ impl Service for MockService {
             txid: sha256d::Hash::from_hex("1234567890000000000000000000000000000000000000000000000000000000").unwrap(),
             // pubkey corresponding to SecretKey::from_slice(&[0xaa; 32])
             pubkey: PublicKey::from_str("026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3").unwrap(),
-            payment: None,
         });
         let _ = bid_set.insert(Bid {
             txid: sha256d::Hash::from_hex("0000000001234567890000000000000000000000000000000000000000000000").unwrap(),
             // pubkey corresponding to SecretKey::from_slice(&[0xbb; 32])
             pubkey: PublicKey::from_str("0268680737c76dabb801cb2204f57dbe4e4579e4f710cd67dc1b4227592c81e9b5").unwrap(),
-            payment: None,
         });
         let _ = bid_set.insert(Bid {
             txid: sha256d::Hash::from_hex("0000000000000000001234567890000000000000000000000000000000000000").unwrap(),
             // pubkey corresponding to SecretKey::from_slice(&[0xcc; 32])
             pubkey: PublicKey::from_str("02b95c249d84f417e3e395a127425428b540671cc15881eb828c17b722a53fc599").unwrap(),
-            payment: None,
         });
         Ok(Some(bid_set))
     }
@@ -269,15 +245,7 @@ impl Storage for MockStorage {
         if self.return_err {
             return Err(Error::from(CError::Generic("save_challenge_state failed".to_owned())));
         }
-        // do not add request if already exists
-        if !self
-            .requests
-            .borrow_mut()
-            .iter()
-            .any(|request| request.get("txid").unwrap().as_str().unwrap() == &challenge.request.txid.to_string())
-        {
-            self.requests.borrow_mut().push(request_to_doc(&challenge.request));
-        }
+        self.requests.borrow_mut().push(request_to_doc(&challenge.request));
         for bid in challenge.bids.iter() {
             self.bids
                 .borrow_mut()
@@ -286,52 +254,26 @@ impl Storage for MockStorage {
         Ok(())
     }
 
-    /// update request in mock storage
-    fn update_request(&self, request_update: &ServiceRequest) -> Result<()> {
-        for request in self.requests.borrow_mut().iter_mut() {
-            if request.get("txid").unwrap().as_str().unwrap() == &request_update.txid.to_string() {
-                *request = request_to_doc(&request_update);
-            }
-        }
-        Ok(())
-    }
-
-    /// update bid in mock storage
-    fn update_bid(&self, _request_hash: sha256d::Hash, _bid: &Bid) -> Result<()> {
-        Ok(())
-    }
-
-    /// Store response for a specific challenge request
+    /// Store responses for a specific challenge request
     fn save_response(&self, request_hash: sha256d::Hash, ids: &ChallengeResponseIds) -> Result<()> {
         if self.return_err {
             return Err(Error::from(CError::Generic("save_response failed".to_owned())));
         }
-
-        for resp_doc in self.challenge_responses.borrow_mut().iter_mut() {
-            if resp_doc.get("request_id").unwrap().as_str().unwrap() == &request_hash.to_string() {
-                let mut resp = doc_to_response(resp_doc);
-                resp.update(&ids);
-                *resp_doc = response_to_doc(&Bson::String(request_hash.to_string()), &resp);
-                return Ok(());
-            }
-        }
-
-        let mut resp = Response::new();
-        resp.update(&ids);
         self.challenge_responses
             .borrow_mut()
-            .push(response_to_doc(&Bson::String(request_hash.to_string()), &resp));
+            .push(challenge_responses_to_doc(&Bson::String(request_hash.to_string()), ids));
         Ok(())
     }
 
-    /// Get challenge response for a specific request
-    fn get_response(&self, request_hash: sha256d::Hash) -> Result<Option<Response>> {
+    /// Get all challenge responses for a specific request
+    fn get_responses(&self, request_hash: sha256d::Hash) -> Result<Vec<ChallengeResponseIds>> {
+        let mut challenge_responses = vec![];
         for doc in self.challenge_responses.borrow().to_vec().iter() {
             if doc.get("request_id").unwrap().as_str().unwrap() == request_hash.to_string() {
-                return Ok(Some(doc_to_response(doc)));
+                challenge_responses.push(doc_to_challenge_responses(doc));
             }
         }
-        Ok(None)
+        Ok(challenge_responses)
     }
 
     /// Get all bids for a specific request
@@ -345,9 +287,8 @@ impl Storage for MockStorage {
         Ok(bids)
     }
 
-    /// Get all the requests, with an optional flag to return payment complete
-    /// only
-    fn get_requests(&self, _complete: Option<bool>) -> Result<Vec<ServiceRequest>> {
+    /// Get all the requests
+    fn get_requests(&self) -> Result<Vec<ServiceRequest>> {
         let mut requests = vec![];
         for doc in self.requests.borrow().to_vec().iter() {
             requests.push(doc_to_request(doc))
