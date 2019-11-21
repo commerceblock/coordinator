@@ -2,7 +2,7 @@
 //!
 //! Ocean node communication implementations
 
-use ocean_rpc::{Client, RpcApi};
+use ocean_rpc::{Auth, Client, RpcApi};
 
 use crate::error::Result;
 
@@ -15,17 +15,23 @@ pub struct OceanClient {
 impl OceanClient {
     /// Create an OceanClient with underlying rpc client connectivity
     pub fn new(url: String, user: Option<String>, pass: Option<String>) -> Result<Self> {
+        let mut auth = Auth::None;
+        if let Some(ref _user) = user {
+            if let Some(ref _pass) = pass {
+                auth = Auth::UserPass(_user.clone(), _pass.clone());
+            }
+        }
         Ok(OceanClient {
-            client: Client::new(format!("http://{}", url), user, pass),
+            client: Client::new(format!("http://{}", url), auth)?,
         })
     }
 }
 
 /// Interval between retry attempts of rpc client
-pub const CLIENT_INTERVAL: u64 = 10;
+pub const OCEAN_CLIENT_RETRY_INTERVAL: u64 = 10;
 
 /// Number of retry attemps for rpc client calls
-pub const CLIENT_RETRY_ATTEMPTS: u8 = 5;
+pub const OCEAN_CLIENT_RETRY_ATTEMPTS: u8 = 5;
 
 impl RpcApi for OceanClient {
     fn call<T: for<'b> serde::de::Deserialize<'b>>(
@@ -33,12 +39,12 @@ impl RpcApi for OceanClient {
         cmd: &str,
         args: &[serde_json::Value],
     ) -> ocean_rpc::Result<T> {
-        for _ in 0..CLIENT_RETRY_ATTEMPTS {
+        for _ in 0..OCEAN_CLIENT_RETRY_ATTEMPTS {
             match self.client.call(cmd, args) {
                 Ok(ret) => return Ok(ret),
                 Err(ocean_rpc::Error::JsonRpc(e)) => {
                     warn!("rpc error: {}, retrying...", e);
-                    ::std::thread::sleep(::std::time::Duration::from_millis(CLIENT_INTERVAL));
+                    ::std::thread::sleep(::std::time::Duration::from_millis(OCEAN_CLIENT_RETRY_INTERVAL));
                     continue;
                 }
                 Err(e) => return Err(e),

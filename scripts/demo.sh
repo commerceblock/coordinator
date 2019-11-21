@@ -1,3 +1,8 @@
+# Script spins up new chain with datadir=~/co-client-dir/ and creates a new
+# demo request transaction along with 2 bids. This can be used to initialise
+# exmples/demo.rs to perform coordinator functionality on a mock client and service
+# chain.
+
 #!/bin/bash
 shopt -s expand_aliases
 

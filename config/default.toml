@@ -1,14 +1,14 @@
 # Log level option used to set RUST_LOG for the rust env logger
-log_level = "coordinator,demo"
+# log_level = "coordinator,demo"
 
 # Duration that we wait for challenge responses from guardnodes, in seconds
-challenge_duration = 60
+# challenge_duration = 60
 
 # Frequency of creating new challenges, in number of blocks
-challenge_frequency = 2
+# challenge_frequency = 2
 
-# Duration that we attempt to verify a challenge transaction before skipping, in seconds
-verify_duration = 150
+# Block find time of service chain, in seconds
+# block_time = 60
 
 # Host address that the listener binds to and receives guardnode requests
 listener_host = "127.0.0.1:9999"
@@ -28,11 +28,12 @@ host = "127.0.0.1:5555"
 user = "user1"
 pass = "password1"
 genesis_hash = "ff8950160a77988cdc485913568d06c2d69a8c952ef0f179b4b097e3de63d7cc"
+block_time = 60
 asset = "CHALLENGE"
 asset_key = "cScSHCQp9AEwzZoucRpX9bMRkLCJ4LoQWBNFTZuD6tPX9qwNMWfQ"
+chain = "ocean_test"
+payment_asset = "CBT"
 
 [storage]
 host = "localhost:27017"
 name = "coordinator"
-user = "user"
-pass = "pass"

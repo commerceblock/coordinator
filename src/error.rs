@@ -6,11 +6,13 @@ use std::error;
 use std::fmt;
 use std::result;
 
-use bitcoin_hashes::Error as HashesError;
+use bitcoin::hashes::hex::Error as HashesHexError;
+use bitcoin::hashes::Error as HashesError;
+use bitcoin::secp256k1::Error as Secp256k1Error;
 use config_rs::ConfigError;
 use mongodb::Error as MongoDbError;
+use ocean::AddressError;
 use ocean_rpc::Error as OceanRpcError;
-use secp256k1::Error as Secp256k1Error;
 
 /// Crate specific Result for crate specific Errors
 pub type Result<T> = result::Result<T, Error>;
@@ -20,6 +22,8 @@ pub type Result<T> = result::Result<T, Error>;
 pub enum CError {
     /// Missing bids for a specific request error
     MissingBids,
+    /// Challenge was not successfully verified
+    UnverifiedChallenge,
     /// Listener receiver disconnected error
     ReceiverDisconnected,
     /// Missing unspent for challenge asset. Takes parameters asset label and
@@ -44,15 +48,16 @@ pub enum InputErrorType {
     PrivKey,
     /// Invalid genesis hash string
     GenHash,
+    /// Missing input argument
+    MissingArgument,
 }
 
 impl InputErrorType {
     fn as_str(&self) -> &'static str {
         match *self {
-            InputErrorType::PrivKey => "Invalid private key input - must be base58check string of length 52.",
-            InputErrorType::GenHash => {
-                "Invalid client chain genesis hash input - must be hexadecimal string of length 64."
-            }
+            InputErrorType::PrivKey => "Private key input - must be base58check string of length 52",
+            InputErrorType::GenHash => "Chain genesis hash input must be hexadecimal string of length 64",
+            InputErrorType::MissingArgument => "Argument missing",
         }
     }
 }
@@ -61,9 +66,7 @@ impl fmt::Display for CError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             CError::Generic(ref e) => write!(f, "generic Error: {}", e),
-            CError::InputError(ref error, ref value) => {
-                write!(f, "Input Error: {} \nProblem value: {}", error.as_str(), value)
-            }
+            CError::InputError(ref error, ref value) => write!(f, "Input Error: {} (value: {})", error.as_str(), value),
             CError::MissingUnspent(ref asset, ref chain) => {
                 write!(f, "No unspent found for {} asset on {} chain", asset, chain)
             }
@@ -77,6 +80,7 @@ impl error::Error for CError {
         match *self {
             CError::Generic(_) => "Generic error",
             CError::MissingBids => "No bids found",
+            CError::UnverifiedChallenge => "Challenge not successfully verified",
             CError::ReceiverDisconnected => "Challenge response receiver disconnected",
             CError::MissingUnspent(_, _) => "No unspent found for asset",
             CError::InputError(_, _) => "Input parameter error",
@@ -96,6 +100,10 @@ pub enum Error {
     OceanRpc(OceanRpcError),
     /// Bitcoin hashes error
     BitcoinHashes(HashesError),
+    /// Bitcoin hex hashes error
+    BitcoinHashesHex(HashesHexError),
+    /// Ocean address error
+    OceanAddress(AddressError),
     /// Secp256k1 error
     Secp256k1(Secp256k1Error),
     /// Mongodb error
@@ -124,9 +132,21 @@ impl From<HashesError> for Error {
     }
 }
 
+impl From<HashesHexError> for Error {
+    fn from(e: HashesHexError) -> Error {
+        Error::BitcoinHashesHex(e)
+    }
+}
+
 impl From<Secp256k1Error> for Error {
     fn from(e: Secp256k1Error) -> Error {
         Error::Secp256k1(e)
+    }
+}
+
+impl From<AddressError> for Error {
+    fn from(e: AddressError) -> Error {
+        Error::OceanAddress(e)
     }
 }
 
@@ -147,7 +167,9 @@ impl fmt::Display for Error {
         match *self {
             Error::OceanRpc(ref e) => write!(f, "ocean rpc error: {}", e),
             Error::BitcoinHashes(ref e) => write!(f, "bitcoin hashes error: {}", e),
+            Error::BitcoinHashesHex(ref e) => write!(f, "bitcoin hashes hex error: {}", e),
             Error::Secp256k1(ref e) => write!(f, "secp256k1 error: {}", e),
+            Error::OceanAddress(ref e) => write!(f, "ocean address error: {}", e),
             Error::MongoDb(ref e) => write!(f, "mongodb error: {}", e),
             Error::Config(ref e) => write!(f, "config error: {}", e),
             Error::Coordinator(ref e) => write!(f, "coordinator error: {}", e),
@@ -160,7 +182,9 @@ impl error::Error for Error {
         match *self {
             Error::OceanRpc(ref e) => Some(e),
             Error::BitcoinHashes(ref e) => Some(e),
+            Error::BitcoinHashesHex(ref e) => Some(e),
             Error::Secp256k1(ref e) => Some(e),
+            Error::OceanAddress(ref e) => Some(e),
             Error::MongoDb(ref e) => Some(e),
             Error::Config(ref e) => Some(e),
             Error::Coordinator(_) => None,
