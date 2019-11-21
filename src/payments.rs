@@ -62,12 +62,17 @@ fn calculate_bid_payment(fees_amount: &Amount, fee_percentage: u64, num_bids: u6
     Ok(total_amount / num_bids) // amount per bid
 }
 
-/// TODO: add comments
+/// Payment Struct holding data and logic required to pay bids at the end of the
+/// service request
 pub struct Payments {
-    storage: Arc<dyn Storage + Send + Sync>,
-    config: ClientChainConfig,
-    client: OceanClient,
-    addr_params: &'static AddressParams,
+    /// Thread safe storage instance
+    pub storage: Arc<dyn Storage + Send + Sync>,
+    /// Client config required for fee payments
+    pub config: ClientChainConfig,
+    /// Ocean rpc connectivity to client chain
+    pub client: OceanClient,
+    /// Clientchain address params required for fee payments
+    pub addr_params: &'static AddressParams,
 }
 
 impl Payments {
