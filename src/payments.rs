@@ -224,3 +224,55 @@ pub fn run_payments(
         }
     }))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn calculate_bid_payment_test() {
+        assert_eq!(
+            1.125,
+            calculate_bid_payment(&Amount::from_btc(6.0).unwrap(), 75, 4)
+                .unwrap()
+                .as_btc()
+        );
+        assert_eq!(
+            0.24,
+            calculate_bid_payment(&Amount::from_btc(4.0).unwrap(), 30, 5)
+                .unwrap()
+                .as_btc()
+        );
+        assert_eq!(
+            1.0,
+            calculate_bid_payment(&Amount::from_btc(100.0).unwrap(), 1, 1)
+                .unwrap()
+                .as_btc()
+        );
+        assert_eq!(
+            0.0,
+            calculate_bid_payment(&Amount::from_btc(0.0).unwrap(), 1, 1)
+                .unwrap()
+                .as_btc()
+        );
+        assert_eq!(
+            0.0,
+            calculate_bid_payment(&Amount::from_btc(4.0).unwrap(), 0, 5)
+                .unwrap()
+                .as_btc()
+        );
+    }
+
+    #[test]
+    fn get_chain_addr_params_test() {
+        assert_eq!(
+            &AddressParams::OCEAN,
+            get_chain_addr_params(&String::from("ocean_main"))
+        );
+        assert_eq!(&AddressParams::GOLD, get_chain_addr_params(&String::from("gold_main")));
+        assert_eq!(
+            &AddressParams::ELEMENTS,
+            get_chain_addr_params(&String::from("supersilverhazechain"))
+        );
+    }
+}
