@@ -11,6 +11,7 @@ use bitcoin::hashes::Error as HashesError;
 use bitcoin::secp256k1::Error as Secp256k1Error;
 use config_rs::ConfigError;
 use mongodb::Error as MongoDbError;
+use ocean::AddressError;
 use ocean_rpc::Error as OceanRpcError;
 
 /// Crate specific Result for crate specific Errors
@@ -47,15 +48,16 @@ pub enum InputErrorType {
     PrivKey,
     /// Invalid genesis hash string
     GenHash,
+    /// Missing input argument
+    MissingArgument,
 }
 
 impl InputErrorType {
     fn as_str(&self) -> &'static str {
         match *self {
-            InputErrorType::PrivKey => "Invalid private key input - must be base58check string of length 52.",
-            InputErrorType::GenHash => {
-                "Invalid client chain genesis hash input - must be hexadecimal string of length 64."
-            }
+            InputErrorType::PrivKey => "Private key input - must be base58check string of length 52",
+            InputErrorType::GenHash => "Chain genesis hash input must be hexadecimal string of length 64",
+            InputErrorType::MissingArgument => "Argument missing",
         }
     }
 }
@@ -64,9 +66,7 @@ impl fmt::Display for CError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             CError::Generic(ref e) => write!(f, "generic Error: {}", e),
-            CError::InputError(ref error, ref value) => {
-                write!(f, "Input Error: {} \nProblem value: {}", error.as_str(), value)
-            }
+            CError::InputError(ref error, ref value) => write!(f, "Input Error: {} (value: {})", error.as_str(), value),
             CError::MissingUnspent(ref asset, ref chain) => {
                 write!(f, "No unspent found for {} asset on {} chain", asset, chain)
             }
@@ -102,6 +102,8 @@ pub enum Error {
     BitcoinHashes(HashesError),
     /// Bitcoin hex hashes error
     BitcoinHashesHex(HashesHexError),
+    /// Ocean address error
+    OceanAddress(AddressError),
     /// Secp256k1 error
     Secp256k1(Secp256k1Error),
     /// Mongodb error
@@ -142,6 +144,12 @@ impl From<Secp256k1Error> for Error {
     }
 }
 
+impl From<AddressError> for Error {
+    fn from(e: AddressError) -> Error {
+        Error::OceanAddress(e)
+    }
+}
+
 impl From<MongoDbError> for Error {
     fn from(e: MongoDbError) -> Error {
         Error::MongoDb(e)
@@ -161,6 +169,7 @@ impl fmt::Display for Error {
             Error::BitcoinHashes(ref e) => write!(f, "bitcoin hashes error: {}", e),
             Error::BitcoinHashesHex(ref e) => write!(f, "bitcoin hashes hex error: {}", e),
             Error::Secp256k1(ref e) => write!(f, "secp256k1 error: {}", e),
+            Error::OceanAddress(ref e) => write!(f, "ocean address error: {}", e),
             Error::MongoDb(ref e) => write!(f, "mongodb error: {}", e),
             Error::Config(ref e) => write!(f, "config error: {}", e),
             Error::Coordinator(ref e) => write!(f, "coordinator error: {}", e),
@@ -175,6 +184,7 @@ impl error::Error for Error {
             Error::BitcoinHashes(ref e) => Some(e),
             Error::BitcoinHashesHex(ref e) => Some(e),
             Error::Secp256k1(ref e) => Some(e),
+            Error::OceanAddress(ref e) => Some(e),
             Error::MongoDb(ref e) => Some(e),
             Error::Config(ref e) => Some(e),
             Error::Coordinator(_) => None,

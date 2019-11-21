@@ -9,6 +9,7 @@ fn is_base58_char(char: &char) -> bool {
         _ => false,
     }
 }
+
 /// Check for correct priv key input string format
 pub fn check_privkey_string(str: &String) -> bool {
     if str.len() == 52 && str.chars().all(|x| is_base58_char(&x)) {
@@ -16,6 +17,7 @@ pub fn check_privkey_string(str: &String) -> bool {
     }
     return false;
 }
+
 /// Check for correct hash input string format
 pub fn check_hash_string(str: &String) -> bool {
     if str.len() == 64 && str.chars().all(|x| x.is_ascii_hexdigit()) {

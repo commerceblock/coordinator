@@ -38,6 +38,7 @@ fn main() {
     config.challenge_duration = 5;
     config.challenge_frequency = 2;
     config.block_time = 10;
+    config.clientchain.block_time = 10;
 
     env::set_var("RUST_LOG", "coordinator,demo");
     env::set_var("RUST_BACKTRACE", "1");
@@ -56,7 +57,7 @@ fn main() {
     let client_rpc_clone = client_rpc.clone();
     thread::spawn(move || loop {
         thread::sleep(time::Duration::from_secs(10));
-        if let Err(e) = client_rpc_clone.clone().client.generate(1, None) {
+        if let Err(e) = client_rpc_clone.clone().client.generate(1) {
             error!("{}", e);
         }
     });
@@ -72,7 +73,6 @@ fn main() {
     for bid in client_rpc.get_request_bids(&request_txid).unwrap().unwrap().bids {
         if bid.fee_pub_key.to_string() == guardnode_pubkey {
             guardnode_txid = bid.txid;
-            println!("Guardnode bid txid: {}", guardnode_txid);
             break;
         }
     }

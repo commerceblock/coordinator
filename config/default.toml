@@ -31,6 +31,8 @@ genesis_hash = "ff8950160a77988cdc485913568d06c2d69a8c952ef0f179b4b097e3de63d7cc
 block_time = 60
 asset = "CHALLENGE"
 asset_key = "cScSHCQp9AEwzZoucRpX9bMRkLCJ4LoQWBNFTZuD6tPX9qwNMWfQ"
+chain = "ocean_test"
+payment_asset = "CBT"
 
 [storage]
 host = "localhost:27017"

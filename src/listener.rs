@@ -20,7 +20,7 @@ use serde_json::{self, Value};
 
 use crate::challenger::{ChallengeResponse, ChallengeState};
 use crate::error::Result;
-use crate::interfaces::request::Bid;
+use crate::interfaces::bid::Bid;
 
 /// Messsage type for challenge proofs sent by guardnodes
 #[derive(Debug)]
@@ -43,7 +43,11 @@ impl ChallengeProof {
         Ok(ChallengeProof {
             hash,
             sig,
-            bid: Bid { txid, pubkey },
+            bid: Bid {
+                txid,
+                pubkey,
+                payment: None,
+            },
         })
     }
 
@@ -258,6 +262,7 @@ mod tests {
             bid: Bid {
                 txid: bid_txid,
                 pubkey: bid_pubkey,
+                payment: None,
             },
         };
 
@@ -274,6 +279,7 @@ mod tests {
             bid: Bid {
                 txid: bid_txid,
                 pubkey: bid_pubkey,
+                payment: None,
             },
         };
 
@@ -414,6 +420,7 @@ mod tests {
                     Bid {
                         txid: bid_txid,
                         pubkey: bid_pubkey,
+                        payment: None
                     },
                 ))
         ); // check receiver not empty
@@ -662,6 +669,7 @@ mod tests {
                     Bid {
                         txid: bid_txid,
                         pubkey: bid_pubkey,
+                        payment: None
                     },
                 ))
         ); // check receiver not empty

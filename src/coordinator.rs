@@ -26,12 +26,15 @@ pub fn run(config: Config) -> Result<()> {
     let genesis_hash = sha256d::Hash::from_hex(&config.clientchain.genesis_hash)?;
 
     let _ = ::api::run_api_server(&config.api, storage.clone());
+    let (req_send, req_recv): (Sender<sha256d::Hash>, Receiver<sha256d::Hash>) = channel();
+    let _ = ::payments::run_payments(config.clientchain.clone(), storage.clone(), req_recv)?;
 
     // This loop runs continuously fetching and running challenge requests,
     // generating challenge responses and fails on any errors that occur
     loop {
         if let Some(request_id) = run_request(&config, &service, &clientchain, storage.clone(), genesis_hash)? {
             // if challenge request succeeds print responses
+            req_send.send(request_id).unwrap();
             info! {"***** Response *****"}
             let resp = storage.get_response(request_id)?.unwrap();
             info! {"{}", serde_json::to_string_pretty(&resp).unwrap()};

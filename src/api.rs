@@ -15,9 +15,9 @@ use jsonrpc_http_server::{hyper::header, AccessControlAllowOrigin, DomainsValida
 use serde::{Deserialize, Serialize};
 
 use crate::config::ApiConfig;
-use crate::interfaces::request::{BidSet, Request as ServiceRequest};
 use crate::interfaces::response::Response as ChallengeResponse;
 use crate::interfaces::storage::Storage;
+use crate::interfaces::{bid::BidSet, request::Request as ServiceRequest};
 
 #[derive(Deserialize, Debug)]
 struct GetRequestParams {
@@ -59,7 +59,7 @@ struct GetRequestsResponse {
 
 /// Get requests RPC call returning all stored requests
 fn get_requests(storage: Arc<dyn Storage>) -> futures::Finished<Value, Error> {
-    let requests = storage.get_requests().unwrap();
+    let requests = storage.get_requests(None).unwrap();
     let mut response = GetRequestsResponse { requests: vec![] };
     for request in requests {
         let bids = storage.get_bids(request.txid).unwrap();
@@ -194,7 +194,7 @@ mod tests {
         let resp = get_request(params, storage.clone());
         assert_eq!(
             format!(
-                r#"{{"request":{{"txid":"{}","start_blockheight":2,"end_blockheight":5,"genesis_blockhash":"0000000000000000000000000000000000000000000000000000000000000000","fee_percentage":5,"num_tickets":10,"start_blockheight_clientchain":0,"end_blockheight_clientchain":0}},"bids":[{{"txid":"1234567890000000000000000000000000000000000000000000000000000000","pubkey":"026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3"}}]}}"#,
+                r#"{{"request":{{"txid":"{}","start_blockheight":2,"end_blockheight":5,"genesis_blockhash":"0000000000000000000000000000000000000000000000000000000000000000","fee_percentage":5,"num_tickets":10,"start_blockheight_clientchain":0,"end_blockheight_clientchain":0,"is_payment_complete":false}},"bids":[{{"txid":"1234567890000000000000000000000000000000000000000000000000000000","pubkey":"026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3","payment":null}}]}}"#,
                 dummy_hash.to_string()
             ),
             resp.wait().unwrap()
@@ -216,7 +216,7 @@ mod tests {
         let resp = get_requests(storage.clone());
         assert_eq!(
             format!(
-                r#"{{"requests":[{{"request":{{"txid":"{}","start_blockheight":2,"end_blockheight":5,"genesis_blockhash":"0000000000000000000000000000000000000000000000000000000000000000","fee_percentage":5,"num_tickets":10,"start_blockheight_clientchain":0,"end_blockheight_clientchain":0}},"bids":[{{"txid":"1234567890000000000000000000000000000000000000000000000000000000","pubkey":"026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3"}}]}}]}}"#,
+                r#"{{"requests":[{{"request":{{"txid":"{}","start_blockheight":2,"end_blockheight":5,"genesis_blockhash":"0000000000000000000000000000000000000000000000000000000000000000","fee_percentage":5,"num_tickets":10,"start_blockheight_clientchain":0,"end_blockheight_clientchain":0,"is_payment_complete":false}},"bids":[{{"txid":"1234567890000000000000000000000000000000000000000000000000000000","pubkey":"026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3","payment":null}}]}}]}}"#,
                 dummy_hash.to_string()
             ),
             resp.wait().unwrap()
@@ -228,7 +228,7 @@ mod tests {
         let resp = get_requests(storage.clone());
         assert_eq!(
             format!(
-                r#"{{"requests":[{{"request":{{"txid":"{}","start_blockheight":2,"end_blockheight":5,"genesis_blockhash":"0000000000000000000000000000000000000000000000000000000000000000","fee_percentage":5,"num_tickets":10,"start_blockheight_clientchain":0,"end_blockheight_clientchain":0}},"bids":[{{"txid":"1234567890000000000000000000000000000000000000000000000000000000","pubkey":"026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3"}}]}},{{"request":{{"txid":"{}","start_blockheight":2,"end_blockheight":5,"genesis_blockhash":"0000000000000000000000000000000000000000000000000000000000000000","fee_percentage":5,"num_tickets":10,"start_blockheight_clientchain":0,"end_blockheight_clientchain":0}},"bids":[{{"txid":"1234567890000000000000000000000000000000000000000000000000000000","pubkey":"026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3"}}]}}]}}"#,
+                r#"{{"requests":[{{"request":{{"txid":"{}","start_blockheight":2,"end_blockheight":5,"genesis_blockhash":"0000000000000000000000000000000000000000000000000000000000000000","fee_percentage":5,"num_tickets":10,"start_blockheight_clientchain":0,"end_blockheight_clientchain":0,"is_payment_complete":false}},"bids":[{{"txid":"1234567890000000000000000000000000000000000000000000000000000000","pubkey":"026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3","payment":null}}]}},{{"request":{{"txid":"{}","start_blockheight":2,"end_blockheight":5,"genesis_blockhash":"0000000000000000000000000000000000000000000000000000000000000000","fee_percentage":5,"num_tickets":10,"start_blockheight_clientchain":0,"end_blockheight_clientchain":0,"is_payment_complete":false}},"bids":[{{"txid":"1234567890000000000000000000000000000000000000000000000000000000","pubkey":"026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3","payment":null}}]}}]}}"#,
                 dummy_hash.to_string(),
                 dummy_hash2.to_string()
             ),

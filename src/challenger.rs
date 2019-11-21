@@ -12,9 +12,12 @@ use bitcoin::hashes::sha256d;
 
 use crate::error::{CError, Error, Result};
 use crate::interfaces::clientchain::ClientChain;
-use crate::interfaces::request::{Bid, BidSet, Request};
 use crate::interfaces::service::Service;
 use crate::interfaces::storage::Storage;
+use crate::interfaces::{
+    bid::{Bid, BidSet},
+    request::Request,
+};
 
 /// Verify attempt interval to client in ms
 pub const CHALLENGER_VERIFY_INTERVAL: u64 = 100;
@@ -495,7 +498,7 @@ mod tests {
                 assert_eq!(resps, None);
                 let bids = storage.get_bids(dummy_request.txid).unwrap();
                 assert_eq!(challenge_state.bids, bids);
-                let requests = storage.get_requests().unwrap();
+                let requests = storage.get_requests(None).unwrap();
                 assert_eq!(1, requests.len());
                 assert_eq!(&challenge_state.request, &requests[0]);
                 assert_eq!(
@@ -536,7 +539,7 @@ mod tests {
                 assert_eq!(1, storage.challenge_responses.borrow().len());
                 let bids = storage.get_bids(dummy_request.txid).unwrap();
                 assert_eq!(challenge_state.bids, bids);
-                let requests = storage.get_requests().unwrap();
+                let requests = storage.get_requests(None).unwrap();
                 assert_eq!(1, requests.len());
                 assert_eq!(&challenge_state.request, &requests[0]);
                 assert_eq!(

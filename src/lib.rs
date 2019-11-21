@@ -24,7 +24,7 @@ extern crate config as config_rs;
 extern crate futures;
 extern crate hyper;
 extern crate ocean_rpc;
-extern crate rust_ocean as _ocean;
+extern crate rust_ocean as ocean;
 extern crate serde as serde;
 extern crate serde_json;
 #[macro_use]
@@ -37,6 +37,7 @@ pub mod config;
 pub mod coordinator;
 pub mod error;
 pub mod listener;
+pub mod payments;
 
 pub mod interfaces;
 pub mod util;
