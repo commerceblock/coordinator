@@ -1,13 +1,45 @@
-//! # Bid
+//! # Request
 //!
-//! Service request models for bids and bid payments
+//! Service request models for client requests and bids
 
 use std::collections::HashSet;
 
-use bitcoin::{hashes::sha256d, secp256k1::PublicKey, Amount};
-use ocean::Address;
-use ocean_rpc::json::GetRequestBidsResultBid;
+use bitcoin_hashes::sha256d;
+use ocean_rpc::json::{GetRequestBidsResultBid, GetRequestsResult};
+use secp256k1::key::PublicKey;
 use serde::{Serialize, Serializer};
+
+/// Request struct storing info on client request and modelling data that need
+/// to be stored
+#[derive(Debug, PartialEq, Clone, Serialize)]
+pub struct Request {
+    /// Ocean transaction ID of the request transaction
+    pub txid: sha256d::Hash,
+    /// Request start block height
+    pub start_blockheight: u32,
+    /// Request end block height
+    pub end_blockheight: u32,
+    /// Genesis blockhash of client issuing request
+    pub genesis_blockhash: sha256d::Hash,
+    /// Fee percentage for Guardnodes set by client
+    pub fee_percentage: u32,
+    /// Num of Guardnode tickets set by client
+    pub num_tickets: u32,
+}
+
+impl Request {
+    /// Return an instance of Request from an ocean json rpc GetRequestsResult
+    pub fn from_json(res: &GetRequestsResult) -> Self {
+        Request {
+            txid: res.txid,
+            start_blockheight: res.start_block_height,
+            end_blockheight: res.end_block_height,
+            genesis_blockhash: res.genesis_block,
+            fee_percentage: res.fee_percentage,
+            num_tickets: res.num_tickets,
+        }
+    }
+}
 
 /// Bid struct storing successful bids and modelling data that need to be stored
 #[derive(Clone, Debug, PartialEq, Hash, Eq, Serialize)]
@@ -17,8 +49,6 @@ pub struct Bid {
     /// Bid owner verification public key
     #[serde(serialize_with = "serialize_pubkey")]
     pub pubkey: PublicKey,
-    /// Bid payment optional
-    pub payment: Option<BidPayment>,
 }
 
 impl Bid {
@@ -26,23 +56,9 @@ impl Bid {
     pub fn from_json(res: &GetRequestBidsResultBid) -> Self {
         Bid {
             txid: res.txid,
-            pubkey: res.fee_pub_key.key,
-            payment: None,
+            pubkey: res.fee_pub_key,
         }
     }
-}
-
-/// Bid payment struct holding information for fee payments received by bid
-/// owners
-#[derive(Clone, Debug, PartialEq, Hash, Eq, Serialize)]
-pub struct BidPayment {
-    /// Bid payment transaction id; optional as might not be set yet
-    pub txid: Option<sha256d::Hash>,
-    /// Bid pay to address
-    pub address: Address,
-    /// Bid amount expected
-    #[serde(with = "bitcoin::util::amount::serde::as_btc")]
-    pub amount: Amount,
 }
 
 /// Type defining a set of Bids
@@ -63,7 +79,7 @@ mod tests {
 
     use std::str::FromStr;
 
-    use bitcoin::hashes::hex::FromHex;
+    use bitcoin_hashes::hex::FromHex;
 
     #[test]
     fn serialize_pubkey_test() {
@@ -72,12 +88,11 @@ mod tests {
         let bid = Bid {
             txid: sha256d::Hash::from_hex(txid_hex).unwrap(),
             pubkey: PublicKey::from_str(pubkey_hex).unwrap(),
-            payment: None,
         };
 
         let serialized = serde_json::to_string(&bid);
         assert_eq!(
-            format!(r#"{{"txid":"{}","pubkey":"{}","payment":null}}"#, txid_hex, pubkey_hex),
+            format!(r#"{{"txid":"{}","pubkey":"{}"}}"#, txid_hex, pubkey_hex),
             serialized.unwrap()
         );
     }

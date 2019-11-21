@@ -8,16 +8,16 @@ use std::sync::Arc;
 use std::thread;
 
 use base64::decode;
-use bitcoin::hashes::sha256d;
+use bitcoin_hashes::sha256d;
 use hyper::{Body, Request, StatusCode};
 use jsonrpc_http_server::jsonrpc_core::{Error, ErrorCode, IoHandler, Params, Value};
 use jsonrpc_http_server::{hyper::header, AccessControlAllowOrigin, DomainsValidation, Response, ServerBuilder};
 use serde::{Deserialize, Serialize};
 
+use crate::challenger::ChallengeResponseIds;
 use crate::config::ApiConfig;
-use crate::interfaces::response::Response as ChallengeResponse;
-use crate::interfaces::storage::Storage;
-use crate::interfaces::{bid::BidSet, request::Request as ServiceRequest};
+use crate::request::{BidSet, Request as ServiceRequest};
+use crate::storage::Storage;
 
 #[derive(Deserialize, Debug)]
 struct GetRequestParams {
@@ -59,7 +59,7 @@ struct GetRequestsResponse {
 
 /// Get requests RPC call returning all stored requests
 fn get_requests(storage: Arc<dyn Storage>) -> futures::Finished<Value, Error> {
-    let requests = storage.get_requests(None).unwrap();
+    let requests = storage.get_requests().unwrap();
     let mut response = GetRequestsResponse { requests: vec![] };
     for request in requests {
         let bids = storage.get_bids(request.txid).unwrap();
@@ -74,27 +74,19 @@ struct GetRequestResponsesParams {
 }
 
 #[derive(Serialize, Debug)]
-struct GetRequestResponseResponse {
-    response: ChallengeResponse,
+struct GetRequestResponsesResponse {
+    responses: Vec<ChallengeResponseIds>,
 }
 
 /// Get requests responses RPC call returning all responses for a specific
 /// request transaction id hash
-fn get_request_response(params: Params, storage: Arc<dyn Storage>) -> futures::Finished<Value, Error> {
+fn get_request_responses(params: Params, storage: Arc<dyn Storage>) -> futures::Finished<Value, Error> {
     let try_parse = params.parse::<GetRequestResponsesParams>();
     match try_parse {
         Ok(parse) => {
-            let response_get = storage.get_response(parse.txid).unwrap();
-            if let Some(response) = response_get {
-                let res_serialized = serde_json::to_string(&GetRequestResponseResponse { response }).unwrap();
-                return futures::finished(Value::String(res_serialized));
-            } else {
-                return futures::failed(Error {
-                    code: ErrorCode::InvalidParams,
-                    message: "Invalid params: `txid` does not exist.".to_string(),
-                    data: None,
-                });
-            }
+            let responses = storage.get_responses(parse.txid).unwrap();
+            let res_serialized = serde_json::to_string(&GetRequestResponsesResponse { responses }).unwrap();
+            return futures::finished(Value::String(res_serialized));
         }
         Err(e) => return futures::failed(e),
     }
@@ -127,8 +119,8 @@ pub fn run_api_server<D: Storage + Send + Sync + 'static>(
 ) -> thread::JoinHandle<()> {
     let mut io = IoHandler::default();
     let storage_ref = storage.clone();
-    io.add_method("getrequestresponse", move |params: Params| {
-        get_request_response(params, storage_ref.clone())
+    io.add_method("getrequestresponses", move |params: Params| {
+        get_request_responses(params, storage_ref.clone())
     });
     let storage_ref = storage.clone();
     io.add_method("getrequest", move |params: Params| {
@@ -169,7 +161,6 @@ mod tests {
 
     use futures::Future;
 
-    use crate::challenger::ChallengeResponseIds;
     use crate::util::testing::{gen_challenge_state, gen_dummy_hash, MockStorage};
 
     #[test]
@@ -194,7 +185,7 @@ mod tests {
         let resp = get_request(params, storage.clone());
         assert_eq!(
             format!(
-                r#"{{"request":{{"txid":"{}","start_blockheight":2,"end_blockheight":5,"genesis_blockhash":"0000000000000000000000000000000000000000000000000000000000000000","fee_percentage":5,"num_tickets":10,"start_blockheight_clientchain":0,"end_blockheight_clientchain":0,"is_payment_complete":false}},"bids":[{{"txid":"1234567890000000000000000000000000000000000000000000000000000000","pubkey":"026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3","payment":null}}]}}"#,
+                r#"{{"request":{{"txid":"{}","start_blockheight":2,"end_blockheight":5,"genesis_blockhash":"0000000000000000000000000000000000000000000000000000000000000000","fee_percentage":5,"num_tickets":10}},"bids":[{{"txid":"1234567890000000000000000000000000000000000000000000000000000000","pubkey":"026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3"}}]}}"#,
                 dummy_hash.to_string()
             ),
             resp.wait().unwrap()
@@ -216,7 +207,7 @@ mod tests {
         let resp = get_requests(storage.clone());
         assert_eq!(
             format!(
-                r#"{{"requests":[{{"request":{{"txid":"{}","start_blockheight":2,"end_blockheight":5,"genesis_blockhash":"0000000000000000000000000000000000000000000000000000000000000000","fee_percentage":5,"num_tickets":10,"start_blockheight_clientchain":0,"end_blockheight_clientchain":0,"is_payment_complete":false}},"bids":[{{"txid":"1234567890000000000000000000000000000000000000000000000000000000","pubkey":"026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3","payment":null}}]}}]}}"#,
+                r#"{{"requests":[{{"request":{{"txid":"{}","start_blockheight":2,"end_blockheight":5,"genesis_blockhash":"0000000000000000000000000000000000000000000000000000000000000000","fee_percentage":5,"num_tickets":10}},"bids":[{{"txid":"1234567890000000000000000000000000000000000000000000000000000000","pubkey":"026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3"}}]}}]}}"#,
                 dummy_hash.to_string()
             ),
             resp.wait().unwrap()
@@ -228,7 +219,7 @@ mod tests {
         let resp = get_requests(storage.clone());
         assert_eq!(
             format!(
-                r#"{{"requests":[{{"request":{{"txid":"{}","start_blockheight":2,"end_blockheight":5,"genesis_blockhash":"0000000000000000000000000000000000000000000000000000000000000000","fee_percentage":5,"num_tickets":10,"start_blockheight_clientchain":0,"end_blockheight_clientchain":0,"is_payment_complete":false}},"bids":[{{"txid":"1234567890000000000000000000000000000000000000000000000000000000","pubkey":"026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3","payment":null}}]}},{{"request":{{"txid":"{}","start_blockheight":2,"end_blockheight":5,"genesis_blockhash":"0000000000000000000000000000000000000000000000000000000000000000","fee_percentage":5,"num_tickets":10,"start_blockheight_clientchain":0,"end_blockheight_clientchain":0,"is_payment_complete":false}},"bids":[{{"txid":"1234567890000000000000000000000000000000000000000000000000000000","pubkey":"026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3","payment":null}}]}}]}}"#,
+                r#"{{"requests":[{{"request":{{"txid":"{}","start_blockheight":2,"end_blockheight":5,"genesis_blockhash":"0000000000000000000000000000000000000000000000000000000000000000","fee_percentage":5,"num_tickets":10}},"bids":[{{"txid":"1234567890000000000000000000000000000000000000000000000000000000","pubkey":"026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3"}}]}},{{"request":{{"txid":"{}","start_blockheight":2,"end_blockheight":5,"genesis_blockhash":"0000000000000000000000000000000000000000000000000000000000000000","fee_percentage":5,"num_tickets":10}},"bids":[{{"txid":"1234567890000000000000000000000000000000000000000000000000000000","pubkey":"026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3"}}]}}]}}"#,
                 dummy_hash.to_string(),
                 dummy_hash2.to_string()
             ),
@@ -237,20 +228,10 @@ mod tests {
     }
 
     #[test]
-    fn get_request_response_test() {
+    fn get_request_responses_test() {
         let storage = Arc::new(MockStorage::new());
         let dummy_hash = gen_dummy_hash(1);
         let dummy_hash_bid = gen_dummy_hash(2);
-
-        // no such request
-        let s = format!(r#"{{"txid": "{}"}}"#, dummy_hash.to_string());
-        let params: Params = serde_json::from_str(&s).unwrap();
-        let resp = get_request_response(params, storage.clone());
-        assert_eq!(
-            "Invalid params: `txid` does not exist.",
-            resp.wait().unwrap_err().message
-        );
-
         let mut dummy_response_set = ChallengeResponseIds::new();
         let _ = dummy_response_set.insert(dummy_hash_bid);
         let _ = storage.save_response(dummy_hash, &dummy_response_set);
@@ -258,7 +239,7 @@ mod tests {
         // invalid key
         let s = format!(r#"{{"hash": "{}"}}"#, dummy_hash.to_string());
         let params: Params = serde_json::from_str(&s).unwrap();
-        let resp = get_request_response(params, storage.clone());
+        let resp = get_request_responses(params, storage.clone());
         assert_eq!(
             "Invalid params: missing field `txid`.",
             resp.wait().unwrap_err().message
@@ -267,21 +248,18 @@ mod tests {
         // invalid value
         let s = format!(r#"{{"txid": "{}a"}}"#, dummy_hash.to_string());
         let params: Params = serde_json::from_str(&s).unwrap();
-        let resp = get_request_response(params, storage.clone());
+        let resp = get_request_responses(params, storage.clone());
         assert_eq!(
-            "Invalid params: odd hex string length 65.",
+            "Invalid params: bad hex string length 65 (expected 64).",
             resp.wait().unwrap_err().message
         );
 
         // valid key and value
         let s = format!(r#"{{"txid": "{}"}}"#, dummy_hash.to_string());
         let params: Params = serde_json::from_str(&s).unwrap();
-        let resp = get_request_response(params, storage.clone());
+        let resp = get_request_responses(params, storage.clone());
         assert_eq!(
-            format!(
-                r#"{{"response":{{"num_challenges":1,"bid_responses":{{"{}":1}}}}}}"#,
-                dummy_hash_bid.to_string()
-            ),
+            format!("{{\"responses\":[[\"{}\"]]}}", dummy_hash_bid.to_string()),
             resp.wait().unwrap()
         );
     }

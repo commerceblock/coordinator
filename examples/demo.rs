@@ -1,33 +1,30 @@
 //! Simple demo of coordinator with mock guard node
-//!
-//! Demo Coordinator connects to demo client chain (can be built by running
-//! ./scripts/demo.sh) and sends challenges to mock guardnodes that made bids.
-//! When guardnode responses are received by coordinator they are verified and
-//! can be stored ready for fee payments to be made.
 
 #[macro_use]
 extern crate log;
 extern crate bitcoin;
+extern crate bitcoin_hashes;
 extern crate coordinator;
 extern crate env_logger;
 extern crate hyper;
 extern crate ocean_rpc;
+extern crate secp256k1;
 
 use std::sync::Arc;
 use std::{env, thread, time};
 
 use bitcoin::consensus::encode::serialize;
-use bitcoin::hashes::{hex::FromHex, hex::ToHex, sha256d};
-use bitcoin::secp256k1::{Message, Secp256k1, SecretKey};
+use bitcoin_hashes::{hex::FromHex, hex::ToHex, sha256d};
 use hyper::{
     rt::{self, Future, Stream},
     Body, Client, Method, Request,
 };
 use ocean_rpc::RpcApi;
+use secp256k1::{Message, Secp256k1, SecretKey};
 
+use coordinator::clientchain::get_first_unspent;
 use coordinator::coordinator as coordinator_main;
-use coordinator::interfaces::clientchain::get_first_unspent;
-use coordinator::util::ocean::OceanClient;
+use coordinator::ocean::OceanClient;
 
 /// Demo coordinator with listener and challenge service running
 /// mock implementation for service chain interface and ocean
@@ -36,11 +33,9 @@ use coordinator::util::ocean::OceanClient;
 fn main() {
     let mut config = coordinator::config::Config::new().unwrap();
     config.challenge_duration = 5;
-    config.challenge_frequency = 2;
-    config.block_time = 10;
-    config.clientchain.block_time = 10;
+    config.verify_duration = 30;
 
-    env::set_var("RUST_LOG", "coordinator,demo");
+    env::set_var("RUST_LOG", &config.log_level);
     env::set_var("RUST_BACKTRACE", "1");
     env_logger::init();
 
@@ -56,7 +51,7 @@ fn main() {
     // auto client chain block generation
     let client_rpc_clone = client_rpc.clone();
     thread::spawn(move || loop {
-        thread::sleep(time::Duration::from_secs(10));
+        thread::sleep(time::Duration::from_secs(5));
         if let Err(e) = client_rpc_clone.clone().client.generate(1) {
             error!("{}", e);
         }
@@ -73,6 +68,7 @@ fn main() {
     for bid in client_rpc.get_request_bids(&request_txid).unwrap().unwrap().bids {
         if bid.fee_pub_key.to_string() == guardnode_pubkey {
             guardnode_txid = bid.txid;
+            println!("guardnode bid txid: {}", guardnode_txid);
             break;
         }
     }

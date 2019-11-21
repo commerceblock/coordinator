@@ -9,18 +9,18 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 
 use bitcoin::consensus::serialize;
-use bitcoin::hashes::{hex::FromHex, sha256d};
-use bitcoin::secp256k1::{Message, PublicKey, Secp256k1, Signature};
+use bitcoin_hashes::{hex::FromHex, sha256d};
 use futures::future;
 use futures::sync::oneshot;
 use hyper::rt::{self, Future, Stream};
 use hyper::service::service_fn;
 use hyper::{Body, Method, Request, Response, Server, StatusCode};
+use secp256k1::{Message, PublicKey, Secp256k1, Signature};
 use serde_json::{self, Value};
 
 use crate::challenger::{ChallengeResponse, ChallengeState};
 use crate::error::Result;
-use crate::interfaces::bid::Bid;
+use crate::request::Bid;
 
 /// Messsage type for challenge proofs sent by guardnodes
 #[derive(Debug)]
@@ -43,11 +43,7 @@ impl ChallengeProof {
         Ok(ChallengeProof {
             hash,
             sig,
-            bid: Bid {
-                txid,
-                pubkey,
-                payment: None,
-            },
+            bid: Bid { txid, pubkey },
         })
     }
 
@@ -181,8 +177,8 @@ mod tests {
 
     use std::sync::mpsc::{channel, Receiver, TryRecvError};
 
-    use bitcoin::hashes::hex::ToHex;
-    use bitcoin::secp256k1::SecretKey;
+    use bitcoin_hashes::hex::ToHex;
+    use secp256k1::SecretKey;
 
     use crate::util::testing::{gen_challenge_state_with_challenge, gen_dummy_hash};
 
@@ -208,7 +204,7 @@ mod tests {
             "sig": "304402201742daea5ec3b7306b9164be862fc1659cc830032180b8b17beffe02645860d602201039eba402d22e630308e6af05da8dd4f05b51b7d672ca5fc9e3b0a57776365c"
         }"#;
         let proof = ChallengeProof::from_json(serde_json::from_str::<Value>(data).unwrap());
-        assert!(proof.err().unwrap().to_string().contains("bitcoin hashes hex error"));
+        assert!(proof.err().unwrap().to_string().contains("bitcoin hashes error"));
 
         // bad pubkey
         let data = r#"
@@ -230,7 +226,7 @@ mod tests {
             "sig": "304402201742daea5ec3b7306b9164be862fc1659cc830032180b8b17beffe02645860d602201039eba402d22e630308e6af05da8dd4f05b51b7d672ca5fc9e3b0a57776365c"
         }"#;
         let proof = ChallengeProof::from_json(serde_json::from_str::<Value>(data).unwrap());
-        assert!(proof.err().unwrap().to_string().contains("bitcoin hashes hex error"));
+        assert!(proof.err().unwrap().to_string().contains("bitcoin hashes error"));
 
         // bad sig
         let data = r#"
@@ -262,7 +258,6 @@ mod tests {
             bid: Bid {
                 txid: bid_txid,
                 pubkey: bid_pubkey,
-                payment: None,
             },
         };
 
@@ -279,7 +274,6 @@ mod tests {
             bid: Bid {
                 txid: bid_txid,
                 pubkey: bid_pubkey,
-                payment: None,
             },
         };
 
@@ -420,7 +414,6 @@ mod tests {
                     Bid {
                         txid: bid_txid,
                         pubkey: bid_pubkey,
-                        payment: None
                     },
                 ))
         ); // check receiver not empty
@@ -669,7 +662,6 @@ mod tests {
                     Bid {
                         txid: bid_txid,
                         pubkey: bid_pubkey,
-                        payment: None
                     },
                 ))
         ); // check receiver not empty

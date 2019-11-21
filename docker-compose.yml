@@ -46,8 +46,6 @@ services:
       CO_CLIENTCHAIN_PASS: password1
       CO_CLIENTCHAIN_GENESIS_HASH: d1fbd07bd9a7a80a85445b8e28246f0b644c01ac7412e81ce3ffc0815386ad77
       CO_CLIENTCHAIN_ASSET_KEY: cScSHCQp9AEwzZoucRpX9bMRkLCJ4LoQWBNFTZuD6tPX9qwNMWfQ
-      CO_CLIENTCHAIN_CHAIN: ocean_test
-      CO_CLIENTCHAIN_PAYMENT_ASSET: CBT
 
       # cb service chain node connectivity
       CO_SERVICE_HOST: service_chain:5555

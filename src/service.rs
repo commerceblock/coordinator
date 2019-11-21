@@ -2,16 +2,13 @@
 //!
 //! Service chain interface and implementations
 
-use bitcoin::hashes::sha256d;
+use bitcoin_hashes::sha256d;
 use ocean_rpc::RpcApi;
 
 use crate::config::ServiceConfig;
 use crate::error::Result;
-use crate::interfaces::{
-    bid::{Bid, BidSet},
-    request::Request,
-};
-use crate::util::ocean::OceanClient;
+use crate::ocean::OceanClient;
+use crate::request::{Bid, BidSet, Request};
 
 /// Service trait defining functionality for interfacing with service chain
 pub trait Service {
