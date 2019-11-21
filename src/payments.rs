@@ -32,33 +32,34 @@ pub fn get_chain_addr_params(chain: &String) -> &'static AddressParams {
     }
 }
 
-/// TODO: add comments
+/// Function that calculates all the fees accumulated in the duration of a
+/// service request in the clientchain
 fn calculate_fees(request: &Request, client: &OceanClient) -> Result<Amount> {
     let mut fee_sum = Amount::ZERO;
     for i in request.start_blockheight_clientchain..request.end_blockheight_clientchain {
         let block = client.get_block_info(&client.get_block_hash(i.into())?)?;
-        // using raw rpc to get asset label
-        // check also coinbase destination ?
-        // check is coinbase
-        // check is correct label
-        // check ownership
-        let tx = client.get_raw_transaction_verbose(&block.tx[0], None)?;
+        let tx = client.get_raw_transaction_verbose(&block.tx[0], None)?; // coinbase tx
+        assert!(tx.is_coinbase() == true);
         for txout in tx.vout {
-            // do label check :)
-            fee_sum += txout.value;
+            match txout.assetlabel {
+                Some(label) => {
+                    // any other label is a policy asset
+                    if label == "CBT" {
+                        fee_sum += txout.value;
+                    }
+                }
+                None => fee_sum += txout.value,
+            }
         }
     }
     Ok(fee_sum)
 }
 
-/// TODO
-fn calculate_bid_payment(fee_amount: &Amount, fee_percentage: u64, num_bids: u64) -> Result<Amount> {
-    info!("amount: {}", fee_amount);
-    let gn_amount = *fee_amount * fee_percentage / 100;
-    info!("gn_amount: {}", gn_amount);
-    let gn_amount_per_gn = gn_amount / num_bids;
-    info!("gn_amount_per_gn: {}", gn_amount_per_gn);
-    Ok(gn_amount_per_gn)
+/// Function that calculates the fee amount to be received per bid given total
+/// fees, fee percentage and bid number
+fn calculate_bid_payment(fees_amount: &Amount, fee_percentage: u64, num_bids: u64) -> Result<Amount> {
+    let total_amount = *fees_amount * fee_percentage / 100;
+    Ok(total_amount / num_bids) // amount per bid
 }
 
 /// TODO: add comments
@@ -70,7 +71,7 @@ pub struct Payments {
 }
 
 impl Payments {
-    /// TODO
+    /// TODO: implement payments
     fn complete_bid_payments(&self, _bids: &mut Vec<Bid>) -> Result<()> {
         // pay
         // set bid txid
