@@ -22,7 +22,7 @@ pub trait Storage {
     /// Store the state of a challenge request
     fn save_challenge_state(&self, challenge: &ChallengeState) -> Result<()>;
     /// Update request in storage
-    fn update_request(&self, request: Request) -> Result<()>;
+    fn update_request(&self, request: &Request) -> Result<()>;
     /// Store response for a specific challenge request
     fn save_response(&self, request_hash: sha256d::Hash, ids: &ChallengeResponseIds) -> Result<()>;
     /// Get challenge response for a specific request
@@ -124,7 +124,7 @@ impl Storage for MongoStorage {
     }
 
     /// Update entry in Request collection with given Request model
-    fn update_request(&self, request: Request) -> Result<()> {
+    fn update_request(&self, request: &Request) -> Result<()> {
         let db_locked = self.db.lock().unwrap();
         self.auth(&db_locked)?;
         let coll = db_locked.collection("Request");

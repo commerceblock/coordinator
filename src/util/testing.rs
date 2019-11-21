@@ -287,7 +287,7 @@ impl Storage for MockStorage {
     }
 
     /// update request in mock storage
-    fn update_request(&self, request_update: ServiceRequest) -> Result<()> {
+    fn update_request(&self, request_update: &ServiceRequest) -> Result<()> {
         for request in self.requests.borrow_mut().iter_mut() {
             if request.get("txid").unwrap().as_str().unwrap() == &request_update.txid.to_string() {
                 *request = request_to_doc(&request_update);
@@ -342,7 +342,7 @@ impl Storage for MockStorage {
 
     /// Get all the requests, with an optional flag to return payment complete
     /// only
-    fn get_requests(&self, complete: Option<bool>) -> Result<Vec<ServiceRequest>> {
+    fn get_requests(&self, _complete: Option<bool>) -> Result<Vec<ServiceRequest>> {
         let mut requests = vec![];
         for doc in self.requests.borrow().to_vec().iter() {
             requests.push(doc_to_request(doc))

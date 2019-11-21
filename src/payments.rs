@@ -15,7 +15,12 @@ use ocean_rpc::RpcApi;
 
 use crate::config::ClientChainConfig;
 use crate::error::{CError, Error, Result};
-use crate::interfaces::{bid::BidSet, request::Request, response::Response, storage::Storage};
+use crate::interfaces::{
+    bid::{Bid, BidPayment},
+    request::Request,
+    response::Response,
+    storage::Storage,
+};
 use crate::util::ocean::OceanClient;
 
 /// Get addr params from chain name
@@ -66,68 +71,90 @@ pub struct Payments {
 
 impl Payments {
     /// TODO
-    fn pay_bids(&self, _bids: &BidSet) -> Result<()> {
+    fn complete_bid_payments(&self, _bids: &mut Vec<Bid>) -> Result<()> {
         // pay
         // set bid txid
         // update bid
         Ok(())
     }
 
-    /// TODO
-    fn process_bids(&self, bids: &BidSet, bid_payment: &Amount, response: &Response) -> Result<()> {
+    /// Process bid payments method handles calculating the payment to be
+    /// received per bid and on which address, and updates the corresponding
+    /// payment info in Storage
+    fn process_bid_payments(&self, bids: &mut Vec<Bid>, bid_payment: &Amount, response: &Response) -> Result<()> {
         for bid in bids {
             if let Some(bid_resp) = response.bid_responses.get(&bid.txid) {
-                let gn_amount_corrected = *bid_payment * (*bid_resp).into() / response.num_challenges.into();
-                let das_pub = PublicKey {
-                    key: bid.pubkey,
-                    compressed: true,
-                };
-                let gn_pay_to_addr = Address::p2pkh(&das_pub, None, self.addr_params);
-                info!(
-                    "bid: {}\naddr: {}\ngn_amount_corrected: {}\n",
-                    bid.txid, gn_pay_to_addr, gn_amount_corrected
+                // correct bid payment by calculating the performance
+                // base on successful responses / total responses
+                let bid_payment_corrected = *bid_payment * (*bid_resp).into() / response.num_challenges.into();
+                let bid_pay_to_addr = Address::p2pkh(
+                    &PublicKey {
+                        key: bid.pubkey,
+                        compressed: true,
+                    },
+                    None,
+                    self.addr_params,
                 );
 
-                // set bid amount, addr
+                bid.payment = Some(BidPayment {
+                    amount: bid_payment_corrected,
+                    address: bid_pay_to_addr,
+                    txid: None,
+                });
                 // update bid
             }
         }
         Ok(())
     }
 
-    /// TODO: add comments
-    fn do_request_payment(&self, request: &Request) -> Result<()> {
-        let bids = self.storage.get_bids(request.txid)?;
-        if bids.len() > 0 {
+    /// Method that handles payments for a single request, fetching bid
+    /// information, calculating fees, updating payment information and doing
+    /// payments
+    fn do_request_payment(&self, request: &mut Request) -> Result<()> {
+        // skip requests that have not finished
+        if request.end_blockheight_clientchain == 0
+            || (self.client.get_block_count()? as u32) < request.end_blockheight_clientchain
+        {
+            warn! {"Skipping unfinished request: {}", request.txid};
+        }
+
+        // fetch bids and responses
+        let bids_set = self.storage.get_bids(request.txid)?;
+        if bids_set.len() > 0 {
+            let mut bids: Vec<Bid> = bids_set.iter().map(|val| val.clone()).collect();
             if let Some(resp) = self.storage.get_response(request.txid)? {
-                let amount = calculate_fees(request, &self.client)?;
-                let bid_payment = calculate_bid_payment(&amount, request.fee_percentage.into(), bids.len() as u64)?;
-                self.process_bids(&bids, &bid_payment, &resp)?;
-                self.pay_bids(&bids)?;
+                let fees_amount = calculate_fees(request, &self.client)?;
+                info! {"Total fees: {}", fees_amount};
+                let bid_payment_amount =
+                    calculate_bid_payment(&fees_amount, request.fee_percentage.into(), bids.len() as u64)?;
+                self.process_bid_payments(&mut bids, &bid_payment_amount, &resp)?;
+                self.complete_bid_payments(&mut bids)?;
             }
         }
 
-        // set request complete
-        // update request
-
+        // update request with payment complete
+        request.is_payment_complete = true;
+        self.storage.update_request(request)?;
         Ok(())
     }
 
-    /// TODO: add comments
+    /// Main Request payments method; first checks for any incomplete requests
+    /// and then listens for new requests on the receiver channel
     fn do_request_payments(&self, req_recv: Receiver<sha256d::Hash>) -> Result<()> {
-        // First pay out any past requests that have not been fully paid yet
-        // TODO: only get incomplete only from storage
+        // Look for incomplete requests
         let incomplete_requests = self.storage.get_requests(Some(false))?;
-        for req in incomplete_requests {
-            let _ = self.do_request_payment(&req)?;
+        for mut req in incomplete_requests {
+            info! {"Found incomplete request: {} ", req.txid};
+            let _ = self.do_request_payment(&mut req)?;
         }
 
         // Wait for new requests
         loop {
             match req_recv.recv() {
                 Ok(resp) => {
-                    let req = self.storage.get_request(resp)?.unwrap();
-                    let _ = self.do_request_payment(&req)?;
+                    let mut req = self.storage.get_request(resp)?.unwrap();
+                    info! {"New request: {}", req.txid};
+                    let _ = self.do_request_payment(&mut req)?;
                 }
                 Err(RecvError) => {
                     return Err(Error::from(CError::ReceiverDisconnected));
@@ -136,7 +163,10 @@ impl Payments {
         }
     }
 
-    /// TODO: add comments
+    /// Return new Payments instance that requires clientchain config for
+    /// various payment info and rpc calls to calculate payment fees and do the
+    /// payments as well as a thread-safe reference to a Storage instance for
+    /// getting request information and updating payment details
     pub fn new(clientchain_config: ClientChainConfig, storage: Arc<dyn Storage + Send + Sync>) -> Result<Payments> {
         let client = OceanClient::new(
             clientchain_config.host.clone(),
@@ -144,6 +174,7 @@ impl Payments {
             Some(clientchain_config.pass.clone()),
         )?;
 
+        // Check if payment addr/key are set and import the key for payment funds
         let addr_params = get_chain_addr_params(&clientchain_config.chain);
         if let Some(addr) = &clientchain_config.payment_addr {
             let ocean_addr = Address::from_str(&addr)?;
@@ -170,7 +201,8 @@ impl Payments {
     }
 }
 
-/// TODO: add comments
+/// Run payments daemon in a separate thread with a Payments instance receiving
+/// information on finished requests via a Receiver channel
 pub fn run_payments(
     clientchain_config: ClientChainConfig,
     storage: Arc<dyn Storage + Send + Sync>,
