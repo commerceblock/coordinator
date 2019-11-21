@@ -117,7 +117,7 @@ impl Payments {
     fn do_request_payments(&self, req_recv: Receiver<sha256d::Hash>) -> Result<()> {
         // First pay out any past requests that have not been fully paid yet
         // TODO: only get incomplete only from storage
-        let incomplete_requests = self.storage.get_requests()?;
+        let incomplete_requests = self.storage.get_requests(Some(false))?;
         for req in incomplete_requests {
             let _ = self.do_request_payment(&req)?;
         }

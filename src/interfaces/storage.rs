@@ -29,8 +29,9 @@ pub trait Storage {
     fn get_response(&self, request_hash: sha256d::Hash) -> Result<Option<Response>>;
     /// Get all bids for a specific request
     fn get_bids(&self, request_hash: sha256d::Hash) -> Result<BidSet>;
-    /// Get all the requests
-    fn get_requests(&self) -> Result<Vec<Request>>;
+    /// Get all the requests, with an optional flag to return payment complete
+    /// only
+    fn get_requests(&self, complete: Option<bool>) -> Result<Vec<Request>>;
     /// Get request for a specific request txid
     fn get_request(&self, request_hash: sha256d::Hash) -> Result<Option<Request>>;
 }
@@ -241,14 +242,20 @@ impl Storage for MongoStorage {
         Ok(all_bids)
     }
 
-    /// Get all the requests
-    fn get_requests(&self) -> Result<Vec<Request>> {
+    /// Get all the requests, with an optional flag to return payment complete
+    /// only
+    fn get_requests(&self, complete: Option<bool>) -> Result<Vec<Request>> {
         let db_locked = self.db.lock().unwrap();
         self.auth(&db_locked)?;
 
         let mut options = FindOptions::new();
         options.sort = Some(doc! { "_id" : 1 }); // sort ascending, latest request is last
-        let resps = db_locked.collection("Request").find(None, Some(options))?;
+        let filter = if let Some(is_complete) = complete {
+            Some(doc! { "is_payment_complete": is_complete })
+        } else {
+            None
+        };
+        let resps = db_locked.collection("Request").find(filter, Some(options))?;
         drop(db_locked); // drop immediately on get requests
 
         let mut requests = vec![];

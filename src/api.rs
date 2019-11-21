@@ -59,7 +59,7 @@ struct GetRequestsResponse {
 
 /// Get requests RPC call returning all stored requests
 fn get_requests(storage: Arc<dyn Storage>) -> futures::Finished<Value, Error> {
-    let requests = storage.get_requests().unwrap();
+    let requests = storage.get_requests(None).unwrap();
     let mut response = GetRequestsResponse { requests: vec![] };
     for request in requests {
         let bids = storage.get_bids(request.txid).unwrap();

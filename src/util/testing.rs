@@ -340,8 +340,9 @@ impl Storage for MockStorage {
         Ok(bids)
     }
 
-    /// Get all the requests
-    fn get_requests(&self) -> Result<Vec<ServiceRequest>> {
+    /// Get all the requests, with an optional flag to return payment complete
+    /// only
+    fn get_requests(&self, complete: Option<bool>) -> Result<Vec<ServiceRequest>> {
         let mut requests = vec![];
         for doc in self.requests.borrow().to_vec().iter() {
             requests.push(doc_to_request(doc))

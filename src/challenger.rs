@@ -498,7 +498,7 @@ mod tests {
                 assert_eq!(resps, None);
                 let bids = storage.get_bids(dummy_request.txid).unwrap();
                 assert_eq!(challenge_state.bids, bids);
-                let requests = storage.get_requests().unwrap();
+                let requests = storage.get_requests(None).unwrap();
                 assert_eq!(1, requests.len());
                 assert_eq!(&challenge_state.request, &requests[0]);
                 assert_eq!(
@@ -539,7 +539,7 @@ mod tests {
                 assert_eq!(1, storage.challenge_responses.borrow().len());
                 let bids = storage.get_bids(dummy_request.txid).unwrap();
                 assert_eq!(challenge_state.bids, bids);
-                let requests = storage.get_requests().unwrap();
+                let requests = storage.get_requests(None).unwrap();
                 assert_eq!(1, requests.len());
                 assert_eq!(&challenge_state.request, &requests[0]);
                 assert_eq!(
