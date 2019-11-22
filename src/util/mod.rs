@@ -5,4 +5,5 @@
 pub mod checks;
 pub mod doc_format;
 pub mod ocean;
+#[cfg(test)]
 pub mod testing;
