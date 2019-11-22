@@ -36,7 +36,7 @@ pub fn get_chain_addr_params(chain: &String) -> &'static AddressParams {
 /// service request in the clientchain
 fn calculate_fees(request: &Request, client: &OceanClient) -> Result<Amount> {
     let mut fee_sum = Amount::ZERO;
-    for i in request.start_blockheight_clientchain..request.end_blockheight_clientchain {
+    for i in request.start_blockheight_clientchain..=request.end_blockheight_clientchain {
         let block = client.get_block_info(&client.get_block_hash(i.into())?)?;
         let tx = client.get_raw_transaction_verbose(&block.tx[0], None)?; // coinbase tx
         assert!(tx.is_coinbase() == true);
