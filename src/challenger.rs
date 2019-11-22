@@ -244,8 +244,11 @@ mod tests {
     use std::sync::mpsc::{channel, Receiver, Sender};
 
     use crate::error::Error;
+    use crate::interfaces::mocks::clientchain::MockClientChain;
+    use crate::interfaces::mocks::service::MockService;
+    use crate::interfaces::mocks::storage::MockStorage;
     use crate::interfaces::response::Response;
-    use crate::util::testing::{gen_challenge_state, gen_dummy_hash, MockClientChain, MockService, MockStorage};
+    use crate::util::testing::{gen_challenge_state, gen_dummy_hash};
 
     #[test]
     fn verify_challenge_test() {

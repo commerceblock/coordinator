@@ -105,7 +105,7 @@ domain_asset=$(echo $bid_tx | jq '.vout['$vout'].asset')
 
 inputs="[{\"txid\":\"$bid_txid2\",\"vout\":$vout,\"asset\":$domain_asset}]"
 outputs="{\"endBlockHeight\":10,\"requestTxid\":\"$request_txid\",\"pubkey\":\"$pub\",\
-\"feePubkey\":\"026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3\",\
+\"feePubkey\":\"029aaa76fcf7b8012041c6b4375ad476408344d842000087aa93c5a33f65d50d92\",\
 \"value\":55,\"change\":\"44.999\",\"changeAddress\":\"$addr\",\"fee\":0.001}"
 
 signedtx=`ocl signrawtransaction $(ocl createrawbidtx $inputs $outputs)`
