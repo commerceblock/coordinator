@@ -170,7 +170,8 @@ mod tests {
     use futures::Future;
 
     use crate::challenger::ChallengeResponseIds;
-    use crate::util::testing::{gen_challenge_state, gen_dummy_hash, MockStorage};
+    use crate::interfaces::mocks::storage::MockStorage;
+    use crate::util::testing::{gen_challenge_state, gen_dummy_hash};
 
     #[test]
     fn get_request_test() {
