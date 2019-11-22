@@ -19,6 +19,7 @@ use std::{env, thread, time};
 use bitcoin::consensus::encode::serialize;
 use bitcoin::hashes::{hex::FromHex, hex::ToHex, sha256d};
 use bitcoin::secp256k1::{Message, Secp256k1, SecretKey};
+use bitcoin::Amount;
 use hyper::{
     rt::{self, Future, Stream},
     Body, Client, Method, Request,
@@ -53,11 +54,25 @@ fn main() {
         .unwrap(),
     );
 
-    // auto client chain block generation
+    // auto client chain block generation and transaction creation to generate fees
     let client_rpc_clone = client_rpc.clone();
+    let unspent = client_rpc_clone
+        .list_unspent(None, None, None, None, Some("CBT"))
+        .unwrap();
+    let addr = unspent[0].address.clone();
     thread::spawn(move || loop {
         thread::sleep(time::Duration::from_secs(10));
         if let Err(e) = client_rpc_clone.clone().client.generate(1) {
+            error!("{}", e);
+        }
+        if let Err(e) = client_rpc_clone.send_to_address(
+            &addr,
+            Amount::from_btc(100.0).unwrap(),
+            Some(""),
+            Some(""),
+            Some(true),
+            Some("CBT"),
+        ) {
             error!("{}", e);
         }
     });
