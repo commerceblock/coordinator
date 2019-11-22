@@ -6,15 +6,15 @@ use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::{thread, time};
 
-use bitcoin_hashes::{hex::FromHex, sha256d};
+use bitcoin::hashes::{hex::FromHex, sha256d};
 use futures::sync::oneshot;
 
 use crate::challenger::ChallengeResponse;
-use crate::clientchain::{ClientChain, RpcClientChain};
 use crate::config::Config;
 use crate::error::Result;
-use crate::service::{RpcService, Service};
-use crate::storage::{MongoStorage, Storage};
+use crate::interfaces::clientchain::{ClientChain, RpcClientChain};
+use crate::interfaces::service::{RpcService, Service};
+use crate::interfaces::storage::{MongoStorage, Storage};
 
 /// Run coordinator main method
 pub fn run(config: Config) -> Result<()> {
@@ -26,18 +26,21 @@ pub fn run(config: Config) -> Result<()> {
     let genesis_hash = sha256d::Hash::from_hex(&config.clientchain.genesis_hash)?;
 
     let _ = ::api::run_api_server(&config.api, storage.clone());
+    let (req_send, req_recv): (Sender<sha256d::Hash>, Receiver<sha256d::Hash>) = channel();
+    let _ = ::payments::run_payments(config.clientchain.clone(), storage.clone(), req_recv)?;
 
     // This loop runs continuously fetching and running challenge requests,
     // generating challenge responses and fails on any errors that occur
     loop {
         if let Some(request_id) = run_request(&config, &service, &clientchain, storage.clone(), genesis_hash)? {
             // if challenge request succeeds print responses
-            println! {"***** Responses *****"}
-            let resp = storage.get_responses(request_id).unwrap();
-            println! {"{}", serde_json::to_string_pretty(&resp).unwrap()};
+            req_send.send(request_id).unwrap();
+            info! {"***** Response *****"}
+            let resp = storage.get_response(request_id)?.unwrap();
+            info! {"{}", serde_json::to_string_pretty(&resp).unwrap()};
         }
-        info! {"Sleeping for 10 sec..."}
-        thread::sleep(time::Duration::from_secs(10))
+        info! {"Sleeping for {} sec...", config.block_time}
+        thread::sleep(time::Duration::from_secs(config.block_time))
     }
 }
 
@@ -52,10 +55,17 @@ pub fn run_request<T: Service, K: ClientChain, D: Storage>(
     genesis_hash: sha256d::Hash,
 ) -> Result<Option<sha256d::Hash>> {
     match ::challenger::fetch_next(service, &genesis_hash)? {
-        Some(challenge) => {
-            // first attempt to store the challenge state information
-            // on requests and winning bids and exit if that fails
-            storage.save_challenge_state(&challenge)?;
+        Some(mut challenge) => {
+            // First attempt to store the challenge state information
+            // on requests and winning bids and exit if it fails.
+            // If already set update challenge state with correct version from storage
+            ::challenger::update_challenge_request_state(
+                clientchain,
+                storage.clone(),
+                &mut challenge,
+                config.block_time,
+                config.clientchain.block_time,
+            )?;
 
             // create a challenge state mutex to share between challenger and listener
             let shared_challenge = Arc::new(Mutex::new(challenge));
@@ -74,10 +84,10 @@ pub fn run_request<T: Service, K: ClientChain, D: Storage>(
                 shared_challenge.clone(),
                 &verify_rx,
                 storage.clone(),
-                time::Duration::from_secs(config.verify_duration),
+                time::Duration::from_secs(5 * config.block_time),
                 time::Duration::from_secs(config.challenge_duration),
                 config.challenge_frequency,
-                time::Duration::from_secs(10),
+                time::Duration::from_secs(config.block_time / 2),
             )?;
 
             // stop listener service

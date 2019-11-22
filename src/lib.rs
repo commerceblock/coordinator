@@ -1,6 +1,6 @@
 //! # Coordinator Library
 //!
-//! Basic functionality required by Coordinator daemon
+//! Core functionality of the coordinator library
 
 // Coding conventions
 #![deny(non_upper_case_globals)]
@@ -20,13 +20,11 @@
 extern crate log;
 extern crate base64;
 extern crate bitcoin;
-extern crate bitcoin_hashes;
 extern crate config as config_rs;
 extern crate futures;
 extern crate hyper;
 extern crate ocean_rpc;
-extern crate rust_ocean as _ocean;
-extern crate secp256k1;
+extern crate rust_ocean as ocean;
 extern crate serde as serde;
 extern crate serde_json;
 #[macro_use]
@@ -35,17 +33,11 @@ extern crate jsonrpc_http_server;
 
 pub mod api;
 pub mod challenger;
-pub mod clientchain;
 pub mod config;
 pub mod coordinator;
 pub mod error;
 pub mod listener;
-pub mod ocean;
-pub mod request;
-pub mod service;
-pub mod storage;
-/// utilities
-pub mod util {
-    pub mod checks;
-    pub mod testing;
-}
+pub mod payments;
+
+pub mod interfaces;
+pub mod util;
