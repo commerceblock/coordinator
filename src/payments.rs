@@ -120,6 +120,7 @@ impl Payments {
             || (self.client.get_block_count()? as u32) < request.end_blockheight_clientchain
         {
             warn! {"Skipping unfinished request: {}", request.txid};
+            return Ok(());
         }
 
         // fetch bids and responses
