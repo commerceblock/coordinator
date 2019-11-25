@@ -248,10 +248,11 @@ mod tests {
     use crate::interfaces::mocks::service::MockService;
     use crate::interfaces::mocks::storage::MockStorage;
     use crate::interfaces::response::Response;
-    use crate::util::testing::{gen_challenge_state, gen_dummy_hash};
+    use crate::util::testing::{gen_challenge_state, gen_dummy_hash, setup_logger};
 
     #[test]
     fn verify_challenge_test() {
+        setup_logger();
         let mut clientchain = MockClientChain::new();
         let dummy_hash = gen_dummy_hash(5);
 
@@ -276,6 +277,7 @@ mod tests {
 
     #[test]
     fn get_challenge_response_test() {
+        setup_logger();
         let service = MockService::new();
 
         let dummy_hash = gen_dummy_hash(3);
@@ -318,6 +320,7 @@ mod tests {
 
     #[test]
     fn update_challenge_request_state_test() {
+        setup_logger();
         let clientchain = MockClientChain::new();
         let storage = Arc::new(MockStorage::new());
 
@@ -376,6 +379,7 @@ mod tests {
 
     #[test]
     fn check_request_test() {
+        setup_logger();
         let service = MockService::new();
         let dummy_hash = gen_dummy_hash(11);
         let dummy_request = service.get_request(&dummy_hash).unwrap().unwrap();
@@ -388,6 +392,7 @@ mod tests {
 
     #[test]
     fn get_request_bids_test() {
+        setup_logger();
         let mut service = MockService::new();
         let dummy_hash = gen_dummy_hash(10);
         let dummy_request = service.get_request(&dummy_hash).unwrap().unwrap();
@@ -419,6 +424,7 @@ mod tests {
 
     #[test]
     fn fetch_next_test() {
+        setup_logger();
         let dummy_hash = gen_dummy_hash(255);
 
         let mut service = MockService::new();
@@ -457,6 +463,7 @@ mod tests {
 
     #[test]
     fn run_challenge_request_test() {
+        setup_logger();
         let mut clientchain = MockClientChain::new();
         let mut storage = Arc::new(MockStorage::new());
         let mut service = MockService::new();

@@ -171,10 +171,11 @@ mod tests {
 
     use crate::challenger::ChallengeResponseIds;
     use crate::interfaces::mocks::storage::MockStorage;
-    use crate::util::testing::{gen_challenge_state, gen_dummy_hash};
+    use crate::util::testing::{gen_challenge_state, gen_dummy_hash, setup_logger};
 
     #[test]
     fn get_request_test() {
+        setup_logger();
         let storage = Arc::new(MockStorage::new());
         let dummy_hash = gen_dummy_hash(1);
 
@@ -204,6 +205,7 @@ mod tests {
 
     #[test]
     fn get_requests_test() {
+        setup_logger();
         let storage = Arc::new(MockStorage::new());
         let dummy_hash = gen_dummy_hash(1);
 
@@ -239,6 +241,7 @@ mod tests {
 
     #[test]
     fn get_request_response_test() {
+        setup_logger();
         let storage = Arc::new(MockStorage::new());
         let dummy_hash = gen_dummy_hash(1);
         let dummy_hash_bid = gen_dummy_hash(2);
@@ -289,6 +292,7 @@ mod tests {
 
     #[test]
     fn authorize_test() {
+        setup_logger();
         let our_auth = "user:pass";
 
         // missing header

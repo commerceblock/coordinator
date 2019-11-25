@@ -2,15 +2,28 @@
 //!
 //! Colleciton of helper functions used in tests module
 
+use std::env;
+use std::str::FromStr;
+use std::sync::Once;
+
 use bitcoin::hashes::{hex::FromHex, sha256d, Hash};
 use bitcoin::secp256k1::PublicKey;
-use std::str::FromStr;
 
 use crate::challenger::ChallengeState;
 use crate::interfaces::{
     bid::{Bid, BidSet},
     request::Request as ServiceRequest,
 };
+
+static INIT: Once = Once::new();
+
+/// Setup logger function that is only run once
+pub fn setup_logger() {
+    INIT.call_once(|| {
+        env::set_var("RUST_LOG", "debug");
+        env_logger::init();
+    });
+}
 
 /// Generate dummy hash
 pub fn gen_dummy_hash(i: u8) -> sha256d::Hash {
