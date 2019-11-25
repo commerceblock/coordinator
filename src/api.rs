@@ -15,7 +15,7 @@ use jsonrpc_http_server::{hyper::header, AccessControlAllowOrigin, DomainsValida
 use serde::{Deserialize, Serialize};
 
 use crate::config::ApiConfig;
-use crate::interfaces::response::Response as ChallengeResponse;
+use crate::interfaces::response::Response as RequestResponse;
 use crate::interfaces::storage::Storage;
 use crate::interfaces::{bid::BidSet, request::Request as ServiceRequest};
 
@@ -75,7 +75,7 @@ struct GetRequestResponsesParams {
 
 #[derive(Serialize, Debug)]
 struct GetRequestResponseResponse {
-    response: ChallengeResponse,
+    response: RequestResponse,
 }
 
 /// Get requests responses RPC call returning all responses for a specific
