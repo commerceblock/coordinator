@@ -55,12 +55,28 @@ fn get_request(params: Params, storage: Arc<dyn Storage>) -> futures::Finished<V
 #[derive(Serialize, Debug)]
 struct GetRequestsResponse {
     requests: Vec<GetRequestResponse>,
+    pages: i64,
 }
+
+/// Default limit on the number of requests returned
+static API_REQUESTS_LIMIT_DEFAULT: i64 = 10;
 
 /// Get requests RPC call returning all stored requests
 fn get_requests(storage: Arc<dyn Storage>) -> futures::Finished<Value, Error> {
-    let requests = storage.get_requests(None).unwrap();
-    let mut response = GetRequestsResponse { requests: vec![] };
+    let pages = storage.get_requests_count().unwrap() / API_REQUESTS_LIMIT_DEFAULT;
+    let page = 0;
+
+    let requests = storage
+        .get_requests(
+            None,
+            Some(API_REQUESTS_LIMIT_DEFAULT),
+            Some(page * API_REQUESTS_LIMIT_DEFAULT),
+        )
+        .unwrap();
+    let mut response = GetRequestsResponse {
+        requests: vec![],
+        pages,
+    };
     for request in requests {
         let bids = storage.get_bids(request.txid).unwrap();
         response.requests.push(GetRequestResponse { request, bids })
@@ -211,7 +227,7 @@ mod tests {
 
         // no requests
         let resp = get_requests(storage.clone());
-        assert_eq!(r#"{"requests":[]}"#, resp.wait().unwrap());
+        assert_eq!(r#"{"requests":[],"pages":0}"#, resp.wait().unwrap());
 
         // save actual state
         let state = gen_challenge_state(&dummy_hash);
@@ -219,7 +235,7 @@ mod tests {
         let resp = get_requests(storage.clone());
         assert_eq!(
             format!(
-                r#"{{"requests":[{{"request":{{"txid":"{}","start_blockheight":2,"end_blockheight":5,"genesis_blockhash":"0000000000000000000000000000000000000000000000000000000000000000","fee_percentage":5,"num_tickets":10,"start_blockheight_clientchain":0,"end_blockheight_clientchain":0,"is_payment_complete":false}},"bids":[{{"txid":"1234567890000000000000000000000000000000000000000000000000000000","pubkey":"026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3","payment":null}}]}}]}}"#,
+                r#"{{"requests":[{{"request":{{"txid":"{}","start_blockheight":2,"end_blockheight":5,"genesis_blockhash":"0000000000000000000000000000000000000000000000000000000000000000","fee_percentage":5,"num_tickets":10,"start_blockheight_clientchain":0,"end_blockheight_clientchain":0,"is_payment_complete":false}},"bids":[{{"txid":"1234567890000000000000000000000000000000000000000000000000000000","pubkey":"026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3","payment":null}}]}}],"pages":0}}"#,
                 dummy_hash.to_string()
             ),
             resp.wait().unwrap()
@@ -231,7 +247,7 @@ mod tests {
         let resp = get_requests(storage.clone());
         assert_eq!(
             format!(
-                r#"{{"requests":[{{"request":{{"txid":"{}","start_blockheight":2,"end_blockheight":5,"genesis_blockhash":"0000000000000000000000000000000000000000000000000000000000000000","fee_percentage":5,"num_tickets":10,"start_blockheight_clientchain":0,"end_blockheight_clientchain":0,"is_payment_complete":false}},"bids":[{{"txid":"1234567890000000000000000000000000000000000000000000000000000000","pubkey":"026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3","payment":null}}]}},{{"request":{{"txid":"{}","start_blockheight":2,"end_blockheight":5,"genesis_blockhash":"0000000000000000000000000000000000000000000000000000000000000000","fee_percentage":5,"num_tickets":10,"start_blockheight_clientchain":0,"end_blockheight_clientchain":0,"is_payment_complete":false}},"bids":[{{"txid":"1234567890000000000000000000000000000000000000000000000000000000","pubkey":"026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3","payment":null}}]}}]}}"#,
+                r#"{{"requests":[{{"request":{{"txid":"{}","start_blockheight":2,"end_blockheight":5,"genesis_blockhash":"0000000000000000000000000000000000000000000000000000000000000000","fee_percentage":5,"num_tickets":10,"start_blockheight_clientchain":0,"end_blockheight_clientchain":0,"is_payment_complete":false}},"bids":[{{"txid":"1234567890000000000000000000000000000000000000000000000000000000","pubkey":"026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3","payment":null}}]}},{{"request":{{"txid":"{}","start_blockheight":2,"end_blockheight":5,"genesis_blockhash":"0000000000000000000000000000000000000000000000000000000000000000","fee_percentage":5,"num_tickets":10,"start_blockheight_clientchain":0,"end_blockheight_clientchain":0,"is_payment_complete":false}},"bids":[{{"txid":"1234567890000000000000000000000000000000000000000000000000000000","pubkey":"026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3","payment":null}}]}}],"pages":0}}"#,
                 dummy_hash.to_string(),
                 dummy_hash2.to_string()
             ),

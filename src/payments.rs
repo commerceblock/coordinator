@@ -152,7 +152,7 @@ impl Payments {
     /// and then listens for new requests on the receiver channel
     fn do_request_payments(&self, req_recv: Receiver<sha256d::Hash>) -> Result<()> {
         // Look for incomplete requests
-        let incomplete_requests = self.storage.get_requests(Some(false))?;
+        let incomplete_requests = self.storage.get_requests(Some(false), None, None)?;
         for mut req in incomplete_requests {
             info! {"Found incomplete request: {} ", req.txid};
             let _ = self.do_request_payment(&mut req)?;
