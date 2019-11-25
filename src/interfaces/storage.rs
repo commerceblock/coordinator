@@ -37,6 +37,8 @@ pub trait Storage {
     /// Get all the requests, with an optional flag to return payment complete
     /// only
     fn get_requests(&self, complete: Option<bool>) -> Result<Vec<Request>>;
+    /// Get the number of requests in storage
+    fn get_requests_count(&self) -> Result<i64>;
     /// Get request for a specific request txid
     fn get_request(&self, request_hash: sha256d::Hash) -> Result<Option<Request>>;
 }
@@ -295,6 +297,13 @@ impl Storage for MongoStorage {
             }
         }
         Ok(requests)
+    }
+
+    /// Get the number of requests in the Request collection
+    fn get_requests_count(&self) -> Result<i64> {
+        let db_locked = self.db.lock().unwrap();
+        self.auth(&db_locked)?;
+        Ok(db_locked.collection("Request").count(None, None)?)
     }
 
     /// Get request for a specific request txid

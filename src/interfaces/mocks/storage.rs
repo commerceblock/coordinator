@@ -136,6 +136,11 @@ impl Storage for MockStorage {
         Ok(requests)
     }
 
+    /// Get the number of requests stored in memory
+    fn get_requests_count(&self) -> Result<i64> {
+        Ok(self.requests.borrow().len() as i64)
+    }
+
     /// Get request for a specific request txid
     fn get_request(&self, request_hash: sha256d::Hash) -> Result<Option<ServiceRequest>> {
         for doc in self.requests.borrow().to_vec().iter() {
