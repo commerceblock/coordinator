@@ -192,7 +192,7 @@ mod tests {
         );
         assert_eq!(bid, doc_to_bid(&doc));
 
-        let addr = "1HXfr2qBwT4qGZYn8FczNy68rw5dwG8trc";
+        let addr = "CMAMyHorv18WKKTvg5Kifi8ap8CuSJUxXT";
         let amount = 56.123;
         let mut bid_payment = BidPayment {
             txid: None,
