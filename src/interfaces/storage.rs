@@ -160,7 +160,7 @@ impl Storage for MongoStorage {
             .clone();
 
         let coll = db_locked.collection("Bid");
-        let filter = doc! {"request_id": request_id.clone()};
+        let filter = doc! {"request_id": request_id.clone(), "txid": bid.txid.to_string()};
         let update = doc! {"$set" => bid_to_doc(&request_id, &bid)};
         let _ = coll.update_one(filter, update, None)?;
         Ok(())
