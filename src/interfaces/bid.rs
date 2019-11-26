@@ -65,8 +65,11 @@ mod tests {
 
     use bitcoin::hashes::hex::FromHex;
 
+    use util::testing::setup_logger;
+
     #[test]
     fn serialize_pubkey_test() {
+        setup_logger();
         let txid_hex = "1234567890000000000000000000000000000000000000000000000000000000";
         let pubkey_hex = "026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3";
         let bid = Bid {

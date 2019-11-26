@@ -132,10 +132,11 @@ mod tests {
     use mongodb::oid::ObjectId;
 
     use crate::challenger::ChallengeResponseIds;
-    use crate::util::testing::gen_dummy_hash;
+    use crate::util::testing::{gen_dummy_hash, setup_logger};
 
     #[test]
     fn request_doc_test() {
+        setup_logger();
         let request_hash = gen_dummy_hash(9);
         let genesis_hash = "1100000000000000000000000000000000000000000000000000000000000022";
         let request = Request {
@@ -170,6 +171,7 @@ mod tests {
 
     #[test]
     fn bid_doc_test() {
+        setup_logger();
         let id = ObjectId::new().unwrap();
         let pubkey_hex = "026a04ab98d9e4774ad806e302dddeb63bea16b5cb5f223ee77478e861bb583eb3";
         let hash = gen_dummy_hash(1);
@@ -190,7 +192,7 @@ mod tests {
         );
         assert_eq!(bid, doc_to_bid(&doc));
 
-        let addr = "1HXfr2qBwT4qGZYn8FczNy68rw5dwG8trc";
+        let addr = "CMAMyHorv18WKKTvg5Kifi8ap8CuSJUxXT";
         let amount = 56.123;
         let mut bid_payment = BidPayment {
             txid: None,
@@ -235,6 +237,7 @@ mod tests {
 
     #[test]
     fn response_doc_test() {
+        setup_logger();
         let id = ObjectId::new().unwrap();
         let mut ids = ChallengeResponseIds::new();
         let mut resp = Response::new();

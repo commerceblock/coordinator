@@ -120,6 +120,7 @@ impl Payments {
             || (self.client.get_block_count()? as u32) < request.end_blockheight_clientchain
         {
             warn! {"Skipping unfinished request: {}", request.txid};
+            return Ok(());
         }
 
         // fetch bids and responses
@@ -151,7 +152,7 @@ impl Payments {
     /// and then listens for new requests on the receiver channel
     fn do_request_payments(&self, req_recv: Receiver<sha256d::Hash>) -> Result<()> {
         // Look for incomplete requests
-        let incomplete_requests = self.storage.get_requests(Some(false))?;
+        let incomplete_requests = self.storage.get_requests(Some(false), None, None)?;
         for mut req in incomplete_requests {
             info! {"Found incomplete request: {} ", req.txid};
             let _ = self.do_request_payment(&mut req)?;
@@ -229,8 +230,11 @@ pub fn run_payments(
 mod tests {
     use super::*;
 
+    use crate::util::testing::setup_logger;
+
     #[test]
     fn calculate_bid_payment_test() {
+        setup_logger();
         assert_eq!(
             1.125,
             calculate_bid_payment(&Amount::from_btc(6.0).unwrap(), 75, 4)
@@ -265,6 +269,7 @@ mod tests {
 
     #[test]
     fn get_chain_addr_params_test() {
+        setup_logger();
         assert_eq!(
             &AddressParams::OCEAN,
             get_chain_addr_params(&String::from("ocean_main"))

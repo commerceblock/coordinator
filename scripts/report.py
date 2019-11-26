@@ -19,18 +19,14 @@ def connect(user, password, host, port):
     return authproxy.AuthServiceProxy("http://%s:%s@%s:%s"%
         (user, password, host, port))
 
-def hash160(s):
-    return hashlib.new('ripemd160', sha256(s)).digest()
-
 def sha256(s):
     return hashlib.new('sha256', s).digest()
 
-def hash256(byte_str):
-    sha256 = hashlib.sha256()
-    sha256.update(byte_str)
-    sha256d = hashlib.sha256()
-    sha256d.update(sha256.digest())
-    return sha256d.digest()[::-1]
+def hash160(s):
+    return hashlib.new('ripemd160', sha256(s)).digest()
+
+def hash256(s):
+    return sha256(sha256(s))
 
 def bytes_to_hex_str(byte_str):
     return hexlify(byte_str).decode('ascii')
@@ -65,6 +61,7 @@ def check_key(key):
 def key_to_p2pkh(key, version):
     key = check_key(key)
     return byte_to_base58(hash160(key), version)
+
 ###################################################################
 
 # Calculate fees from starting to ending height or
@@ -81,8 +78,8 @@ def calculate_fees(rpc, start_height, end_height):
         print("ERROR with rpc connectivity: {0}".format(e))
     return fee
 
-addr_prefix = 235
-txid = "6e993034df3203c0867c98f420f85b5ffecd7cb8580e2b6f2d33764e1cbfb074"
+addr_prefix = 28
+txid = "de365af1df965518fff05fc7e82716107074553535217daaa5b886b2d63b1d46"
 url = 'http://userApi:passwordApi@localhost:3333'
 rpc = connect("user1", "password1", "localhost", "5555")
 

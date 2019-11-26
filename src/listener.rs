@@ -184,10 +184,11 @@ mod tests {
     use bitcoin::hashes::hex::ToHex;
     use bitcoin::secp256k1::SecretKey;
 
-    use crate::util::testing::{gen_challenge_state_with_challenge, gen_dummy_hash};
+    use crate::util::testing::{gen_challenge_state_with_challenge, gen_dummy_hash, setup_logger};
 
     #[test]
     fn challengeproof_from_json_test() {
+        setup_logger();
         // good data
         let data = r#"
         {
@@ -246,6 +247,7 @@ mod tests {
 
     #[test]
     fn challengeproof_verify_test() {
+        setup_logger();
         let chl_hash = gen_dummy_hash(11);
         let _challenge_state = gen_challenge_state_with_challenge(&gen_dummy_hash(3), &chl_hash);
         let bid_txid = _challenge_state.bids.iter().next().unwrap().txid;
@@ -289,6 +291,7 @@ mod tests {
 
     #[test]
     fn handle_test() {
+        setup_logger();
         let (resp_tx, resp_rx): (Sender<ChallengeResponse>, Receiver<ChallengeResponse>) = channel();
 
         let chl_hash = gen_dummy_hash(11);
@@ -428,6 +431,7 @@ mod tests {
 
     #[test]
     fn handle_challengeproof_test() {
+        setup_logger();
         let (resp_tx, resp_rx): (Sender<ChallengeResponse>, Receiver<ChallengeResponse>) = channel();
 
         let chl_hash = gen_dummy_hash(8);
