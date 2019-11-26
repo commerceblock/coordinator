@@ -62,10 +62,6 @@ def key_to_p2pkh(key, version):
     key = check_key(key)
     return byte_to_base58(hash160(key), version)
 
-def key_to_p2pkh_version(key, version):
-    key = check_key(key)
-    return byte_to_base58(hash160(key), version)
-
 ###################################################################
 
 # Calculate fees from starting to ending height or
@@ -82,7 +78,7 @@ def calculate_fees(rpc, start_height, end_height):
         print("ERROR with rpc connectivity: {0}".format(e))
     return fee
 
-addr_prefix = 235
+addr_prefix = 28
 txid = "de365af1df965518fff05fc7e82716107074553535217daaa5b886b2d63b1d46"
 url = 'http://userApi:passwordApi@localhost:3333'
 rpc = connect("user1", "password1", "localhost", "5555")
