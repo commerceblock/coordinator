@@ -1,4 +1,4 @@
-FROM rust:1.33-stretch
+FROM rust:1.39-stretch
 
 COPY . /usr/src/coordinator
 WORKDIR /usr/src/coordinator

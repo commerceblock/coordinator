@@ -128,12 +128,32 @@ impl Storage for MockStorage {
 
     /// Get all the requests, with an optional flag to return payment complete
     /// only
-    fn get_requests(&self, _complete: Option<bool>) -> Result<Vec<ServiceRequest>> {
+    fn get_requests(
+        &self,
+        _complete: Option<bool>,
+        limit: Option<i64>,
+        skip: Option<i64>,
+    ) -> Result<Vec<ServiceRequest>> {
+        let mut skip_val: i64 = 0;
+        if let Some(skip_opt_val) = skip {
+            skip_val = skip_opt_val;
+        }
+        let mut limit_val: i64 = 10000000;
+        if let Some(limit_opt_val) = limit {
+            limit_val = limit_opt_val;
+        }
         let mut requests = vec![];
-        for doc in self.requests.borrow().to_vec().iter() {
-            requests.push(doc_to_request(doc))
+        for (i, doc) in self.requests.borrow().to_vec().iter().enumerate() {
+            if i as i64 >= skip_val && (requests.len() as i64) < limit_val {
+                requests.push(doc_to_request(doc))
+            }
         }
         Ok(requests)
+    }
+
+    /// Get the number of requests stored in memory
+    fn get_requests_count(&self) -> Result<i64> {
+        Ok(self.requests.borrow().len() as i64)
     }
 
     /// Get request for a specific request txid
