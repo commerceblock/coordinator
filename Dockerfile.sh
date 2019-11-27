@@ -3,12 +3,9 @@ FROM alpine:latest
 ENV PATH=$PATH:/usr/src/jsonrpc-cli
 WORKDIR /usr/src
 
-#    && curl -LO https://raw.githubusercontent.com/commerceblock/coordinator/develop/scripts/create_request.sh \
-
-COPY scripts/create_request.sh /usr/src
-
 RUN set -x \
     && apk --no-cache add bash jq bc curl php composer git \
+    && curl -LO https://raw.githubusercontent.com/commerceblock/coordinator/develop/scripts/create_request.sh \
     && chmod +x create_request.sh \
     && git clone https://github.com/dan-da/jsonrpc-cli \
     && composer install -d jsonrpc-cli \
