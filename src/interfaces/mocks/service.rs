@@ -2,10 +2,11 @@
 //!
 //! Mock service implementation for testing
 
-use bitcoin::hashes::{hex::FromHex, sha256d, Hash};
-use bitcoin::secp256k1::PublicKey;
 use std::cell::RefCell;
 use std::str::FromStr;
+
+use bitcoin::hashes::{hex::FromHex, sha256d, Hash};
+use bitcoin::secp256k1::PublicKey;
 
 use crate::error::{CError, Error, Result};
 use crate::interfaces::service::Service;

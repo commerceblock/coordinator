@@ -129,9 +129,10 @@ pub fn doc_to_response(doc: &OrderedDocument) -> Response {
 mod tests {
     use super::*;
 
+    use std::collections::HashSet;
+
     use mongodb::oid::ObjectId;
 
-    use crate::challenger::ChallengeResponseIds;
     use crate::util::testing::{gen_dummy_hash, setup_logger};
 
     #[test]
@@ -239,7 +240,7 @@ mod tests {
     fn response_doc_test() {
         setup_logger();
         let id = ObjectId::new().unwrap();
-        let mut ids = ChallengeResponseIds::new();
+        let mut ids = HashSet::new();
         let mut resp = Response::new();
 
         let doc = response_to_doc(&Bson::ObjectId(id.clone()), &resp);

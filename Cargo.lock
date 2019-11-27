@@ -195,7 +195,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "coordinator"
-version = "0.3.9"
+version = "0.4.1"
 dependencies = [
  "base64 0.10.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "bitcoin 0.20.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -817,7 +817,7 @@ dependencies = [
 [[package]]
 name = "ocean-rpc"
 version = "0.8.0"
-source = "git+https://github.com/commerceblock/rust-ocean-rpc#89c2e45cf3ce99308ba80b42c8c1b9bf6c88ff4d"
+source = "git+https://github.com/commerceblock/rust-ocean-rpc#30a53790c2a4a3c035e580cec8a38cf43f05d3c9"
 dependencies = [
  "bitcoin 0.20.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "hex 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -833,7 +833,7 @@ dependencies = [
 [[package]]
 name = "ocean-rpc-json"
 version = "0.8.0"
-source = "git+https://github.com/commerceblock/rust-ocean-rpc#89c2e45cf3ce99308ba80b42c8c1b9bf6c88ff4d"
+source = "git+https://github.com/commerceblock/rust-ocean-rpc#30a53790c2a4a3c035e580cec8a38cf43f05d3c9"
 dependencies = [
  "bitcoin 0.20.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "hex 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
