@@ -9,7 +9,18 @@ RUN set -x \
     && chmod +x create_request.sh \
     && git clone https://github.com/dan-da/jsonrpc-cli \
     && composer install -d jsonrpc-cli \
-    && echo "*/15    *       *       *       *       bash /usr/src/create_request.sh \$(echo \${CLIENT_GENESIS_HASH}) 100 10 5 5 25 50 \$(echo \${PRIV_KEY_ADDR})" \
-       >> /var/spool/cron/crontabs/root
+    && echo "*/15    *       *       *       *       bash /usr/src/create_request.sh \
+         \$(echo \${CLIENT_GENESIS_HASH}) \
+         \$(echo \${START_PRICE}) \
+         \$(echo \${END_PRICE}) \
+         \$(echo \${AUCTION_DURATION}) \
+         \$(echo \${REQUEST_DURATION}) \
+         \$(echo \${NUM_TICKETS}) \
+         \$(echo \${FEE_PERCENTAGE}) \
+         \$(echo \${PRIV_KEY_ADDR}) \
+         \$(echo \${TXID}) \
+         \$(echo \${VOUT})" \
+        > /var/spool/cron/crontabs/root \
+    && sed -i 's/          / /g' /var/spool/cron/crontabs/root
 
 CMD ["bash", "-c"]

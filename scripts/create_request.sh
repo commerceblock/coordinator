@@ -13,6 +13,10 @@ if [ -f /run/secrets/ocean_pass ]; then
     export RPC_PASS=$(cat /run/secrets/ocean_pass)
 fi
 
+if [ -f /run/secrets/co_priv_key_addr ]; then
+    export PRIV_KEY_ADDR=$(cat /run/secrets/co_priv_key_addr)
+fi
+
 shopt -s expand_aliases
 alias ocl="jsonrpc-cli --user=$RPC_USER --pass=$RPC_PASS --format=jsonpretty --resultonly=on --highlight=off  http://$RPC_CONNECT:$RPC_PORT/"
 # parameters:
@@ -23,7 +27,7 @@ alias ocl="jsonrpc-cli --user=$RPC_USER --pass=$RPC_PASS --format=jsonpretty --r
 # $5 request duration
 # $6 number of tickets
 # $7 fee percentage
-# $8 Permission asset private key
+# $8 Permission asset private key (read from environment variable PRIV_KEY_ADDR)
 # OPTIONAL
 # $9 prevtxid
 # $10 prevvout
@@ -85,9 +89,9 @@ fee=$7
 
 unspent=`ocl listunspent '[1, 9999999, [], true, "PERMISSION"]' | jq -c '.[]'`
 # Import private key. Check if list unspent is empty first to avoid unnessesary re-scanning every time script runs
-if [ ! -z $8 ] && [[ -z $unspent ]]; then
+if [ ! -z $PRIV_KEY_ADDR ] && [[ -z $unspent ]]; then
         echo "Importing private key..."
-        ocl importprivkey $8 > /dev/null
+        ocl importprivkey $PRIV_KEY_ADDR > /dev/null
         unspent=`ocl listunspent '[1, 9999999, [], true, "PERMISSION"]' | jq -c '.[]'`
 fi
 
