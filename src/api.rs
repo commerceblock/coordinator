@@ -7,7 +7,7 @@ use std::str;
 use std::sync::Arc;
 use std::thread;
 
-use base64::decode;
+use base64::decode as b64decode;
 use bitcoin::hashes::sha256d;
 use hyper::{Body, Request, StatusCode};
 use jsonrpc_http_server::jsonrpc_core::{Error, ErrorCode, IoHandler, Params, Value};
@@ -133,9 +133,13 @@ fn authorize(our_auth: &str, request: &Request<Body>) -> bool {
     if let Some(auth_basic) = auth {
         let auth_parts: Vec<&str> = auth_basic.split(" ").collect();
         if auth_parts.len() == 2 {
-            let auth_basic = &decode(auth_parts[1]).unwrap();
-            let auth_basic_str = str::from_utf8(&auth_basic).unwrap();
-            return auth_basic_str == our_auth;
+            if auth_parts[0] == "Basic" {
+                if let Ok(auth_part_up) = &b64decode(auth_parts[1]) {
+                    if let Ok(auth_part_up_utf8) = str::from_utf8(&auth_part_up) {
+                        return our_auth == auth_part_up_utf8;
+                    }
+                }
+            }
         }
     }
     false
@@ -407,6 +411,32 @@ mod tests {
                 header::AUTHORIZATION,
                 format!("Basic {}", base64::encode("user2:pass1")),
             )
+            .body(Body::from(""))
+            .unwrap();
+        assert_eq!(false, authorize(our_auth, &request));
+
+        // not Basic
+        let request: Request<Body> = Request::builder()
+            .header(
+                header::AUTHORIZATION,
+                format!("NotBasic {}", base64::encode("user:pass")),
+            )
+            .body(Body::from(""))
+            .unwrap();
+        assert_eq!(false, authorize(our_auth, &request));
+
+        // not base64
+        let request: Request<Body> = Request::builder()
+            .header(header::AUTHORIZATION, format!("Basic {}", "user:pass"))
+            .body(Body::from(""))
+            .unwrap();
+        assert_eq!(false, authorize(our_auth, &request));
+
+        // not utf8
+        let non_utf8 = vec![0, 159, 146, 150];
+        assert!(str::from_utf8(&non_utf8).is_err());
+        let request: Request<Body> = Request::builder()
+            .header(header::AUTHORIZATION, format!("Basic {}", base64::encode(&non_utf8)))
             .body(Body::from(""))
             .unwrap();
         assert_eq!(false, authorize(our_auth, &request));
