@@ -2,21 +2,18 @@
 //!
 //! Mock storage implementation for testing
 
+use std::cell::RefCell;
+
 use bitcoin::hashes::sha256d;
-use challenger::ChallengeState;
 use mongodb::ordered::OrderedDocument;
 use mongodb::Bson;
-use std::cell::RefCell;
-use util::doc_format::*;
 
-use crate::challenger::ChallengeResponseIds;
+use crate::challenger::{ChallengeResponseIds, ChallengeState};
 use crate::error::{CError, Error, Result};
 use crate::interfaces::response::Response;
 use crate::interfaces::storage::*;
-use crate::interfaces::{
-    bid::{Bid, BidSet},
-    request::Request as ServiceRequest,
-};
+use crate::interfaces::{bid::Bid, request::Request as ServiceRequest};
+use crate::util::doc_format::*;
 
 /// Mock implementation of Storage storing data in memory for testing
 #[derive(Debug)]
@@ -116,11 +113,11 @@ impl Storage for MockStorage {
     }
 
     /// Get all bids for a specific request
-    fn get_bids(&self, request_hash: sha256d::Hash) -> Result<BidSet> {
-        let mut bids = BidSet::new();
+    fn get_bids(&self, request_hash: sha256d::Hash) -> Result<Vec<Bid>> {
+        let mut bids = Vec::new();
         for doc in self.bids.borrow().to_vec().iter() {
             if doc.get("request_id").unwrap().as_str().unwrap() == request_hash.to_string() {
-                let _ = bids.insert(doc_to_bid(doc));
+                let _ = bids.push(doc_to_bid(doc));
             }
         }
         Ok(bids)

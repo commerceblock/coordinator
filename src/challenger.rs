@@ -241,6 +241,8 @@ pub fn fetch_next<T: Service>(service: &T, genesis: &sha256d::Hash) -> Result<Op
 mod tests {
     use super::*;
 
+    use std::collections::HashSet;
+    use std::iter::FromIterator;
     use std::sync::mpsc::{channel, Receiver, Sender};
 
     use crate::error::Error;
@@ -507,7 +509,7 @@ mod tests {
                 let resps = storage.get_response(dummy_request.txid).unwrap();
                 assert_eq!(resps, None);
                 let bids = storage.get_bids(dummy_request.txid).unwrap();
-                assert_eq!(challenge_state.bids, bids);
+                assert_eq!(challenge_state.bids, HashSet::from_iter(bids.iter().cloned()));
                 let requests = storage.get_requests(None, None, None).unwrap();
                 assert_eq!(1, requests.len());
                 assert_eq!(&challenge_state.request, &requests[0]);
@@ -548,7 +550,7 @@ mod tests {
                 );
                 assert_eq!(1, storage.challenge_responses.borrow().len());
                 let bids = storage.get_bids(dummy_request.txid).unwrap();
-                assert_eq!(challenge_state.bids, bids);
+                assert_eq!(challenge_state.bids, HashSet::from_iter(bids.iter().cloned()));
                 let requests = storage.get_requests(None, None, None).unwrap();
                 assert_eq!(1, requests.len());
                 assert_eq!(&challenge_state.request, &requests[0]);

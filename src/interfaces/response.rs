@@ -4,9 +4,10 @@
 
 use std::collections::HashMap;
 
-use crate::challenger::ChallengeResponseIds;
 use bitcoin::hashes::sha256d;
 use serde::Serialize;
+
+use crate::challenger::ChallengeResponseIds;
 
 /// Response struct that models responses to service challenges
 /// by keeping track of the total number of challengers and the

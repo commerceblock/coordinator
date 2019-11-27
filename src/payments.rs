@@ -124,9 +124,8 @@ impl Payments {
         }
 
         // fetch bids and responses
-        let bids_set = self.storage.get_bids(request.txid)?;
-        if bids_set.len() > 0 {
-            let mut bids: Vec<Bid> = bids_set.iter().map(|val| val.clone()).collect();
+        let mut bids = self.storage.get_bids(request.txid)?;
+        if bids.len() > 0 {
             if let Some(resp) = self.storage.get_response(request.txid)? {
                 let fees_amount = calculate_fees(request, &self.client)?;
                 info! {"Total fees: {}", fees_amount};

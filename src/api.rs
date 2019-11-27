@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use crate::config::ApiConfig;
 use crate::interfaces::response::Response as RequestResponse;
 use crate::interfaces::storage::Storage;
-use crate::interfaces::{bid::BidSet, request::Request as ServiceRequest};
+use crate::interfaces::{bid::Bid, request::Request as ServiceRequest};
 
 #[derive(Deserialize, Debug)]
 struct GetRequestParams {
@@ -27,7 +27,7 @@ struct GetRequestParams {
 #[derive(Serialize, Debug)]
 struct GetRequestResponse {
     request: ServiceRequest,
-    bids: BidSet,
+    bids: Vec<Bid>,
 }
 
 /// Get request RPC call returning corresponding request if it exists

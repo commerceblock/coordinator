@@ -8,16 +8,13 @@ use std::sync::{Mutex, MutexGuard};
 use bitcoin::hashes::sha256d;
 use mongodb::db::{Database, ThreadedDatabase};
 use mongodb::{coll::options::FindOptions, Client, ThreadedClient};
-use util::doc_format::*;
 
 use crate::challenger::{ChallengeResponseIds, ChallengeState};
 use crate::config::StorageConfig;
 use crate::error::{Error::MongoDb, Result};
 use crate::interfaces::response::Response;
-use crate::interfaces::{
-    bid::{Bid, BidSet},
-    request::Request,
-};
+use crate::interfaces::{bid::Bid, request::Request};
+use crate::util::doc_format::*;
 
 /// Storage trait defining required functionality for objects that store request
 /// and challenge information
@@ -33,7 +30,7 @@ pub trait Storage {
     /// Get challenge response for a specific request
     fn get_response(&self, request_hash: sha256d::Hash) -> Result<Option<Response>>;
     /// Get all bids for a specific request
-    fn get_bids(&self, request_hash: sha256d::Hash) -> Result<BidSet>;
+    fn get_bids(&self, request_hash: sha256d::Hash) -> Result<Vec<Bid>>;
     /// Get all the requests, with an optional flag to return payment complete
     /// only
     fn get_requests(&self, complete: Option<bool>, limit: Option<i64>, skip: Option<i64>) -> Result<Vec<Request>>;
@@ -240,7 +237,7 @@ impl Storage for MongoStorage {
     }
 
     /// Get all bids for a specific request
-    fn get_bids(&self, request_hash: sha256d::Hash) -> Result<BidSet> {
+    fn get_bids(&self, request_hash: sha256d::Hash) -> Result<Vec<Bid>> {
         let db_locked = self.db.lock().unwrap();
         self.auth(&db_locked)?;
 
@@ -265,10 +262,10 @@ impl Storage for MongoStorage {
         )?;
         drop(db_locked); // drop immediately on get requests
 
-        let mut all_bids = BidSet::new();
+        let mut all_bids = Vec::new();
         if let Some(resp) = resp_aggr.next() {
             for bid in resp?.get_array("bids").unwrap().iter() {
-                let _ = all_bids.insert(doc_to_bid(bid.as_document().unwrap()));
+                let _ = all_bids.push(doc_to_bid(bid.as_document().unwrap()));
             }
         }
         Ok(all_bids)
