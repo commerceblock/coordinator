@@ -17,6 +17,7 @@ use crate::interfaces::storage::Storage;
 use crate::interfaces::{
     bid::{Bid, BidSet},
     request::Request,
+    response::Response,
 };
 
 /// Verify attempt interval to client in ms
@@ -102,6 +103,7 @@ pub fn run_challenge_request<T: Service, K: ClientChain, D: Storage>(
     refresh_delay: time::Duration,
 ) -> Result<()> {
     let request = challenge_state.lock().unwrap().request.clone(); // clone as const and drop mutex
+    let mut response = storage.get_response(request.txid)?.unwrap_or(Response::new());
     info! {"Running challenge request: {:?}", request.txid};
     let mut prev_challenge_height: u64 = 0;
     loop {
@@ -125,10 +127,12 @@ pub fn run_challenge_request<T: Service, K: ClientChain, D: Storage>(
         }
 
         info! {"fetching responses..."}
-        storage.save_response(
-            request.txid,
-            &get_challenge_response(&challenge_hash, &verify_rx, challenge_duration)?,
-        )?;
+        response.update(&get_challenge_response(
+            &challenge_hash,
+            &verify_rx,
+            challenge_duration,
+        )?);
+        storage.save_response(request.txid, &response)?;
         challenge_state.lock().unwrap().latest_challenge = None; // stop receiving responses
         prev_challenge_height = challenge_height; // update prev height
     }
@@ -158,8 +162,8 @@ pub fn update_challenge_request_state<K: ClientChain, D: Storage>(
             // Calculate and set request's end_blockheight_clientchain
             challenge.request.end_blockheight_clientchain = challenge.request.start_blockheight_clientchain
                 + (service_period_time_s as f32 / block_time_clientchain as f32).floor() as u32;
-            storage.save_challenge_state(&challenge)?; // Store Challenge
-                                                       // Request
+            storage.save_challenge_request_state(&challenge.request, &challenge.bids)?;
+            // Store Challenge Request and Bids
         }
     }
     Ok(())
@@ -241,6 +245,8 @@ pub fn fetch_next<T: Service>(service: &T, genesis: &sha256d::Hash) -> Result<Op
 mod tests {
     use super::*;
 
+    use std::collections::HashSet;
+    use std::iter::FromIterator;
     use std::sync::mpsc::{channel, Receiver, Sender};
 
     use crate::error::Error;
@@ -477,7 +483,9 @@ mod tests {
         let _ = service.height.replace(dummy_request.start_blockheight as u64); // set height for fetch_next to succeed
 
         let challenge_state = fetch_next(&service, &dummy_hash).unwrap().unwrap();
-        storage.save_challenge_state(&challenge_state).unwrap();
+        storage
+            .save_challenge_request_state(&challenge_state.request, &challenge_state.bids)
+            .unwrap();
 
         let (vtx, vrx): (Sender<ChallengeResponse>, Receiver<ChallengeResponse>) = channel();
 
@@ -507,7 +515,7 @@ mod tests {
                 let resps = storage.get_response(dummy_request.txid).unwrap();
                 assert_eq!(resps, None);
                 let bids = storage.get_bids(dummy_request.txid).unwrap();
-                assert_eq!(challenge_state.bids, bids);
+                assert_eq!(challenge_state.bids, HashSet::from_iter(bids.iter().cloned()));
                 let requests = storage.get_requests(None, None, None).unwrap();
                 assert_eq!(1, requests.len());
                 assert_eq!(&challenge_state.request, &requests[0]);
@@ -548,7 +556,7 @@ mod tests {
                 );
                 assert_eq!(1, storage.challenge_responses.borrow().len());
                 let bids = storage.get_bids(dummy_request.txid).unwrap();
-                assert_eq!(challenge_state.bids, bids);
+                assert_eq!(challenge_state.bids, HashSet::from_iter(bids.iter().cloned()));
                 let requests = storage.get_requests(None, None, None).unwrap();
                 assert_eq!(1, requests.len());
                 assert_eq!(&challenge_state.request, &requests[0]);

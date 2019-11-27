@@ -3,7 +3,6 @@
 //! Service request models for client requests
 
 use bitcoin::hashes::sha256d;
-
 use ocean_rpc::json::GetRequestsResult;
 use serde::Serialize;
 

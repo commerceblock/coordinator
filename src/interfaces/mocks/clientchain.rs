@@ -2,8 +2,9 @@
 //!
 //! Mock clientchain implementation for testing
 
-use bitcoin::hashes::{sha256d, Hash};
 use std::cell::RefCell;
+
+use bitcoin::hashes::{sha256d, Hash};
 
 use crate::error::*;
 use crate::interfaces::clientchain::ClientChain;

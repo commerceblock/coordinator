@@ -2,21 +2,20 @@
 //!
 //! Mock storage implementation for testing
 
+use std::cell::RefCell;
+
 use bitcoin::hashes::sha256d;
-use challenger::ChallengeState;
 use mongodb::ordered::OrderedDocument;
 use mongodb::Bson;
-use std::cell::RefCell;
-use util::doc_format::*;
 
-use crate::challenger::ChallengeResponseIds;
 use crate::error::{CError, Error, Result};
-use crate::interfaces::response::Response;
 use crate::interfaces::storage::*;
 use crate::interfaces::{
     bid::{Bid, BidSet},
     request::Request as ServiceRequest,
+    response::Response,
 };
+use crate::util::doc_format::*;
 
 /// Mock implementation of Storage storing data in memory for testing
 #[derive(Debug)]
@@ -46,23 +45,25 @@ impl MockStorage {
 
 impl Storage for MockStorage {
     /// Store the state of a challenge request
-    fn save_challenge_state(&self, challenge: &ChallengeState) -> Result<()> {
+    fn save_challenge_request_state(&self, request: &ServiceRequest, bids: &BidSet) -> Result<()> {
         if self.return_err {
-            return Err(Error::from(CError::Generic("save_challenge_state failed".to_owned())));
+            return Err(Error::from(CError::Generic(
+                "save_challenge_request_state failed".to_owned(),
+            )));
         }
         // do not add request if already exists
         if !self
             .requests
             .borrow_mut()
             .iter()
-            .any(|request| request.get("txid").unwrap().as_str().unwrap() == &challenge.request.txid.to_string())
+            .any(|req_store| req_store.get("txid").unwrap().as_str().unwrap() == &request.txid.to_string())
         {
-            self.requests.borrow_mut().push(request_to_doc(&challenge.request));
+            self.requests.borrow_mut().push(request_to_doc(&request));
         }
-        for bid in challenge.bids.iter() {
+        for bid in bids.iter() {
             self.bids
                 .borrow_mut()
-                .push(bid_to_doc(&Bson::String(challenge.request.txid.to_string()), bid))
+                .push(bid_to_doc(&Bson::String(request.txid.to_string()), bid))
         }
         Ok(())
     }
@@ -83,25 +84,21 @@ impl Storage for MockStorage {
     }
 
     /// Store response for a specific challenge request
-    fn save_response(&self, request_hash: sha256d::Hash, ids: &ChallengeResponseIds) -> Result<()> {
+    fn save_response(&self, request_hash: sha256d::Hash, response: &Response) -> Result<()> {
         if self.return_err {
             return Err(Error::from(CError::Generic("save_response failed".to_owned())));
         }
 
         for resp_doc in self.challenge_responses.borrow_mut().iter_mut() {
             if resp_doc.get("request_id").unwrap().as_str().unwrap() == &request_hash.to_string() {
-                let mut resp = doc_to_response(resp_doc);
-                resp.update(&ids);
-                *resp_doc = response_to_doc(&Bson::String(request_hash.to_string()), &resp);
+                *resp_doc = response_to_doc(&Bson::String(request_hash.to_string()), &response);
                 return Ok(());
             }
         }
 
-        let mut resp = Response::new();
-        resp.update(&ids);
         self.challenge_responses
             .borrow_mut()
-            .push(response_to_doc(&Bson::String(request_hash.to_string()), &resp));
+            .push(response_to_doc(&Bson::String(request_hash.to_string()), &response));
         Ok(())
     }
 
@@ -116,11 +113,11 @@ impl Storage for MockStorage {
     }
 
     /// Get all bids for a specific request
-    fn get_bids(&self, request_hash: sha256d::Hash) -> Result<BidSet> {
-        let mut bids = BidSet::new();
+    fn get_bids(&self, request_hash: sha256d::Hash) -> Result<Vec<Bid>> {
+        let mut bids = Vec::new();
         for doc in self.bids.borrow().to_vec().iter() {
             if doc.get("request_id").unwrap().as_str().unwrap() == request_hash.to_string() {
-                let _ = bids.insert(doc_to_bid(doc));
+                let _ = bids.push(doc_to_bid(doc));
             }
         }
         Ok(bids)
@@ -134,14 +131,8 @@ impl Storage for MockStorage {
         limit: Option<i64>,
         skip: Option<i64>,
     ) -> Result<Vec<ServiceRequest>> {
-        let mut skip_val: i64 = 0;
-        if let Some(skip_opt_val) = skip {
-            skip_val = skip_opt_val;
-        }
-        let mut limit_val: i64 = 10000000;
-        if let Some(limit_opt_val) = limit {
-            limit_val = limit_opt_val;
-        }
+        let skip_val = skip.unwrap_or(0);
+        let limit_val = limit.unwrap_or(10000000);
         let mut requests = vec![];
         for (i, doc) in self.requests.borrow().to_vec().iter().enumerate() {
             if i as i64 >= skip_val && (requests.len() as i64) < limit_val {
