@@ -2,12 +2,10 @@
 //!
 //! Response model for service challenge responses
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use bitcoin::hashes::sha256d;
 use serde::Serialize;
-
-use crate::challenger::ChallengeResponseIds;
 
 /// Response struct that models responses to service challenges
 /// by keeping track of the total number of challengers and the
@@ -30,7 +28,7 @@ impl Response {
     }
 
     /// Update Response struct from challenge response ids
-    pub fn update(&mut self, responses: &ChallengeResponseIds) {
+    pub fn update(&mut self, responses: &HashSet<sha256d::Hash>) {
         self.num_challenges += 1;
         for txid in responses.iter() {
             let bid_entry = self.bid_responses.entry(*txid).or_insert(0);

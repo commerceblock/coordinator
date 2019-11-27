@@ -7,9 +7,11 @@ use std::sync::{Mutex, MutexGuard};
 
 use bitcoin::hashes::sha256d;
 use mongodb::db::{Database, ThreadedDatabase};
-use mongodb::{coll::options::FindOptions, Client, ThreadedClient};
+use mongodb::{
+    coll::options::{FindOptions, UpdateOptions},
+    Client, ThreadedClient,
+};
 
-use crate::challenger::ChallengeResponseIds;
 use crate::config::StorageConfig;
 use crate::error::{Error::MongoDb, Result};
 use crate::interfaces::response::Response;
@@ -29,7 +31,7 @@ pub trait Storage {
     /// Update bid in storage
     fn update_bid(&self, request_hash: sha256d::Hash, bid: &Bid) -> Result<()>;
     /// Store response for a specific challenge request
-    fn save_response(&self, request_hash: sha256d::Hash, ids: &ChallengeResponseIds) -> Result<()>;
+    fn save_response(&self, request_hash: sha256d::Hash, response: &Response) -> Result<()>;
     /// Get challenge response for a specific request
     fn get_response(&self, request_hash: sha256d::Hash) -> Result<Option<Response>>;
     /// Get all bids for a specific request
@@ -164,7 +166,7 @@ impl Storage for MongoStorage {
     }
 
     /// Store response for a specific challenge request
-    fn save_response(&self, request_hash: sha256d::Hash, ids: &ChallengeResponseIds) -> Result<()> {
+    fn save_response(&self, request_hash: sha256d::Hash, response: &Response) -> Result<()> {
         let db_locked = self.db.lock().unwrap();
         self.auth(&db_locked)?;
 
@@ -183,19 +185,12 @@ impl Storage for MongoStorage {
 
         let coll = db_locked.collection("Response");
         let filter = doc! {"request_id": request_id.clone()};
-        match coll.find_one(Some(filter.clone()), None)? {
-            Some(res) => {
-                let mut resp = doc_to_response(&res);
-                resp.update(ids);
-                let update = doc! {"$set" => response_to_doc(&request_id, &resp)};
-                let _ = coll.update_one(filter, update, None)?;
-            }
-            None => {
-                let mut resp = Response::new();
-                resp.update(ids);
-                let _ = coll.insert_one(response_to_doc(&request_id, &resp), None)?;
-            }
-        }
+        let update = doc! {"$set" => response_to_doc(&request_id, &response)};
+        let options = UpdateOptions {
+            upsert: Some(true),
+            ..Default::default()
+        };
+        let _ = coll.update_one(filter, update, Some(options))?;
         Ok(())
     }
 

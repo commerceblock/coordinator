@@ -192,9 +192,10 @@ pub fn run_api_server<D: Storage + Send + Sync + 'static>(
 mod tests {
     use super::*;
 
+    use std::collections::HashSet;
+
     use futures::Future;
 
-    use crate::challenger::ChallengeResponseIds;
     use crate::interfaces::mocks::storage::MockStorage;
     use crate::util::testing::{gen_challenge_state, gen_dummy_hash, setup_logger};
 
@@ -354,9 +355,11 @@ mod tests {
             resp.wait().unwrap_err().message
         );
 
-        let mut dummy_response_set = ChallengeResponseIds::new();
+        let mut dummy_response_set = HashSet::new();
         let _ = dummy_response_set.insert(dummy_hash_bid);
-        let _ = storage.save_response(dummy_hash, &dummy_response_set);
+        let mut dummy_response = RequestResponse::new();
+        dummy_response.update(&dummy_response_set);
+        let _ = storage.save_response(dummy_hash, &dummy_response);
 
         // invalid key
         let s = format!(r#"{{"hash": "{}"}}"#, dummy_hash.to_string());

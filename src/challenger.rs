@@ -17,6 +17,7 @@ use crate::interfaces::storage::Storage;
 use crate::interfaces::{
     bid::{Bid, BidSet},
     request::Request,
+    response::Response,
 };
 
 /// Verify attempt interval to client in ms
@@ -102,6 +103,7 @@ pub fn run_challenge_request<T: Service, K: ClientChain, D: Storage>(
     refresh_delay: time::Duration,
 ) -> Result<()> {
     let request = challenge_state.lock().unwrap().request.clone(); // clone as const and drop mutex
+    let mut response = storage.get_response(request.txid)?.unwrap_or(Response::new());
     info! {"Running challenge request: {:?}", request.txid};
     let mut prev_challenge_height: u64 = 0;
     loop {
@@ -125,10 +127,12 @@ pub fn run_challenge_request<T: Service, K: ClientChain, D: Storage>(
         }
 
         info! {"fetching responses..."}
-        storage.save_response(
-            request.txid,
-            &get_challenge_response(&challenge_hash, &verify_rx, challenge_duration)?,
-        )?;
+        response.update(&get_challenge_response(
+            &challenge_hash,
+            &verify_rx,
+            challenge_duration,
+        )?);
+        storage.save_response(request.txid, &response)?;
         challenge_state.lock().unwrap().latest_challenge = None; // stop receiving responses
         prev_challenge_height = challenge_height; // update prev height
     }

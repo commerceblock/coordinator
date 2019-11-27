@@ -8,13 +8,12 @@ use bitcoin::hashes::sha256d;
 use mongodb::ordered::OrderedDocument;
 use mongodb::Bson;
 
-use crate::challenger::ChallengeResponseIds;
 use crate::error::{CError, Error, Result};
-use crate::interfaces::response::Response;
 use crate::interfaces::storage::*;
 use crate::interfaces::{
     bid::{Bid, BidSet},
     request::Request as ServiceRequest,
+    response::Response,
 };
 use crate::util::doc_format::*;
 
@@ -85,25 +84,21 @@ impl Storage for MockStorage {
     }
 
     /// Store response for a specific challenge request
-    fn save_response(&self, request_hash: sha256d::Hash, ids: &ChallengeResponseIds) -> Result<()> {
+    fn save_response(&self, request_hash: sha256d::Hash, response: &Response) -> Result<()> {
         if self.return_err {
             return Err(Error::from(CError::Generic("save_response failed".to_owned())));
         }
 
         for resp_doc in self.challenge_responses.borrow_mut().iter_mut() {
             if resp_doc.get("request_id").unwrap().as_str().unwrap() == &request_hash.to_string() {
-                let mut resp = doc_to_response(resp_doc);
-                resp.update(&ids);
-                *resp_doc = response_to_doc(&Bson::String(request_hash.to_string()), &resp);
+                *resp_doc = response_to_doc(&Bson::String(request_hash.to_string()), &response);
                 return Ok(());
             }
         }
 
-        let mut resp = Response::new();
-        resp.update(&ids);
         self.challenge_responses
             .borrow_mut()
-            .push(response_to_doc(&Bson::String(request_hash.to_string()), &resp));
+            .push(response_to_doc(&Bson::String(request_hash.to_string()), &response));
         Ok(())
     }
 
