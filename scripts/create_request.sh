@@ -8,8 +8,13 @@
 # address imported to the wallet to allow for automatic renewal of the request.
 
 #!/bin/bash
+
+if [ -f /run/secrets/ocean_pass ]; then
+    export RPC_PASS=$(cat /run/secrets/ocean_pass)
+fi
+
 shopt -s expand_aliases
-alias ocl="$HOME/jsonrpc-cli/jsonrpc-cli --user=$RPC_USER --pass=$RPC_PASS --format=jsonpretty --resultonly=on --highlight=off  http://$RPC_CONNECT:$RPC_PORT/"
+alias ocl="jsonrpc-cli --user=$RPC_USER --pass=$RPC_PASS --format=jsonpretty --resultonly=on --highlight=off  http://$RPC_CONNECT:$RPC_PORT/"
 # parameters:
 # $1 Genesis hash
 # $2 start price
