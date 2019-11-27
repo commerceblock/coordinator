@@ -158,8 +158,8 @@ pub fn update_challenge_request_state<K: ClientChain, D: Storage>(
             // Calculate and set request's end_blockheight_clientchain
             challenge.request.end_blockheight_clientchain = challenge.request.start_blockheight_clientchain
                 + (service_period_time_s as f32 / block_time_clientchain as f32).floor() as u32;
-            storage.save_challenge_state(&challenge)?; // Store Challenge
-                                                       // Request
+            storage.save_challenge_request_state(&challenge.request, &challenge.bids)?;
+            // Store Challenge Request and Bids
         }
     }
     Ok(())
@@ -479,7 +479,9 @@ mod tests {
         let _ = service.height.replace(dummy_request.start_blockheight as u64); // set height for fetch_next to succeed
 
         let challenge_state = fetch_next(&service, &dummy_hash).unwrap().unwrap();
-        storage.save_challenge_state(&challenge_state).unwrap();
+        storage
+            .save_challenge_request_state(&challenge_state.request, &challenge_state.bids)
+            .unwrap();
 
         let (vtx, vrx): (Sender<ChallengeResponse>, Receiver<ChallengeResponse>) = channel();
 

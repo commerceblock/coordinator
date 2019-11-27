@@ -8,11 +8,14 @@ use bitcoin::hashes::sha256d;
 use mongodb::ordered::OrderedDocument;
 use mongodb::Bson;
 
-use crate::challenger::{ChallengeResponseIds, ChallengeState};
+use crate::challenger::ChallengeResponseIds;
 use crate::error::{CError, Error, Result};
 use crate::interfaces::response::Response;
 use crate::interfaces::storage::*;
-use crate::interfaces::{bid::Bid, request::Request as ServiceRequest};
+use crate::interfaces::{
+    bid::{Bid, BidSet},
+    request::Request as ServiceRequest,
+};
 use crate::util::doc_format::*;
 
 /// Mock implementation of Storage storing data in memory for testing
@@ -43,23 +46,25 @@ impl MockStorage {
 
 impl Storage for MockStorage {
     /// Store the state of a challenge request
-    fn save_challenge_state(&self, challenge: &ChallengeState) -> Result<()> {
+    fn save_challenge_request_state(&self, request: &ServiceRequest, bids: &BidSet) -> Result<()> {
         if self.return_err {
-            return Err(Error::from(CError::Generic("save_challenge_state failed".to_owned())));
+            return Err(Error::from(CError::Generic(
+                "save_challenge_request_state failed".to_owned(),
+            )));
         }
         // do not add request if already exists
         if !self
             .requests
             .borrow_mut()
             .iter()
-            .any(|request| request.get("txid").unwrap().as_str().unwrap() == &challenge.request.txid.to_string())
+            .any(|req_store| req_store.get("txid").unwrap().as_str().unwrap() == &request.txid.to_string())
         {
-            self.requests.borrow_mut().push(request_to_doc(&challenge.request));
+            self.requests.borrow_mut().push(request_to_doc(&request));
         }
-        for bid in challenge.bids.iter() {
+        for bid in bids.iter() {
             self.bids
                 .borrow_mut()
-                .push(bid_to_doc(&Bson::String(challenge.request.txid.to_string()), bid))
+                .push(bid_to_doc(&Bson::String(request.txid.to_string()), bid))
         }
         Ok(())
     }

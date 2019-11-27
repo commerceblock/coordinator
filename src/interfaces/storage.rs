@@ -9,18 +9,21 @@ use bitcoin::hashes::sha256d;
 use mongodb::db::{Database, ThreadedDatabase};
 use mongodb::{coll::options::FindOptions, Client, ThreadedClient};
 
-use crate::challenger::{ChallengeResponseIds, ChallengeState};
+use crate::challenger::ChallengeResponseIds;
 use crate::config::StorageConfig;
 use crate::error::{Error::MongoDb, Result};
 use crate::interfaces::response::Response;
-use crate::interfaces::{bid::Bid, request::Request};
+use crate::interfaces::{
+    bid::{Bid, BidSet},
+    request::Request,
+};
 use crate::util::doc_format::*;
 
 /// Storage trait defining required functionality for objects that store request
 /// and challenge information
 pub trait Storage {
     /// Store the state of a challenge request
-    fn save_challenge_state(&self, challenge: &ChallengeState) -> Result<()>;
+    fn save_challenge_request_state(&self, request: &Request, bids: &BidSet) -> Result<()>;
     /// Update request in storage
     fn update_request(&self, request: &Request) -> Result<()>;
     /// Update bid in storage
@@ -95,27 +98,24 @@ impl MongoStorage {
 
 impl Storage for MongoStorage {
     /// Store the state of a challenge request
-    fn save_challenge_state(&self, challenge: &ChallengeState) -> Result<()> {
+    fn save_challenge_request_state(&self, request: &Request, bids: &BidSet) -> Result<()> {
         let db_locked = self.db.lock().unwrap();
         self.auth(&db_locked)?;
 
         let request_id;
         let coll = db_locked.collection("Request");
-        let filter = doc! {"txid"=>challenge.request.txid.to_string()};
+        let filter = doc! {"txid"=>request.txid.to_string()};
         match coll.find_one(Some(filter), None)? {
             Some(res) => {
                 request_id = res.get("_id").unwrap().clone();
             }
             None => {
-                request_id = coll
-                    .insert_one(request_to_doc(&challenge.request), None)?
-                    .inserted_id
-                    .unwrap();
+                request_id = coll.insert_one(request_to_doc(&request), None)?.inserted_id.unwrap();
             }
         }
 
         let coll = db_locked.collection("Bid");
-        for bid in challenge.bids.iter() {
+        for bid in bids.iter() {
             let doc = bid_to_doc(&request_id, bid);
             match coll.find_one(Some(doc.clone()), None)? {
                 Some(_) => (),
