@@ -5,7 +5,7 @@ WORKDIR /usr/src
 
 RUN set -x \
     && apk --no-cache add bash jq bc curl php composer git \
-    && curl -LO https://raw.githubusercontent.com/commerceblock/coordinator/develop/scripts/create_request.sh \
+    && curl -LO https://raw.githubusercontent.com/commerceblock/coordinator/master/scripts/create_request.sh \
     && chmod +x create_request.sh \
     && git clone https://github.com/dan-da/jsonrpc-cli \
     && composer install -d jsonrpc-cli \
