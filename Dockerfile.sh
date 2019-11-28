@@ -1,15 +1,15 @@
 FROM alpine:latest
 
 ENV PATH=$PATH:/usr/src/jsonrpc-cli
+COPY scripts /usr/src/scripts
 WORKDIR /usr/src
 
 RUN set -x \
     && apk --no-cache add bash jq bc curl php composer git \
-    && curl -LO https://raw.githubusercontent.com/commerceblock/coordinator/master/scripts/create_request.sh \
-    && chmod +x create_request.sh \
+    && chmod +x scripts/*.sh \
     && git clone https://github.com/dan-da/jsonrpc-cli \
     && composer install -d jsonrpc-cli \
-    && echo "*/15    *       *       *       *       bash /usr/src/create_request.sh \
+    && echo "*/15    *       *       *       *       bash /usr/src/scripts/create_request.sh \
          \$(echo \${CLIENT_GENESIS_HASH}) \
          \$(echo \${START_PRICE}) \
          \$(echo \${END_PRICE}) \
