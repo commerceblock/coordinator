@@ -45,7 +45,7 @@ genesis=`ocl getblockhash 0`
 
 inputs="{\"txid\":$(echo $unspent | jq ".txid"),\"vout\":$(echo $unspent | jq -r ".vout")}"
 outputs="{\"decayConst\":1000,\"endBlockHeight\":10,\"fee\":3,\"genesisBlockHash\":\"$genesis\",\
-\"startBlockHeight\":5,\"tickets\":2,\"startPrice\":50,\"value\":$value,\"pubkey\":\"$pub\"}"
+\"startBlockHeight\":5,\"tickets\":3,\"startPrice\":50,\"value\":$value,\"pubkey\":\"$pub\"}"
 
 signedtx=`ocl signrawtransaction $(ocl createrawrequesttx $inputs $outputs)`
 request_txid=`ocl sendrawtransaction $(echo $signedtx | jq -r ".hex")`
@@ -113,6 +113,6 @@ txid=`ocl sendrawtransaction $(echo $signedtx | jq -r ".hex")`
 
 echo "mempool"
 ocl getrawmempool
-ocl generate 1
+#ocl generate 1
 ocl getrequestbids $(ocl getrequests | jq -r ".[].txid")
 echo "Guardnode txid: $txid"
