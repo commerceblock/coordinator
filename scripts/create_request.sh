@@ -90,6 +90,8 @@ if [ ! -z $PRIV_KEY_ADDR ] && [[ -z $unspent ]]; then
         unspent=`ocl listunspent '[1, 9999999, [], true, "PERMISSION"]' | jq -c '.[]'`
 fi
 
+currentblockheight=`ocl getblockcount`
+
 checkLockTime () {
     if [[ $currentblockheight -gt `echo $1 | jq -r '.locktime'` ]]; then
         return 0
@@ -145,7 +147,7 @@ else
     fi
 fi
 
-currentblockheight=`ocl getblockcount`
+currentblockheight=`ocl getblockcount` # may have updated by now  
 # Request start height = confirmation time bufffer + current height + auction duration
 let start=1+$currentblockheight+$4
 # Request end height = request start height + request duration
