@@ -74,9 +74,9 @@ fi
 
 # Request start height = current height + auction duration
 currentblockheight=`ocl getblockchaininfo | jq ".blocks"`
-let start=$currentblockheight+$5
+let start=$currentblockheight+$4
 # Request end height = request start height + request duration
-let end=start+$4
+let end=start+$5
 
 # Starting price
 price=$2
