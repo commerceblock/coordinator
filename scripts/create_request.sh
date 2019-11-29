@@ -72,12 +72,6 @@ if [[ `ocl getrequests | jq "if .[].genesisBlock == \"$genesis\" then 1 else 0 e
     exit
 fi
 
-# Request start height = current height + auction duration
-currentblockheight=`ocl getblockchaininfo | jq ".blocks"`
-let start=$currentblockheight+$4
-# Request end height = request start height + request duration
-let end=start+$5
-
 # Starting price
 price=$2
 # Decay constant formula
@@ -149,6 +143,15 @@ else
         exit
     fi
 fi
+
+currentblockheight=`ocl getblockcount`
+# Request start height = confirmation time bufffer + current height + auction duration
+let start=1+$currentblockheight+$4
+echo $start
+# Request end height = request start height + request duration
+let end=start+$5
+exit
+
 # Address permission tokens will be locked in
 pub=`ocl validateaddress $(ocl getnewaddress | jq -r '.') | jq -r ".pubkey"`
 
