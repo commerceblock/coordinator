@@ -19,6 +19,7 @@ fi
 
 shopt -s expand_aliases
 alias ocl="jsonrpc-cli --user=$RPC_USER --pass=$RPC_PASS --format=jsonpretty --resultonly=on --highlight=off  http://$RPC_CONNECT:$RPC_PORT/"
+
 # parameters:
 # $1 Genesis hash
 # $2 start price
@@ -71,12 +72,6 @@ if [[ `ocl getrequests | jq "if .[].genesisBlock == \"$genesis\" then 1 else 0 e
     ocl getrequests $1 | jq '.[]'
     exit
 fi
-
-# Request start height = current height + auction duration
-currentblockheight=`ocl getblockchaininfo | jq ".blocks"`
-let start=$currentblockheight+$4
-# Request end height = request start height + request duration
-let end=start+$5
 
 # Starting price
 price=$2
@@ -149,6 +144,13 @@ else
         exit
     fi
 fi
+
+currentblockheight=`ocl getblockcount`
+# Request start height = confirmation time bufffer + current height + auction duration
+let start=1+$currentblockheight+$4
+# Request end height = request start height + request duration
+let end=start+$5
+
 # Address permission tokens will be locked in
 pub=`ocl validateaddress $(ocl getnewaddress | jq -r '.') | jq -r ".pubkey"`
 
