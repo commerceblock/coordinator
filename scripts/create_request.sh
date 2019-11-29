@@ -19,6 +19,7 @@ fi
 
 shopt -s expand_aliases
 alias ocl="jsonrpc-cli --user=$RPC_USER --pass=$RPC_PASS --format=jsonpretty --resultonly=on --highlight=off  http://$RPC_CONNECT:$RPC_PORT/"
+
 # parameters:
 # $1 Genesis hash
 # $2 start price
@@ -147,10 +148,8 @@ fi
 currentblockheight=`ocl getblockcount`
 # Request start height = confirmation time bufffer + current height + auction duration
 let start=1+$currentblockheight+$4
-echo $start
 # Request end height = request start height + request duration
 let end=start+$5
-exit
 
 # Address permission tokens will be locked in
 pub=`ocl validateaddress $(ocl getnewaddress | jq -r '.') | jq -r ".pubkey"`
