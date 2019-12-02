@@ -147,11 +147,11 @@ else
     fi
 fi
 
-currentblockheight=`ocl getblockcount` # may have updated by now  
+currentblockheight=`ocl getblockcount` # may have updated by now
 # Request start height = confirmation time bufffer + current height + auction duration
-let start=1+$currentblockheight+$4
+start=$(( 1+$currentblockheight+$4 ))
 # Request end height = request start height + request duration
-let end=start+$5
+end=$(( start+$5 ))
 
 # Address permission tokens will be locked in
 pub=`ocl validateaddress $(ocl getnewaddress | jq -r '.') | jq -r ".pubkey"`
