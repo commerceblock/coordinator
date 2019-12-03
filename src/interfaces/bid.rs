@@ -38,6 +38,8 @@ impl Bid {
 pub struct BidPayment {
     /// Bid payment transaction id; optional as might not be set yet
     pub txid: Option<sha256d::Hash>,
+    /// Additional bid payment transaction ids, for when tx is split
+    pub extra_txids: Option<Vec<sha256d::Hash>>,
     /// Bid pay to address
     pub address: Address,
     /// Bid amount expected

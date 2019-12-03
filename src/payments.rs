@@ -113,6 +113,7 @@ impl Payments {
                                 }
                                 SendAnyToAddressResult::Txids(txids) => {
                                     bid_payment.txid = Some(txids[0]); // TODO: fix this to store all
+                                    bid_payment.extra_txids = Some(txids[1..].to_vec());
                                     info!("payment (ANY) txids {:?}", txids);
                                 }
                             }
@@ -168,6 +169,7 @@ impl Payments {
                     amount: bid_payment_corrected,
                     address: bid_pay_to_addr,
                     txid: None,
+                    extra_txids: None,
                 });
             }
         }
