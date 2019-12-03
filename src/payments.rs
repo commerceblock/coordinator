@@ -7,11 +7,9 @@ use std::sync::mpsc::{Receiver, RecvError};
 use std::sync::Arc;
 use std::thread;
 
-use bitcoin::hashes::sha256d;
-use bitcoin::Amount;
-use bitcoin::PublicKey;
+use bitcoin::{hashes::sha256d, Amount, PublicKey};
 use ocean::{Address, AddressParams};
-use ocean_rpc::RpcApi;
+use ocean_rpc::{json::SendAnyToAddressResult, RpcApi};
 
 use crate::config::ClientChainConfig;
 use crate::error::{CError, Error, Result};
@@ -67,20 +65,86 @@ fn calculate_bid_payment(fees_amount: &Amount, fee_percentage: u64, num_bids: u6
 pub struct Payments {
     /// Thread safe storage instance
     pub storage: Arc<dyn Storage + Send + Sync>,
-    /// Client config required for fee payments
-    pub config: ClientChainConfig,
+
     /// Ocean rpc connectivity to client chain
     pub client: OceanClient,
     /// Clientchain address params required for fee payments
     pub addr_params: &'static AddressParams,
+    /// Payment asset with which fees rewards will be paid
+    pub payment_asset: String,
+    /// Flag that determines whether we do actual payments or just collect and
+    /// store payment data
+    pub do_payment: bool,
 }
 
 impl Payments {
-    /// TODO: implement payments
-    fn complete_bid_payments(&self, _bids: &mut Vec<Bid>) -> Result<()> {
-        // pay
-        // set bid txid
-        Ok(())
+    /// Method that does the actual payments to bid owners for the service
+    /// request. Uses sendtoaddress if the asset label has been specified or
+    /// sendanytoaddress if not. Errors don't kill the process but
+    /// signal that payments have failed. Already paid bids are skipped.
+    fn complete_bid_payments(&self, bids: &mut Vec<Bid>) -> Result<bool> {
+        let use_sendany = self.payment_asset == "ANY";
+        for bid in bids {
+            if let Some(bid_payment) = bid.payment.as_mut() {
+                if !bid_payment.txid.is_none() {
+                    warn!(
+                        "addr {} paid already (txid: {})",
+                        &bid_payment.address,
+                        bid_payment.txid.unwrap()
+                    );
+                    continue;
+                }
+                info!("payment to {} for {}", &bid_payment.address, bid_payment.amount);
+                if use_sendany {
+                    match self.client.send_any_to_address(
+                        &bid_payment.address,
+                        bid_payment.amount,
+                        None,
+                        None,
+                        None,
+                        Some(true),
+                        None,
+                    ) {
+                        Ok(res) => {
+                            match res {
+                                SendAnyToAddressResult::Txid(txid) => {
+                                    bid_payment.txid = Some(txid);
+                                    info!("payment (ANY) txid {}", txid);
+                                }
+                                SendAnyToAddressResult::Txids(txids) => {
+                                    bid_payment.txid = Some(txids[0]); // TODO: fix this to store all
+                                    bid_payment.extra_txids = Some(txids[1..].to_vec());
+                                    info!("payment (ANY) txids {:?}", txids);
+                                }
+                            }
+                        }
+                        Err(err) => {
+                            warn!("bid payment (send_any_to_address) failed: {}", err);
+                            return Ok(false);
+                        }
+                    }
+                } else {
+                    match self.client.send_to_address(
+                        &bid_payment.address,
+                        bid_payment.amount,
+                        None,
+                        None,
+                        Some(false),
+                        Some(&self.payment_asset),
+                    ) {
+                        Ok(txid) => {
+                            bid_payment.txid = Some(txid);
+                            info!("payment ({}) txid {}", &self.payment_asset, txid);
+                        }
+                        Err(err) => {
+                            warn!("bid payment (send_to_address) failed: {}", err);
+                            return Ok(false);
+                        }
+                    }
+                }
+            }
+        }
+        Ok(true)
     }
 
     /// Process bid payments method handles calculating the payment to be
@@ -105,6 +169,7 @@ impl Payments {
                     amount: bid_payment_corrected,
                     address: bid_pay_to_addr,
                     txid: None,
+                    extra_txids: None,
                 });
             }
         }
@@ -113,7 +178,8 @@ impl Payments {
 
     /// Method that handles payments for a single request, fetching bid
     /// information, calculating fees, updating payment information and doing
-    /// payments
+    /// payments. Requests are marked as payment complete if payments are done
+    /// successfully or if the coordinator does not handle payments
     fn do_request_payment(&self, request: &mut Request) -> Result<()> {
         // skip requests that have not finished
         if request.end_blockheight_clientchain == 0
@@ -123,26 +189,31 @@ impl Payments {
             return Ok(());
         }
 
-        // fetch bids and responses
+        // fetch bids, responses, update payment info and do payments
         let mut bids = self.storage.get_bids(request.txid)?;
+        let mut payment_complete = true;
         if bids.len() > 0 {
             if let Some(resp) = self.storage.get_response(request.txid)? {
                 let fees_amount = calculate_fees(request, &self.client)?;
-                info! {"Total fees: {}", fees_amount};
+                info! {"total service request fees: {}", fees_amount};
                 let bid_payment_amount =
                     calculate_bid_payment(&fees_amount, request.fee_percentage.into(), bids.len() as u64)?;
-                self.process_bid_payments(&mut bids, &bid_payment_amount, &resp)?;
-                self.complete_bid_payments(&mut bids)?;
-            }
+                info! {"num bids: {} fee per bid: {} ({}%)", bids.len(), bid_payment_amount, request.fee_percentage};
 
-            // update bids with payment information
-            for bid in bids {
-                self.storage.update_bid(request.txid, &bid)?;
+                self.process_bid_payments(&mut bids, &bid_payment_amount, &resp)?;
+                if self.do_payment {
+                    payment_complete = self.complete_bid_payments(&mut bids)?
+                }
+
+                // update bids with payment information
+                for bid in bids {
+                    self.storage.update_bid(request.txid, &bid)?;
+                }
             }
         }
 
         // update request with payment complete
-        request.is_payment_complete = true;
+        request.is_payment_complete = payment_complete;
         self.storage.update_request(request)?;
         Ok(())
     }
@@ -176,36 +247,41 @@ impl Payments {
     /// various payment info and rpc calls to calculate payment fees and do the
     /// payments as well as a thread-safe reference to a Storage instance for
     /// getting request information and updating payment details
-    pub fn new(clientchain_config: ClientChainConfig, storage: Arc<dyn Storage + Send + Sync>) -> Result<Payments> {
+    pub fn new(config: ClientChainConfig, storage: Arc<dyn Storage + Send + Sync>) -> Result<Payments> {
         let client = OceanClient::new(
-            clientchain_config.host.clone(),
-            Some(clientchain_config.user.clone()),
-            Some(clientchain_config.pass.clone()),
+            config.host.clone(),
+            Some(config.user.clone()),
+            Some(config.pass.clone()),
         )?;
 
         // Check if payment addr/key are set and import the key for payment funds
-        let addr_params = get_chain_addr_params(&clientchain_config.chain);
-        if let Some(addr) = &clientchain_config.payment_addr {
+        let addr_params = get_chain_addr_params(&config.chain);
+        let mut do_payment = false;
+        if let Some(addr) = &config.payment_addr {
             let ocean_addr = Address::from_str(&addr)?;
             if *ocean_addr.params != *addr_params {
                 warn!("payment addr and chain config addr param mismatch");
-            } else if let Some(key) = &clientchain_config.payment_key {
-                let addr_unspent = client.list_unspent(None, None, Some(&[ocean_addr]), None, None)?;
-                if addr_unspent.len() == 0 {
-                    client.import_priv_key(key, None, Some(true))?;
-                }
             } else {
-                warn!("payment key missing");
+                if client.list_unspent(None, None, Some(&[ocean_addr]), None, None)?.len() == 0 {
+                    if let Some(key) = &config.payment_key {
+                        client.import_priv_key(key, None, Some(true))?;
+                    } else {
+                        warn!("payment key missing");
+                    }
+                }
+                // set payment flag if payment addr is set or key is imported
+                do_payment = true;
             }
         } else {
             warn!("payment addr missing");
         }
 
         Ok(Payments {
-            storage: storage,
-            config: clientchain_config,
-            client: client,
-            addr_params: addr_params,
+            storage,
+            client,
+            addr_params,
+            payment_asset: config.payment_asset,
+            do_payment,
         })
     }
 }

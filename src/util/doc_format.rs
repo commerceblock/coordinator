@@ -63,6 +63,15 @@ pub fn bid_to_doc(request_id: &Bson, bid: &Bid) -> OrderedDocument {
         if let Some(txid) = payment.txid {
             let _ = bid_payment_doc.insert("txid", txid.to_string());
         }
+        if let Some(extra_txids) = &payment.extra_txids {
+            let _ = bid_payment_doc.insert(
+                "extra_txids",
+                extra_txids
+                    .iter()
+                    .map(|x| Bson::String(x.to_string()))
+                    .collect::<Vec<_>>(),
+            );
+        }
         let _ = bid_doc.insert("payment", bid_payment_doc);
     }
     bid_doc
@@ -77,8 +86,18 @@ pub fn doc_to_bid(doc: &OrderedDocument) -> Bid {
         if let Some(doc_payment_txid) = doc_doc_payment.get("txid") {
             payment_txid = Some(sha256d::Hash::from_hex(doc_payment_txid.as_str().unwrap()).unwrap())
         }
+        let mut extra_payment_txids: Option<Vec<sha256d::Hash>> = None;
+        if let Ok(doc_extra_payment_txids) = doc_doc_payment.get_array("extra_txids") {
+            extra_payment_txids = Some(
+                doc_extra_payment_txids
+                    .iter()
+                    .map(|x| sha256d::Hash::from_hex(x.as_str().unwrap()).unwrap())
+                    .collect(),
+            );
+        }
         payment = Some(BidPayment {
             txid: payment_txid,
+            extra_txids: extra_payment_txids,
             address: Address::from_str(doc_doc_payment.get("address").unwrap().as_str().unwrap()).unwrap(),
             amount: Amount::from_btc(doc_doc_payment.get("amount").unwrap().as_f64().unwrap()).unwrap(),
         });
@@ -197,6 +216,7 @@ mod tests {
         let amount = 56.123;
         let mut bid_payment = BidPayment {
             txid: None,
+            extra_txids: None,
             address: Address::from_str(addr).unwrap(),
             amount: Amount::from_btc(amount).unwrap(),
         };
@@ -229,6 +249,28 @@ mod tests {
                     "address": addr,
                     "amount": amount,
                     "txid": payment_txid.to_string()
+                }
+            },
+            doc
+        );
+        assert_eq!(bid, doc_to_bid(&doc));
+
+        let payment_extra_txids = vec![gen_dummy_hash(2), gen_dummy_hash(6), gen_dummy_hash(7)];
+        bid_payment.extra_txids = Some(payment_extra_txids);
+        bid.payment = Some(bid_payment.clone());
+        let doc = bid_to_doc(&Bson::ObjectId(id.clone()), &bid);
+        assert_eq!(
+            doc! {
+                "request_id": id.clone(),
+                "txid": hash.to_string(),
+                "pubkey": pubkey_hex,
+                "payment": doc!{
+                    "address": addr,
+                    "amount": amount,
+                    "txid": "7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b",
+                    "extra_txids": ["0202020202020202020202020202020202020202020202020202020202020202",
+                                    "0606060606060606060606060606060606060606060606060606060606060606",
+                                    "0707070707070707070707070707070707070707070707070707070707070707"]
                 }
             },
             doc

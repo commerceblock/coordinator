@@ -1,4 +1,12 @@
 
+# 0.4.x
+
+0. Payment data
+1. Payment enhancements
+2. Robustness improvements
+3. Dockerize request script and fixes
+4. Complete payments
+
 # 0.3.x
 
 1. Fix issue with coordinator not storing empty responses
