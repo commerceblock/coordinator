@@ -32,7 +32,7 @@ block_time = 60
 asset = "CHALLENGE"
 asset_key = "cScSHCQp9AEwzZoucRpX9bMRkLCJ4LoQWBNFTZuD6tPX9qwNMWfQ"
 chain = "ocean_test"
-payment_asset = "ANY"
+payment_asset = "CBT"
 payment_addr="2dt74vJqpNTM12pbiNpHGvry7tyvUu9tJR8"
 
 [storage]
