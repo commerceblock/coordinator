@@ -265,6 +265,15 @@ mod tests {
         // duration doesn't matter here
         assert!(verify_challenge(&dummy_hash, &clientchain, time::Duration::from_millis(10)).unwrap() == ());
 
+        // test that for very small duration this fails
+        let res = verify_challenge(&dummy_hash, &clientchain, time::Duration::from_nanos(1));
+        match res {
+            Ok(_) => assert!(false, "should not return Ok"),
+            Err(Error::Coordinator(e)) => assert_eq!(CError::UnverifiedChallenge.to_string(), e.to_string()),
+            Err(_) => assert!(false, "should not return any error"),
+        }
+
+        // test with clientchain returning false
         clientchain.return_false = true;
         let res = verify_challenge(&dummy_hash, &clientchain, time::Duration::from_millis(10));
         match res {
@@ -274,11 +283,12 @@ mod tests {
         }
         clientchain.return_false = false;
 
+        // test with clientchain failing
         clientchain.return_err = true;
         assert!(
             verify_challenge(&dummy_hash, &clientchain, time::Duration::from_millis(10)).is_err(),
             "verify_challenge failed"
-        )
+        );
     }
 
     #[test]
@@ -313,6 +323,13 @@ mod tests {
         let res = get_challenge_response(&dummy_hash, &vrx, time::Duration::from_millis(1)).unwrap();
         assert_eq!(res.len(), 1);
         assert_eq!(res, dummy_response_set);
+
+        // then test with dummy hash but little time to fetch
+        let mut dummy_response_set = ChallengeResponseIds::new();
+        let _ = dummy_response_set.insert(dummy_bid.txid);
+        vtx.send(ChallengeResponse(dummy_hash, dummy_bid.clone())).unwrap();
+        let res = get_challenge_response(&dummy_hash, &vrx, time::Duration::from_nanos(1)).unwrap();
+        assert_eq!(res.len(), 0);
 
         // then drop channel sender and test correct error is returned
         std::mem::drop(vtx);
