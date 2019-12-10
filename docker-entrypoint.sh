@@ -20,6 +20,10 @@ if [ -f /run/secrets/co_clientchain_asset_key ]; then
     export CO_CLIENTCHAIN_ASSET_KEY="$(cat /run/secrets/co_clientchain_asset_key)"
 fi
 
+if [ -f /run/secrets/co_clientchain_payment_key ]; then
+    export CO_CLIENTCHAIN_PAYMENT_KEY="$(cat /run/secrets/co_clientchain_payment_key)"
+fi
+
 case "$1" in
         coordinator)
             echo "Running coordinator"
