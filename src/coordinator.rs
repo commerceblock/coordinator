@@ -7,7 +7,6 @@ use std::sync::{Arc, Mutex};
 use std::{thread, time};
 
 use bitcoin::hashes::{hex::FromHex, sha256d};
-use futures::sync::oneshot;
 
 use crate::challenger::ChallengeResponse;
 use crate::config::Config;
@@ -73,9 +72,7 @@ pub fn run_request<T: Service, K: ClientChain, D: Storage>(
             let (verify_tx, verify_rx): (Sender<ChallengeResponse>, Receiver<ChallengeResponse>) = channel();
 
             // start listener along with a oneshot channel to send shutdown message
-            let (thread_tx, thread_rx) = oneshot::channel();
-            let verify_handle =
-                ::listener::run_listener(&config.listener_host, shared_challenge.clone(), verify_tx, thread_rx);
+            let listener_handle = ::listener::run_listener(&config.listener_host, shared_challenge.clone(), verify_tx);
 
             // run challenge request storing expected responses
             ::challenger::run_challenge_request(
@@ -90,9 +87,7 @@ pub fn run_request<T: Service, K: ClientChain, D: Storage>(
                 time::Duration::from_secs(config.block_time / 2),
             )?;
 
-            // stop listener service
-            thread_tx.send(()).expect("thread_tx send failed");
-            verify_handle.join().expect("verify_handle join failed");
+            listener_handle.stop(); // try stop listener service
 
             return Ok(Some(shared_challenge.lock().unwrap().request.txid));
         }

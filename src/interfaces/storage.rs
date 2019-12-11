@@ -47,7 +47,9 @@ pub trait Storage {
 
 /// Database implementation of Storage trait
 pub struct MongoStorage {
+    /// mongo db connection instance
     db: Mutex<Database>,
+    /// db config for reconnecting
     config: StorageConfig,
 }
 
