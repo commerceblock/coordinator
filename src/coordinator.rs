@@ -24,22 +24,30 @@ pub fn run(config: Config) -> Result<()> {
     let storage = Arc::new(MongoStorage::new(config.storage.clone())?);
     let genesis_hash = sha256d::Hash::from_hex(&config.clientchain.genesis_hash)?;
 
-    let _ = ::api::run_api_server(&config.api, storage.clone());
+    let api_handler = ::api::run_api_server(&config.api, storage.clone());
     let (req_send, req_recv): (Sender<sha256d::Hash>, Receiver<sha256d::Hash>) = channel();
     let _ = ::payments::run_payments(config.clientchain.clone(), storage.clone(), req_recv)?;
 
     // This loop runs continuously fetching and running challenge requests,
     // generating challenge responses and fails on any errors that occur
     loop {
-        if let Some(request_id) = run_request(&config, &service, &clientchain, storage.clone(), genesis_hash)? {
-            // if challenge request succeeds print responses
-            req_send.send(request_id).unwrap();
-            info! {"***** Response *****"}
-            let resp = storage.get_response(request_id)?.unwrap();
-            info! {"{}", serde_json::to_string_pretty(&resp).unwrap()};
+        match run_request(&config, &service, &clientchain, storage.clone(), genesis_hash) {
+            Ok(res) => {
+                if let Some(request_id) = res {
+                    // if challenge request succeeds print responses
+                    req_send.send(request_id).unwrap();
+                    info! {"***** Response *****"}
+                    let resp = storage.get_response(request_id)?.unwrap();
+                    info! {"{}", serde_json::to_string_pretty(&resp).unwrap()};
+                }
+                info! {"Sleeping for {} sec...", config.block_time}
+                thread::sleep(time::Duration::from_secs(config.block_time))
+            }
+            Err(err) => {
+                api_handler.close(); // try closing the api rpc server
+                return Err(err);
+            }
         }
-        info! {"Sleeping for {} sec...", config.block_time}
-        thread::sleep(time::Duration::from_secs(config.block_time))
     }
 }
 

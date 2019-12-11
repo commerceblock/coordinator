@@ -11,7 +11,9 @@ use base64::decode as b64decode;
 use bitcoin::hashes::sha256d;
 use hyper::{Body, Request, StatusCode};
 use jsonrpc_http_server::jsonrpc_core::{Error, ErrorCode, IoHandler, Params, Value};
-use jsonrpc_http_server::{hyper::header, AccessControlAllowOrigin, DomainsValidation, Response, ServerBuilder};
+use jsonrpc_http_server::{
+    hyper::header, AccessControlAllowOrigin, CloseHandle, DomainsValidation, Response, ServerBuilder,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::config::ApiConfig;
@@ -148,10 +150,7 @@ fn authorize(our_auth: &str, request: &Request<Body>) -> bool {
 /// Run Api RPC server for external requests that require information from the
 /// coordinator. Data returned to the caller are drawn from the storage
 /// interface which is shared with the main coordinator process
-pub fn run_api_server<D: Storage + Send + Sync + 'static>(
-    config: &ApiConfig,
-    storage: Arc<D>,
-) -> thread::JoinHandle<()> {
+pub fn run_api_server<D: Storage + Send + Sync + 'static>(config: &ApiConfig, storage: Arc<D>) -> CloseHandle {
     let mut io = IoHandler::default();
     let storage_ref = storage.clone();
     io.add_method("getrequestresponse", move |params: Params| {
@@ -189,7 +188,9 @@ pub fn run_api_server<D: Storage + Send + Sync + 'static>(
         .start_http(&addr[0])
         .expect("api error");
 
-    thread::spawn(move || server.wait())
+    let close_handle = server.close_handle();
+    let _ = thread::spawn(move || server.wait());
+    close_handle // handler to stop the server from the main thread
 }
 
 #[cfg(test)]
