@@ -3,11 +3,13 @@
 //! TODO: Add description
 
 use std::str::FromStr;
-use std::sync::mpsc::{Receiver, RecvError};
+use std::sync::mpsc::{Receiver, RecvTimeoutError};
 use std::sync::Arc;
 use std::thread;
+use std::time::Duration;
 
 use bitcoin::{hashes::sha256d, Amount, PublicKey};
+use futures::sync::oneshot;
 use ocean::{Address, AddressParams};
 use ocean_rpc::{json::SendAnyToAddressResult, RpcApi};
 
@@ -19,7 +21,7 @@ use crate::interfaces::{
     response::Response,
     storage::Storage,
 };
-use crate::util::ocean::OceanClient;
+use crate::util::{handler::Handle, ocean::OceanClient};
 
 /// Get addr params from chain name
 pub fn get_chain_addr_params(chain: &String) -> &'static AddressParams {
@@ -220,7 +222,11 @@ impl Payments {
 
     /// Main Request payments method; first checks for any incomplete requests
     /// and then listens for new requests on the receiver channel
-    fn do_request_payments(&self, req_recv: Receiver<sha256d::Hash>) -> Result<()> {
+    fn do_request_payments(
+        &self,
+        req_recv: Receiver<sha256d::Hash>,
+        mut kill_recv: oneshot::Receiver<()>,
+    ) -> Result<()> {
         // Look for incomplete requests
         let incomplete_requests = self.storage.get_requests(Some(false), None, None)?;
         for mut req in incomplete_requests {
@@ -230,15 +236,25 @@ impl Payments {
 
         // Wait for new requests
         loop {
-            match req_recv.recv() {
+            match req_recv.recv_timeout(Duration::from_millis(100)) {
                 Ok(resp) => {
                     let mut req = self.storage.get_request(resp)?.unwrap();
                     info! {"New request: {}", req.txid};
                     let _ = self.do_request_payment(&mut req)?;
                 }
-                Err(RecvError) => {
+                Err(RecvTimeoutError::Timeout) => {} // ignore timeout - it's allowed
+                Err(RecvTimeoutError::Disconnected) => {
                     return Err(Error::from(CError::ReceiverDisconnected));
                 }
+            }
+
+            if kill_recv
+                .try_recv()
+                .expect("failed receiving shutdown signal")
+                .is_some()
+            {
+                info!("Shutting down...");
+                return Ok(());
             }
         }
     }
@@ -288,17 +304,22 @@ impl Payments {
 
 /// Run payments daemon in a separate thread with a Payments instance receiving
 /// information on finished requests via a Receiver channel
-pub fn run_payments(
+pub fn run_payments<'a>(
     clientchain_config: ClientChainConfig,
     storage: Arc<dyn Storage + Send + Sync>,
     req_recv: Receiver<sha256d::Hash>,
-) -> Result<thread::JoinHandle<()>> {
+) -> Result<Handle<'a>> {
     let payments = Payments::new(clientchain_config, storage)?;
-    Ok(thread::spawn(move || {
-        if let Err(err) = payments.do_request_payments(req_recv) {
-            error! {"payments error: {}", err};
-        }
-    }))
+    let (tx, rx) = oneshot::channel();
+    Ok(Handle::new(
+        tx,
+        thread::spawn(move || {
+            if let Err(err) = payments.do_request_payments(req_recv, rx) {
+                error! {"payments error: {}", err};
+            }
+        }),
+        "PAYMENTS",
+    ))
 }
 
 #[cfg(test)]

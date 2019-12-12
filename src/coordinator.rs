@@ -26,7 +26,7 @@ pub fn run(config: Config) -> Result<()> {
 
     let api_handler = ::api::run_api_server(&config.api, storage.clone());
     let (req_send, req_recv): (Sender<sha256d::Hash>, Receiver<sha256d::Hash>) = channel();
-    let _ = ::payments::run_payments(config.clientchain.clone(), storage.clone(), req_recv)?;
+    let payments_handler = ::payments::run_payments(config.clientchain.clone(), storage.clone(), req_recv)?;
 
     // This loop runs continuously fetching and running challenge requests,
     // generating challenge responses and fails on any errors that occur
@@ -45,6 +45,7 @@ pub fn run(config: Config) -> Result<()> {
             }
             Err(err) => {
                 api_handler.close(); // try closing the api rpc server
+                payments_handler.stop(); // try closing the payments service
                 return Err(err);
             }
         }
