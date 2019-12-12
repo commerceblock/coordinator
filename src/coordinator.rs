@@ -84,7 +84,7 @@ pub fn run_request<T: Service, K: ClientChain, D: Storage>(
             let listener_handle = ::listener::run_listener(&config.listener_host, shared_challenge.clone(), verify_tx);
 
             // run challenge request storing expected responses
-            ::challenger::run_challenge_request(
+            match ::challenger::run_challenge_request(
                 service,
                 clientchain,
                 shared_challenge.clone(),
@@ -94,11 +94,13 @@ pub fn run_request<T: Service, K: ClientChain, D: Storage>(
                 time::Duration::from_secs(config.challenge_duration),
                 config.challenge_frequency,
                 time::Duration::from_secs(config.block_time / 2),
-            )?;
-
-            listener_handle.stop(); // try stop listener service
-
-            return Ok(Some(shared_challenge.lock().unwrap().request.txid));
+            ) {
+                Ok(()) => return Ok(Some(shared_challenge.lock().unwrap().request.txid)),
+                Err(err) => {
+                    listener_handle.stop(); // try stop listener service
+                    Err(err)
+                }
+            }
         }
         None => Ok(None),
     }
