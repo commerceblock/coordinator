@@ -7,7 +7,6 @@ use std::sync::{Arc, Mutex};
 use std::{thread, time};
 
 use bitcoin::hashes::{hex::FromHex, sha256d};
-use futures::sync::oneshot;
 
 use crate::challenger::ChallengeResponse;
 use crate::config::Config;
@@ -25,23 +24,37 @@ pub fn run(config: Config) -> Result<()> {
     let storage = Arc::new(MongoStorage::new(config.storage.clone())?);
     let genesis_hash = sha256d::Hash::from_hex(&config.clientchain.genesis_hash)?;
 
-    let _ = ::api::run_api_server(&config.api, storage.clone());
+    let api_handler = ::api::run_api_server(&config.api, storage.clone());
     let (req_send, req_recv): (Sender<sha256d::Hash>, Receiver<sha256d::Hash>) = channel();
-    let _ = ::payments::run_payments(config.clientchain.clone(), storage.clone(), req_recv)?;
+    let mut payments_handler = ::payments::run_payments(config.clientchain.clone(), storage.clone(), req_recv)?;
 
     // This loop runs continuously fetching and running challenge requests,
     // generating challenge responses and fails on any errors that occur
     loop {
-        if let Some(request_id) = run_request(&config, &service, &clientchain, storage.clone(), genesis_hash)? {
-            // if challenge request succeeds print responses
-            req_send.send(request_id).unwrap();
-            info! {"***** Response *****"}
-            let resp = storage.get_response(request_id)?.unwrap();
-            info! {"{}", serde_json::to_string_pretty(&resp).unwrap()};
+        match run_request(&config, &service, &clientchain, storage.clone(), genesis_hash) {
+            Ok(res) => {
+                if let Some(request_id) = res {
+                    // if challenge request succeeds print responses
+                    req_send.send(request_id).unwrap();
+                    info! {"***** Response *****"}
+                    let resp = storage.get_response(request_id)?.unwrap();
+                    info! {"{}", serde_json::to_string_pretty(&resp).unwrap()};
+                }
+                info! {"Sleeping for {} sec...", config.block_time}
+                thread::sleep(time::Duration::from_secs(config.block_time))
+            }
+            Err(err) => {
+                api_handler.close(); // try closing the api server
+                payments_handler.stop(); // try closing the payments service
+                return Err(err);
+            }
         }
-        info! {"Sleeping for {} sec...", config.block_time}
-        thread::sleep(time::Duration::from_secs(config.block_time))
+        if payments_handler.got_err() {
+            break;
+        }
     }
+    api_handler.close(); // try closing the api server
+    Ok(())
 }
 
 /// Run request method attemps to fetch a challenge request and run it
@@ -73,12 +86,10 @@ pub fn run_request<T: Service, K: ClientChain, D: Storage>(
             let (verify_tx, verify_rx): (Sender<ChallengeResponse>, Receiver<ChallengeResponse>) = channel();
 
             // start listener along with a oneshot channel to send shutdown message
-            let (thread_tx, thread_rx) = oneshot::channel();
-            let verify_handle =
-                ::listener::run_listener(&config.listener_host, shared_challenge.clone(), verify_tx, thread_rx);
+            let listener_handle = ::listener::run_listener(&config.listener_host, shared_challenge.clone(), verify_tx);
 
             // run challenge request storing expected responses
-            ::challenger::run_challenge_request(
+            match ::challenger::run_challenge_request(
                 service,
                 clientchain,
                 shared_challenge.clone(),
@@ -88,13 +99,13 @@ pub fn run_request<T: Service, K: ClientChain, D: Storage>(
                 time::Duration::from_secs(config.challenge_duration),
                 config.challenge_frequency,
                 time::Duration::from_secs(config.block_time / 2),
-            )?;
-
-            // stop listener service
-            thread_tx.send(()).expect("thread_tx send failed");
-            verify_handle.join().expect("verify_handle join failed");
-
-            return Ok(Some(shared_challenge.lock().unwrap().request.txid));
+            ) {
+                Ok(()) => return Ok(Some(shared_challenge.lock().unwrap().request.txid)),
+                Err(err) => {
+                    listener_handle.stop(); // try stop listener service
+                    Err(err)
+                }
+            }
         }
         None => Ok(None),
     }

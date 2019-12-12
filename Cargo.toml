@@ -16,7 +16,7 @@ config = "0.9"
 serde = { version = "1.0", features = ["derive"] }
 serde_json="1.0"
 mongodb = "0.3.11"
-jsonrpc-http-server = "11.0"
+jsonrpc-http-server = "14.0.5"
 rust-ocean = { git = "https://github.com/commerceblock/rust-ocean"}
 ocean-rpc = { git = "https://github.com/commerceblock/rust-ocean-rpc"}
 bitcoin = { version = "0.20", features = [ "use-serde" ] }
