@@ -11,6 +11,8 @@ use futures::sync::oneshot;
 pub struct Handle<'a> {
     /// Channel to send kill signal
     tx: oneshot::Sender<()>,
+    /// Channel to receive error from service
+    err_rx: Option<oneshot::Receiver<()>>,
     /// Service thread handler
     thread: thread::JoinHandle<()>,
     /// Service name
@@ -19,8 +21,28 @@ pub struct Handle<'a> {
 
 impl<'a> Handle<'a> {
     /// Return new handle instance
-    pub fn new(tx: oneshot::Sender<()>, thread: thread::JoinHandle<()>, name: &str) -> Handle {
-        Handle { tx, thread, name }
+    pub fn new(
+        tx: oneshot::Sender<()>,
+        err_rx: Option<oneshot::Receiver<()>>,
+        thread: thread::JoinHandle<()>,
+        name: &str,
+    ) -> Handle {
+        Handle {
+            tx,
+            err_rx,
+            thread,
+            name,
+        }
+    }
+
+    /// Check if an err signal has been received in the error receiver channel
+    pub fn got_err(&mut self) -> bool {
+        if let Some(rcv) = &mut self.err_rx {
+            if rcv.try_recv().expect("").is_some() {
+                return true;
+            }
+        }
+        false
     }
 
     /// Handle sending a stop signal to the service and joining the service

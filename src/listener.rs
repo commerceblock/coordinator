@@ -173,6 +173,7 @@ pub fn run_listener(
 
     Handle::new(
         tx,
+        None,
         thread::spawn(move || {
             rt::run(server);
         }),

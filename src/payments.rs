@@ -197,11 +197,11 @@ impl Payments {
         if bids.len() > 0 {
             if let Some(resp) = self.storage.get_response(request.txid)? {
                 let fees_amount = calculate_fees(request, &self.client)?;
-                info! {"total service request fees: {}", fees_amount};
+                info! {"total service fees: {}", fees_amount};
                 let bid_payment_amount =
                     calculate_bid_payment(&fees_amount, request.fee_percentage.into(), bids.len() as u64)?;
-                info! {"num bids: {} fee per bid: {} ({}%)", bids.len(), bid_payment_amount, request.fee_percentage};
-
+                info! {"num bids: {}", bids.len()};
+                info! {"fees per bid: {} ({}%)", bid_payment_amount, request.fee_percentage};
                 self.process_bid_payments(&mut bids, &bid_payment_amount, &resp)?;
                 if self.do_payment {
                     payment_complete = self.complete_bid_payments(&mut bids)?
@@ -311,11 +311,14 @@ pub fn run_payments<'a>(
 ) -> Result<Handle<'a>> {
     let payments = Payments::new(clientchain_config, storage)?;
     let (tx, rx) = oneshot::channel();
+    let (err_tx, err_rx) = oneshot::channel();
     Ok(Handle::new(
         tx,
+        Some(err_rx),
         thread::spawn(move || {
             if let Err(err) = payments.do_request_payments(req_recv, rx) {
                 error! {"payments error: {}", err};
+                err_tx.send(()).expect("failed sending error signal");
             }
         }),
         "PAYMENTS",

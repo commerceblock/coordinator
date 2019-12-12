@@ -26,7 +26,7 @@ pub fn run(config: Config) -> Result<()> {
 
     let api_handler = ::api::run_api_server(&config.api, storage.clone());
     let (req_send, req_recv): (Sender<sha256d::Hash>, Receiver<sha256d::Hash>) = channel();
-    let payments_handler = ::payments::run_payments(config.clientchain.clone(), storage.clone(), req_recv)?;
+    let mut payments_handler = ::payments::run_payments(config.clientchain.clone(), storage.clone(), req_recv)?;
 
     // This loop runs continuously fetching and running challenge requests,
     // generating challenge responses and fails on any errors that occur
@@ -44,12 +44,17 @@ pub fn run(config: Config) -> Result<()> {
                 thread::sleep(time::Duration::from_secs(config.block_time))
             }
             Err(err) => {
-                api_handler.close(); // try closing the api rpc server
+                api_handler.close(); // try closing the api server
                 payments_handler.stop(); // try closing the payments service
                 return Err(err);
             }
         }
+        if payments_handler.got_err() {
+            break;
+        }
     }
+    api_handler.close(); // try closing the api server
+    Ok(())
 }
 
 /// Run request method attemps to fetch a challenge request and run it
