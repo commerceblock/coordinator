@@ -21,6 +21,7 @@ use serde_json::{self, Value};
 use crate::challenger::{ChallengeResponse, ChallengeState};
 use crate::error::Result;
 use crate::interfaces::bid::Bid;
+use crate::util::handler::Handle;
 
 /// Messsage type for challenge proofs sent by guardnodes
 #[derive(Debug)]
@@ -152,8 +153,7 @@ pub fn run_listener(
     listener_host: &String,
     challenge: Arc<Mutex<ChallengeState>>,
     ch_resp: Sender<ChallengeResponse>,
-    ch_recv: oneshot::Receiver<()>,
-) -> thread::JoinHandle<()> {
+) -> Handle {
     let addr: Vec<_> = listener_host
         .to_socket_addrs()
         .expect("Unable to resolve domain")
@@ -165,14 +165,20 @@ pub fn run_listener(
         service_fn(move |req: Request<Body>| handle(req, challenge.clone(), challenge_resp.clone()))
     };
 
+    let (tx, rx) = oneshot::channel();
     let server = Server::bind(&addr[0])
         .serve(listener_service)
-        .with_graceful_shutdown(ch_recv)
+        .with_graceful_shutdown(rx)
         .map_err(|e| error!("listener error: {}", e));
 
-    thread::spawn(move || {
-        rt::run(server);
-    })
+    Handle::new(
+        tx,
+        None,
+        thread::spawn(move || {
+            rt::run(server);
+        }),
+        "LISTENER",
+    )
 }
 
 #[cfg(test)]

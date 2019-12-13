@@ -1,6 +1,6 @@
-//! # Main
+//! # Coord
 //!
-//! Main daemon entry
+//! Coord main daemon entry
 
 #[macro_use]
 extern crate log;

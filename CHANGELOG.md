@@ -6,6 +6,8 @@
 2. Robustness improvements
 3. Dockerize request script and fixes
 4. Complete payments
+5. Payment key secrets
+6. Child thread handling improvements
 
 # 0.3.x
 
