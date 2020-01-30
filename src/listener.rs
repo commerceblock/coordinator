@@ -71,7 +71,7 @@ impl ChallengeProof {
 /// challenger to receive
 fn handle_challengeproof(
     req: Request<Body>,
-    challenge: Arc<Mutex<ChallengeState>>,
+    challenge: Arc<Mutex<Option<ChallengeState>>>,
     challenge_resp: Sender<ChallengeResponse>,
 ) -> impl Future<Item = Response<Body>, Error = hyper::Error> + Send {
     let resp = req.into_body().concat2().map(move |body| {
@@ -82,27 +82,32 @@ fn handle_challengeproof(
                 // parse challenge proof from json
                 Ok(proof) => {
                     // check for an active challenge
-                    let challenge_lock = challenge.lock().unwrap();
-                    if let Some(h) = challenge_lock.latest_challenge {
-                        // check challenge proof bid exists
-                        if !challenge_lock.bids.contains(&proof.bid) {
-                            return response(StatusCode::BAD_REQUEST, "bad-bid".to_owned());
+                    let ch_lock = challenge.lock().unwrap();
+                    if let Some(ch) = ch_lock.as_ref() {
+                        if let Some(h) = ch.latest_challenge {
+                            // check challenge proof bid exists
+                            if !ch.bids.contains(&proof.bid) {
+                                return response(StatusCode::BAD_REQUEST, "bad-bid".to_owned());
+                            }
+                            // drop lock immediately
+                            std::mem::drop(ch_lock);
+                            // check challenge proof hash is correct
+                            if proof.hash != h {
+                                return response(StatusCode::BAD_REQUEST, "bad-hash".to_owned());
+                            }
+                            // check challenge proof sig is correct
+                            if let Err(e) = ChallengeProof::verify(&proof) {
+                                return response(StatusCode::BAD_REQUEST, format!("bad-sig: {}", e));
+                            }
+                            // send successful response to challenger
+                            challenge_resp
+                                .send(ChallengeResponse(proof.hash, proof.bid.clone()))
+                                .unwrap();
+                            return response(StatusCode::OK, String::new());
                         }
+                    } else {
                         // drop lock immediately
-                        std::mem::drop(challenge_lock);
-                        // check challenge proof hash is correct
-                        if proof.hash != h {
-                            return response(StatusCode::BAD_REQUEST, "bad-hash".to_owned());
-                        }
-                        // check challenge proof sig is correct
-                        if let Err(e) = ChallengeProof::verify(&proof) {
-                            return response(StatusCode::BAD_REQUEST, format!("bad-sig: {}", e));
-                        }
-                        // send successful response to challenger
-                        challenge_resp
-                            .send(ChallengeResponse(proof.hash, proof.bid.clone()))
-                            .unwrap();
-                        return response(StatusCode::OK, String::new());
+                        std::mem::drop(ch_lock);
                     }
                     response(StatusCode::BAD_REQUEST, format!("no-active-challenge"))
                 }
@@ -118,7 +123,7 @@ fn handle_challengeproof(
 /// and to the /challengeproof POST uri for receiving challenges from guardnodes
 fn handle(
     req: Request<Body>,
-    challenge: Arc<Mutex<ChallengeState>>,
+    challenge: Arc<Mutex<Option<ChallengeState>>>,
     challenge_resp: Sender<ChallengeResponse>,
 ) -> impl Future<Item = Response<Body>, Error = hyper::Error> + Send {
     let resp = match (req.method(), req.uri().path()) {
@@ -151,7 +156,7 @@ fn response(status: StatusCode, message: String) -> Response<Body> {
 /// of the coordinator
 pub fn run_listener(
     listener_host: &String,
-    challenge: Arc<Mutex<ChallengeState>>,
+    challenge: Arc<Mutex<Option<ChallengeState>>>,
     ch_resp: Sender<ChallengeResponse>,
 ) -> Handle {
     let addr: Vec<_> = listener_host
@@ -304,7 +309,7 @@ mod tests {
         let _challenge_state = gen_challenge_state_with_challenge(&gen_dummy_hash(3), &chl_hash);
         let bid_txid = _challenge_state.bids.iter().next().unwrap().txid;
         let bid_pubkey = _challenge_state.bids.iter().next().unwrap().pubkey;
-        let challenge_state = Arc::new(Mutex::new(_challenge_state));
+        let challenge_state = Arc::new(Mutex::new(Some(_challenge_state)));
 
         // Request get /
         let data = "";
@@ -444,7 +449,7 @@ mod tests {
         let _challenge_state = gen_challenge_state_with_challenge(&gen_dummy_hash(1), &chl_hash);
         let bid_txid = _challenge_state.bids.iter().next().unwrap().txid;
         let bid_pubkey = _challenge_state.bids.iter().next().unwrap().pubkey;
-        let challenge_state = Arc::new(Mutex::new(_challenge_state));
+        let challenge_state = Arc::new(Mutex::new(Some(_challenge_state)));
 
         // Request body data empty
         let data = "";
@@ -523,7 +528,7 @@ mod tests {
         assert!(resp_rx.try_recv() == Err(TryRecvError::Empty)); // check receiver empty
 
         // No active challenge (hash is None) so request rejected
-        challenge_state.lock().unwrap().latest_challenge = None;
+        challenge_state.lock().unwrap().as_mut().unwrap().latest_challenge = None;
         let data = r#"
         {
             "txid": "0000000000000000000000000000000000000000000000000000000000000000",
@@ -543,7 +548,7 @@ mod tests {
                     .wait()
             })
             .wait();
-        challenge_state.lock().unwrap().latest_challenge = Some(chl_hash);
+        challenge_state.lock().unwrap().as_mut().unwrap().latest_challenge = Some(chl_hash);
         assert!(resp_rx.try_recv() == Err(TryRecvError::Empty)); // check receiver empty
 
         // Invalid bid on request body (txid does not exist)

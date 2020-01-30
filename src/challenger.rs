@@ -94,7 +94,7 @@ fn get_challenge_response(
 pub fn run_challenge_request<T: Service, K: ClientChain, D: Storage>(
     service: &T,
     clientchain: &K,
-    challenge_state: Arc<Mutex<ChallengeState>>,
+    challenge_state: Arc<Mutex<Option<ChallengeState>>>,
     verify_rx: &Receiver<ChallengeResponse>,
     storage: Arc<D>,
     verify_duration: time::Duration,
@@ -102,7 +102,7 @@ pub fn run_challenge_request<T: Service, K: ClientChain, D: Storage>(
     challenge_frequency: u64,
     refresh_delay: time::Duration,
 ) -> Result<()> {
-    let request = challenge_state.lock().unwrap().request.clone(); // clone as const and drop mutex
+    let request = challenge_state.lock().unwrap().as_ref().unwrap().request.clone(); // clone as const and drop mutex
     let mut response = storage.get_response(request.txid)?.unwrap_or(Response::new());
     info! {"Running challenge request: {:?}", request.txid};
     let mut prev_challenge_height: u64 = 0;
@@ -119,10 +119,10 @@ pub fn run_challenge_request<T: Service, K: ClientChain, D: Storage>(
 
         info! {"sending challenge..."}
         let challenge_hash = clientchain.send_challenge()?;
-        challenge_state.lock().unwrap().latest_challenge = Some(challenge_hash);
+        challenge_state.lock().unwrap().as_mut().unwrap().latest_challenge = Some(challenge_hash);
 
         if let Err(e) = verify_challenge(&challenge_hash, clientchain, verify_duration) {
-            challenge_state.lock().unwrap().latest_challenge = None; // stop receiving responses
+            challenge_state.lock().unwrap().as_mut().unwrap().latest_challenge = None; // stop receiving responses
             return Err(e);
         }
 
@@ -133,7 +133,7 @@ pub fn run_challenge_request<T: Service, K: ClientChain, D: Storage>(
             challenge_duration,
         )?);
         storage.save_response(request.txid, &response)?;
-        challenge_state.lock().unwrap().latest_challenge = None; // stop receiving responses
+        challenge_state.lock().unwrap().as_mut().unwrap().latest_challenge = None; // stop receiving responses
         prev_challenge_height = challenge_height; // update prev height
     }
     info! {"Challenge request ended"}
@@ -518,7 +518,7 @@ mod tests {
         let res = run_challenge_request(
             &service,
             &clientchain,
-            Arc::new(Mutex::new(challenge_state.clone())),
+            Arc::new(Mutex::new(Some(challenge_state.clone()))),
             &vrx,
             storage.clone(),
             time::Duration::from_millis(10),
@@ -552,7 +552,7 @@ mod tests {
         let res = run_challenge_request(
             &service,
             &clientchain,
-            Arc::new(Mutex::new(challenge_state.clone())),
+            Arc::new(Mutex::new(Some(challenge_state.clone()))),
             &vrx,
             storage.clone(),
             time::Duration::from_millis(10),
@@ -594,7 +594,7 @@ mod tests {
         assert!(run_challenge_request(
             &service,
             &clientchain,
-            Arc::new(Mutex::new(challenge_state)),
+            Arc::new(Mutex::new(Some(challenge_state))),
             &vrx,
             storage.clone(),
             time::Duration::from_millis(10),
@@ -613,7 +613,7 @@ mod tests {
         assert!(run_challenge_request(
             &service,
             &clientchain,
-            Arc::new(Mutex::new(challenge_state)),
+            Arc::new(Mutex::new(Some(challenge_state))),
             &vrx,
             storage.clone(),
             time::Duration::from_millis(10),
@@ -633,7 +633,7 @@ mod tests {
         assert!(run_challenge_request(
             &service,
             &clientchain,
-            Arc::new(Mutex::new(challenge_state)),
+            Arc::new(Mutex::new(Some(challenge_state))),
             &vrx,
             Arc::new(storage_err),
             time::Duration::from_millis(10),
@@ -655,7 +655,7 @@ mod tests {
         let res = run_challenge_request(
             &service,
             &clientchain,
-            Arc::new(Mutex::new(challenge_state)),
+            Arc::new(Mutex::new(Some(challenge_state))),
             &vrx,
             storage.clone(),
             time::Duration::from_millis(10),
@@ -683,7 +683,7 @@ mod tests {
         let res = run_challenge_request(
             &service,
             &clientchain,
-            Arc::new(Mutex::new(challenge_state)),
+            Arc::new(Mutex::new(Some(challenge_state))),
             &vrx,
             storage.clone(),
             time::Duration::from_millis(10),

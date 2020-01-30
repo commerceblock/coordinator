@@ -35,7 +35,7 @@ fn main() {
         sig.serialize_der().to_hex()
     );
 
-    let uri: hyper::Uri = "http://localhost:9999/challengeproof".parse().unwrap();
+    let uri: hyper::Uri = "http://localhost:9998/challengeproof".parse().unwrap();
     let mut req = Request::new(Body::from(data));
     *req.method_mut() = Method::POST;
     *req.uri_mut() = uri.clone();

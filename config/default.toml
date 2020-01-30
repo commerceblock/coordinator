@@ -11,7 +11,7 @@
 # block_time = 60
 
 # Host address that the listener binds to and receives guardnode requests
-listener_host = "127.0.0.1:9999"
+listener_host = "127.0.0.1:9998"
 
 [api]
 host = "localhost:3333"
