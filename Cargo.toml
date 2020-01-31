@@ -1,6 +1,6 @@
 [package]
 name = "coordinator"
-version = "0.4.6"
+version = "0.4.7"
 authors = ["nkostoulas <nkostoulas@gmail.com>"]
 description = "Guardnode Coordinator implementation for the Commerceblock Covalence system"
 homepage = "https://github.com/commerceblock"

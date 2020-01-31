@@ -8,7 +8,7 @@ use std::{thread, time};
 
 use bitcoin::hashes::{hex::FromHex, sha256d};
 
-use crate::challenger::ChallengeResponse;
+use crate::challenger::{ChallengeResponse, ChallengeState};
 use crate::config::Config;
 use crate::error::Result;
 use crate::interfaces::clientchain::{ClientChain, RpcClientChain};
@@ -28,10 +28,26 @@ pub fn run(config: Config) -> Result<()> {
     let (req_send, req_recv): (Sender<sha256d::Hash>, Receiver<sha256d::Hash>) = channel();
     let mut payments_handler = ::payments::run_payments(config.clientchain.clone(), storage.clone(), req_recv)?;
 
+    // create a challenge state mutex to share between challenger and listener.
+    // initially None
+    let shared_challenge = Arc::new(Mutex::new(None));
+    // and a channel for sending responses from listener to challenger
+    let (verify_tx, verify_rx): (Sender<ChallengeResponse>, Receiver<ChallengeResponse>) = channel();
+    // start listener along with a oneshot channel to send shutdown message
+    let listener_handle = ::listener::run_listener(&config.listener_host, shared_challenge.clone(), verify_tx);
+
     // This loop runs continuously fetching and running challenge requests,
     // generating challenge responses and fails on any errors that occur
     loop {
-        match run_request(&config, &service, &clientchain, storage.clone(), genesis_hash) {
+        match run_request(
+            &config,
+            &service,
+            &clientchain,
+            storage.clone(),
+            shared_challenge.clone(),
+            &verify_rx,
+            genesis_hash,
+        ) {
             Ok(res) => {
                 if let Some(request_id) = res {
                     // if challenge request succeeds print responses
@@ -40,12 +56,16 @@ pub fn run(config: Config) -> Result<()> {
                     let resp = storage.get_response(request_id)?.unwrap();
                     info! {"{}", serde_json::to_string_pretty(&resp).unwrap()};
                 }
+                // Reset challenge state to None.
+                *shared_challenge.lock().unwrap() = None;
+
                 info! {"Sleeping for {} sec...", config.block_time}
                 thread::sleep(time::Duration::from_secs(config.block_time))
             }
             Err(err) => {
                 api_handler.close(); // try closing the api server
                 payments_handler.stop(); // try closing the payments service
+                listener_handle.stop(); // try stop listener service
                 return Err(err);
             }
         }
@@ -54,6 +74,7 @@ pub fn run(config: Config) -> Result<()> {
         }
     }
     api_handler.close(); // try closing the api server
+    listener_handle.stop(); // try stop listener service
     Ok(())
 }
 
@@ -65,6 +86,8 @@ pub fn run_request<T: Service, K: ClientChain, D: Storage>(
     service: &T,
     clientchain: &K,
     storage: Arc<D>,
+    shared_challenge: Arc<Mutex<Option<ChallengeState>>>,
+    verify_rx: &Receiver<ChallengeResponse>,
     genesis_hash: sha256d::Hash,
 ) -> Result<Option<sha256d::Hash>> {
     match ::challenger::fetch_next(service, &genesis_hash)? {
@@ -80,13 +103,8 @@ pub fn run_request<T: Service, K: ClientChain, D: Storage>(
                 config.clientchain.block_time,
             )?;
 
-            // create a challenge state mutex to share between challenger and listener
-            let shared_challenge = Arc::new(Mutex::new(challenge));
-            // and a channel for sending responses from listener to challenger
-            let (verify_tx, verify_rx): (Sender<ChallengeResponse>, Receiver<ChallengeResponse>) = channel();
-
-            // start listener along with a oneshot channel to send shutdown message
-            let listener_handle = ::listener::run_listener(&config.listener_host, shared_challenge.clone(), verify_tx);
+            // modify challenge state for the new challenge request
+            *shared_challenge.lock().unwrap() = Some(challenge);
 
             // run challenge request storing expected responses
             match ::challenger::run_challenge_request(
@@ -100,11 +118,8 @@ pub fn run_request<T: Service, K: ClientChain, D: Storage>(
                 config.challenge_frequency,
                 time::Duration::from_secs(config.block_time / 2),
             ) {
-                Ok(()) => return Ok(Some(shared_challenge.lock().unwrap().request.txid)),
-                Err(err) => {
-                    listener_handle.stop(); // try stop listener service
-                    Err(err)
-                }
+                Ok(()) => return Ok(Some(shared_challenge.lock().unwrap().as_ref().unwrap().request.txid)),
+                Err(err) => Err(err),
             }
         }
         None => Ok(None),
