@@ -97,6 +97,7 @@ pub fn run_request<T: Service, K: ClientChain, D: Storage>(
             // If already set update challenge state with correct version from storage
             ::challenger::update_challenge_request_state(
                 clientchain,
+                service,
                 storage.clone(),
                 &mut challenge,
                 config.block_time,
@@ -123,6 +124,10 @@ pub fn run_request<T: Service, K: ClientChain, D: Storage>(
                     let mut shared_ch_lock = shared_challenge.lock().unwrap();
                     let ch_final = shared_ch_lock.as_mut().unwrap();
                     ch_final.request.end_blockheight_clientchain = clientchain.get_blockheight()?;
+                    info!(
+                        "Request client chain end height updated to {}",
+                        ch_final.request.end_blockheight_clientchain
+                    );
                     storage.update_request(&ch_final.request)?;
                     return Ok(Some(ch_final.request.txid));
                 }
