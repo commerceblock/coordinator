@@ -118,7 +118,14 @@ pub fn run_request<T: Service, K: ClientChain, D: Storage>(
                 config.challenge_frequency,
                 time::Duration::from_secs(config.block_time / 2),
             ) {
-                Ok(()) => return Ok(Some(shared_challenge.lock().unwrap().as_ref().unwrap().request.txid)),
+                Ok(()) => {
+                    // update end clientchain height with final height
+                    let mut shared_ch_lock = shared_challenge.lock().unwrap();
+                    let ch_final = shared_ch_lock.as_mut().unwrap();
+                    ch_final.request.end_blockheight_clientchain = clientchain.get_blockheight()?;
+                    storage.update_request(&ch_final.request)?;
+                    return Ok(Some(ch_final.request.txid));
+                }
                 Err(err) => Err(err),
             }
         }

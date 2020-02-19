@@ -162,8 +162,8 @@ pub fn update_challenge_request_state<K: ClientChain, D: Storage>(
             // Calculate and set request's end_blockheight_clientchain
             challenge.request.end_blockheight_clientchain = challenge.request.start_blockheight_clientchain
                 + (service_period_time_s as f32 / block_time_clientchain as f32).floor() as u32;
-            storage.save_challenge_request_state(&challenge.request, &challenge.bids)?;
             // Store Challenge Request and Bids
+            storage.save_challenge_request_state(&challenge.request, &challenge.bids)?;
         }
     }
     Ok(())
