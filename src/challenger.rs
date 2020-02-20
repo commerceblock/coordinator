@@ -144,26 +144,79 @@ pub fn run_challenge_request<T: Service, K: ClientChain, D: Storage>(
 /// heights and store challenge state
 /// If request already stored set challenge state request to request in
 /// storage (catcher for coordinator failure after storing request but
-/// before request service period over)
-pub fn update_challenge_request_state<K: ClientChain, D: Storage>(
+/// before request service period over) and consider any offets between the
+/// client and service chain This should only be used on an active servive
+/// request challenge
+pub fn update_challenge_request_state<K: ClientChain, S: Service, D: Storage>(
     clientchain: &K,
+    service: &S,
     storage: Arc<D>,
     challenge: &mut ChallengeState,
     block_time_servicechain: u64,
     block_time_clientchain: u64,
 ) -> Result<()> {
     match storage.get_request(challenge.request.txid)? {
-        Some(req) => challenge.request = req,
+        Some(req) => {
+            challenge.request = req;
+            let service_height = service.get_blockheight()? as u32;
+            let client_height = clientchain.get_blockheight()?;
+            // Checking that nodes are synced correctly - just a precaution
+            if service_height >= challenge.request.start_blockheight
+                && client_height >= challenge.request.start_blockheight_clientchain
+            {
+                // get theoretical end clientchain height
+                let service_period_time_s = (challenge.request.end_blockheight - challenge.request.start_blockheight)
+                    * block_time_servicechain as u32;
+                let client_end_height = challenge.request.start_blockheight_clientchain
+                    + (service_period_time_s as f32 / block_time_clientchain as f32).floor() as u32;
+
+                // get time passed in s since start of the service for both service/client
+                let service_current_time_s =
+                    (service_height - challenge.request.start_blockheight) * block_time_servicechain as u32;
+                let client_current_time_s =
+                    (client_height - challenge.request.start_blockheight_clientchain) * block_time_clientchain as u32;
+
+                // calculate and apply the difference
+                let time_diff_s = service_current_time_s as i32 - client_current_time_s as i32;
+                if time_diff_s > 0 {
+                    challenge.request.end_blockheight_clientchain =
+                        client_end_height - time_diff_s as u32 / block_time_clientchain as u32;
+                    info!(
+                        "Request client chain end height updated to {}",
+                        challenge.request.end_blockheight_clientchain
+                    );
+                    storage.update_request(&challenge.request)?;
+                } else if time_diff_s < 0 {
+                    challenge.request.end_blockheight_clientchain =
+                        client_end_height + time_diff_s.abs() as u32 / block_time_clientchain as u32;
+                    storage.update_request(&challenge.request)?;
+                    info!(
+                        "Request client chain end height updated to {}",
+                        challenge.request.end_blockheight_clientchain
+                    );
+                }
+            }
+        }
         None => {
             // Set request's start_blockheight_clientchain
             challenge.request.start_blockheight_clientchain = clientchain.get_blockheight()?;
+            info!(
+                "Request client chain start height set to {}",
+                challenge.request.start_blockheight_clientchain
+            );
+
+            // Calculate and set request's end_blockheight_clientchain
             let service_period_time_s = (challenge.request.end_blockheight - challenge.request.start_blockheight)
                 * block_time_servicechain as u32;
-            // Calculate and set request's end_blockheight_clientchain
             challenge.request.end_blockheight_clientchain = challenge.request.start_blockheight_clientchain
                 + (service_period_time_s as f32 / block_time_clientchain as f32).floor() as u32;
-            storage.save_challenge_request_state(&challenge.request, &challenge.bids)?;
+            info!(
+                "Request client chain end height set to {}",
+                challenge.request.end_blockheight_clientchain
+            );
+
             // Store Challenge Request and Bids
+            storage.save_challenge_request_state(&challenge.request, &challenge.bids)?;
         }
     }
     Ok(())
@@ -345,6 +398,7 @@ mod tests {
     fn update_challenge_request_state_test() {
         setup_logger();
         let clientchain = MockClientChain::new();
+        let service = MockService::new();
         let storage = Arc::new(MockStorage::new());
 
         let dummy_hash = gen_dummy_hash(11);
@@ -354,7 +408,7 @@ mod tests {
         // Test challenge state request set and stored correctly
         let _ = clientchain.height.replace(1);
         let mut comparison_challenge_request = challenge.request.clone(); // Clone request for comparison
-        let _ = update_challenge_request_state(&clientchain, storage.clone(), &mut challenge, 1, 1);
+        let _ = update_challenge_request_state(&clientchain, &service, storage.clone(), &mut challenge, 1, 1);
         // All fields stay the same but start and end blockheight_clientchain
         comparison_challenge_request.start_blockheight_clientchain = *clientchain.height.borrow();
         comparison_challenge_request.end_blockheight_clientchain =
@@ -364,18 +418,96 @@ mod tests {
             storage.get_request(challenge.request.txid).unwrap().unwrap(),
             comparison_challenge_request
         );
+        // Test updating request with no diff
+        let _ = clientchain
+            .height
+            .replace(challenge.request.start_blockheight_clientchain + 1);
+        let _ = service.height.replace(challenge.request.start_blockheight as u64 + 1);
+        let _ = update_challenge_request_state(&clientchain, &service, storage.clone(), &mut challenge, 1, 1);
+        // All fields should stay the same
+        assert_eq!(challenge.request, comparison_challenge_request);
+        assert_eq!(
+            storage.get_request(challenge.request.txid).unwrap().unwrap(),
+            comparison_challenge_request
+        );
+        // Test updating request with faster service
+        let _ = clientchain
+            .height
+            .replace(challenge.request.start_blockheight_clientchain + 1);
+        let _ = service.height.replace(challenge.request.start_blockheight as u64 + 2);
+        let _ = update_challenge_request_state(&clientchain, &service, storage.clone(), &mut challenge, 1, 1);
+        // All fields except clientchain end height that should be decreased
+        comparison_challenge_request.end_blockheight_clientchain -= 1;
+        assert_eq!(challenge.request, comparison_challenge_request);
+        assert_eq!(
+            storage.get_request(challenge.request.txid).unwrap().unwrap(),
+            comparison_challenge_request
+        );
+        // Test updating request with faster clientchain
+        let _ = clientchain
+            .height
+            .replace(challenge.request.start_blockheight_clientchain + 2);
+        let _ = service.height.replace(challenge.request.start_blockheight as u64 + 1);
+        let _ = update_challenge_request_state(&clientchain, &service, storage.clone(), &mut challenge, 1, 1);
+        // All fields except clientchain end height that should be decreased
+        comparison_challenge_request.end_blockheight_clientchain += 2; // 1 from before and 1 now
+        assert_eq!(challenge.request, comparison_challenge_request);
+        assert_eq!(
+            storage.get_request(challenge.request.txid).unwrap().unwrap(),
+            comparison_challenge_request
+        );
 
         // Test challenge state set and storage performed correctly
         // for client chain block time half of service chain block time
         let storage = Arc::new(MockStorage::new()); //reset storage
+        let mut challenge = gen_challenge_state(&dummy_hash); // reset challenge
         let _ = clientchain.height.replace(1);
+        let _ = service.height.replace(challenge.request.start_blockheight as u64);
         let mut comparison_challenge_request = challenge.request.clone(); // Clone request for comparison
-        let _ = update_challenge_request_state(&clientchain, storage.clone(), &mut challenge, 2, 1);
+        let _ = update_challenge_request_state(&clientchain, &service, storage.clone(), &mut challenge, 2, 1);
         // All fields stay the same but start and end blockheight_clientchain
         comparison_challenge_request.start_blockheight_clientchain = *clientchain.height.borrow();
         comparison_challenge_request.end_blockheight_clientchain =
             challenge.request.start_blockheight_clientchain + 2 * num_service_chain_blocks; // start_height + (2 times client chain blocks as service chain blocks in same
                                                                                             // time period * number of service chain block)
+        assert_eq!(challenge.request, comparison_challenge_request);
+        assert_eq!(
+            storage.get_request(challenge.request.txid).unwrap().unwrap(),
+            comparison_challenge_request
+        );
+        // Test updating request with no diff
+        let _ = clientchain
+            .height
+            .replace(challenge.request.start_blockheight_clientchain + 2);
+        let _ = service.height.replace(challenge.request.start_blockheight as u64 + 1);
+        let _ = update_challenge_request_state(&clientchain, &service, storage.clone(), &mut challenge, 2, 1);
+        // All fields should stay the same
+        assert_eq!(challenge.request, comparison_challenge_request);
+        assert_eq!(
+            storage.get_request(challenge.request.txid).unwrap().unwrap(),
+            comparison_challenge_request
+        );
+        // Test updating request with faster service
+        let _ = clientchain
+            .height
+            .replace(challenge.request.start_blockheight_clientchain + 1);
+        let _ = service.height.replace(challenge.request.start_blockheight as u64 + 2);
+        let _ = update_challenge_request_state(&clientchain, &service, storage.clone(), &mut challenge, 2, 1);
+        // All fields except clientchain end height that should be decreased
+        comparison_challenge_request.end_blockheight_clientchain -= 3;
+        assert_eq!(challenge.request, comparison_challenge_request);
+        assert_eq!(
+            storage.get_request(challenge.request.txid).unwrap().unwrap(),
+            comparison_challenge_request
+        );
+        // Test updating request with faster clientchain
+        let _ = clientchain
+            .height
+            .replace(challenge.request.start_blockheight_clientchain + 4);
+        let _ = service.height.replace(challenge.request.start_blockheight as u64 + 1);
+        let _ = update_challenge_request_state(&clientchain, &service, storage.clone(), &mut challenge, 2, 1);
+        // All fields except clientchain end height that should be decreased
+        comparison_challenge_request.end_blockheight_clientchain += 5; // 3 from before and 2 now
         assert_eq!(challenge.request, comparison_challenge_request);
         assert_eq!(
             storage.get_request(challenge.request.txid).unwrap().unwrap(),
@@ -387,7 +519,7 @@ mod tests {
         let old_challenge = challenge.clone(); // save old challenge state
         challenge.request.fee_percentage = 25; // alter random field
         let new_challenge = challenge.clone(); // save new challenge state
-        let _ = update_challenge_request_state(&clientchain, storage.clone(), &mut challenge, 2, 1);
+        let _ = update_challenge_request_state(&clientchain, &service, storage.clone(), &mut challenge, 2, 1);
         assert_eq!(challenge.request, old_challenge.request);
         assert_eq!(
             storage.get_request(challenge.request.txid).unwrap().unwrap(),

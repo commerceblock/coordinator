@@ -86,6 +86,7 @@ impl Payments {
     /// signal that payments have failed. Already paid bids are skipped.
     fn complete_bid_payments(&self, bids: &mut Vec<Bid>) -> Result<bool> {
         let use_sendany = self.payment_asset == "ANY";
+        let mut success = true;
         for bid in bids {
             if let Some(bid_payment) = bid.payment.as_mut() {
                 if !bid_payment.txid.is_none() {
@@ -107,22 +108,21 @@ impl Payments {
                         Some(true),
                         None,
                     ) {
-                        Ok(res) => {
-                            match res {
-                                SendAnyToAddressResult::Txid(txid) => {
-                                    bid_payment.txid = Some(txid);
-                                    info!("payment (ANY) txid {}", txid);
-                                }
-                                SendAnyToAddressResult::Txids(txids) => {
-                                    bid_payment.txid = Some(txids[0]); // TODO: fix this to store all
-                                    bid_payment.extra_txids = Some(txids[1..].to_vec());
-                                    info!("payment (ANY) txids {:?}", txids);
-                                }
+                        Ok(res) => match res {
+                            SendAnyToAddressResult::Txid(txid) => {
+                                bid_payment.txid = Some(txid);
+                                info!("payment (ANY) txid {}", txid);
                             }
-                        }
+                            SendAnyToAddressResult::Txids(txids) => {
+                                bid_payment.txid = Some(txids[0]);
+                                bid_payment.extra_txids = Some(txids[1..].to_vec());
+                                info!("payment (ANY) txids {:?}", txids);
+                            }
+                        },
                         Err(err) => {
                             warn!("bid payment (send_any_to_address) failed: {}", err);
-                            return Ok(false);
+                            success = false; // mark that payments failed but
+                                             // keep going
                         }
                     }
                 } else {
@@ -140,13 +140,14 @@ impl Payments {
                         }
                         Err(err) => {
                             warn!("bid payment (send_to_address) failed: {}", err);
-                            return Ok(false);
+                            success = false; // mark that payments failed but
+                                             // keep going
                         }
                     }
                 }
             }
         }
-        Ok(true)
+        Ok(success)
     }
 
     /// Process bid payments method handles calculating the payment to be
