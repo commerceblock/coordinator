@@ -3,7 +3,7 @@
 //! Coordinator entry point for spawning all components
 
 use std::sync::mpsc::{channel, Receiver, Sender};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, RwLock};
 use std::{thread, time};
 
 use bitcoin::hashes::{hex::FromHex, sha256d};
@@ -30,7 +30,7 @@ pub fn run(config: Config) -> Result<()> {
 
     // create a challenge state mutex to share between challenger and listener.
     // initially None
-    let shared_challenge = Arc::new(Mutex::new(None));
+    let shared_challenge = Arc::new(RwLock::new(None));
     // and a channel for sending responses from listener to challenger
     let (verify_tx, verify_rx): (Sender<ChallengeResponse>, Receiver<ChallengeResponse>) = channel();
     // start listener along with a oneshot channel to send shutdown message
@@ -57,7 +57,7 @@ pub fn run(config: Config) -> Result<()> {
                     info! {"{}", serde_json::to_string_pretty(&resp).unwrap()};
                 }
                 // Reset challenge state to None.
-                *shared_challenge.lock().unwrap() = None;
+                *shared_challenge.write().unwrap() = None;
 
                 info! {"Sleeping for {} sec...", config.block_time}
                 thread::sleep(time::Duration::from_secs(config.block_time))
@@ -86,7 +86,7 @@ pub fn run_request<T: Service, K: ClientChain, D: Storage>(
     service: &T,
     clientchain: &K,
     storage: Arc<D>,
-    shared_challenge: Arc<Mutex<Option<ChallengeState>>>,
+    shared_challenge: Arc<RwLock<Option<ChallengeState>>>,
     verify_rx: &Receiver<ChallengeResponse>,
     genesis_hash: sha256d::Hash,
 ) -> Result<Option<sha256d::Hash>> {
@@ -105,7 +105,7 @@ pub fn run_request<T: Service, K: ClientChain, D: Storage>(
             )?;
 
             // modify challenge state for the new challenge request
-            *shared_challenge.lock().unwrap() = Some(challenge);
+            *shared_challenge.write().unwrap() = Some(challenge);
 
             // run challenge request storing expected responses
             match ::challenger::run_challenge_request(
@@ -121,7 +121,7 @@ pub fn run_request<T: Service, K: ClientChain, D: Storage>(
             ) {
                 Ok(()) => {
                     // update end clientchain height with final height
-                    let mut shared_ch_lock = shared_challenge.lock().unwrap();
+                    let mut shared_ch_lock = shared_challenge.write().unwrap();
                     let ch_final = shared_ch_lock.as_mut().unwrap();
                     ch_final.request.end_blockheight_clientchain = clientchain.get_blockheight()?;
                     info!(
