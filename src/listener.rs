@@ -5,7 +5,7 @@
 use std::net::ToSocketAddrs;
 use std::str::FromStr;
 use std::sync::mpsc::Sender;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, RwLock};
 use std::thread;
 
 use bitcoin::consensus::serialize;
@@ -71,7 +71,7 @@ impl ChallengeProof {
 /// challenger to receive
 fn handle_challengeproof(
     req: Request<Body>,
-    challenge: Arc<Mutex<Option<ChallengeState>>>,
+    challenge: Arc<RwLock<Option<ChallengeState>>>,
     challenge_resp: Sender<ChallengeResponse>,
 ) -> impl Future<Item = Response<Body>, Error = hyper::Error> + Send {
     let resp = req.into_body().concat2().map(move |body| {
@@ -82,7 +82,7 @@ fn handle_challengeproof(
                 // parse challenge proof from json
                 Ok(proof) => {
                     // check for an active challenge
-                    let ch_lock = challenge.lock().unwrap();
+                    let ch_lock = challenge.read().unwrap();
                     if let Some(ch) = ch_lock.as_ref() {
                         if let Some(h) = ch.latest_challenge {
                             // check challenge proof bid exists
@@ -123,7 +123,7 @@ fn handle_challengeproof(
 /// and to the /challengeproof POST uri for receiving challenges from guardnodes
 fn handle(
     req: Request<Body>,
-    challenge: Arc<Mutex<Option<ChallengeState>>>,
+    challenge: Arc<RwLock<Option<ChallengeState>>>,
     challenge_resp: Sender<ChallengeResponse>,
 ) -> impl Future<Item = Response<Body>, Error = hyper::Error> + Send {
     let resp = match (req.method(), req.uri().path()) {
@@ -156,7 +156,7 @@ fn response(status: StatusCode, message: String) -> Response<Body> {
 /// of the coordinator
 pub fn run_listener(
     listener_host: &String,
-    challenge: Arc<Mutex<Option<ChallengeState>>>,
+    challenge: Arc<RwLock<Option<ChallengeState>>>,
     ch_resp: Sender<ChallengeResponse>,
 ) -> Handle {
     let addr: Vec<_> = listener_host
@@ -309,7 +309,7 @@ mod tests {
         let _challenge_state = gen_challenge_state_with_challenge(&gen_dummy_hash(3), &chl_hash);
         let bid_txid = _challenge_state.bids.iter().next().unwrap().txid;
         let bid_pubkey = _challenge_state.bids.iter().next().unwrap().pubkey;
-        let challenge_state = Arc::new(Mutex::new(Some(_challenge_state)));
+        let challenge_state = Arc::new(RwLock::new(Some(_challenge_state)));
 
         // Request get /
         let data = "";
@@ -449,7 +449,7 @@ mod tests {
         let _challenge_state = gen_challenge_state_with_challenge(&gen_dummy_hash(1), &chl_hash);
         let bid_txid = _challenge_state.bids.iter().next().unwrap().txid;
         let bid_pubkey = _challenge_state.bids.iter().next().unwrap().pubkey;
-        let challenge_state = Arc::new(Mutex::new(Some(_challenge_state)));
+        let challenge_state = Arc::new(RwLock::new(Some(_challenge_state)));
 
         // Request body data empty
         let data = "";
@@ -528,7 +528,7 @@ mod tests {
         assert!(resp_rx.try_recv() == Err(TryRecvError::Empty)); // check receiver empty
 
         // No active challenge (hash is None) so request rejected
-        challenge_state.lock().unwrap().as_mut().unwrap().latest_challenge = None;
+        challenge_state.write().unwrap().as_mut().unwrap().latest_challenge = None;
         let data = r#"
         {
             "txid": "0000000000000000000000000000000000000000000000000000000000000000",
@@ -548,7 +548,7 @@ mod tests {
                     .wait()
             })
             .wait();
-        challenge_state.lock().unwrap().as_mut().unwrap().latest_challenge = Some(chl_hash);
+        challenge_state.write().unwrap().as_mut().unwrap().latest_challenge = Some(chl_hash);
         assert!(resp_rx.try_recv() == Err(TryRecvError::Empty)); // check receiver empty
 
         // Invalid bid on request body (txid does not exist)
